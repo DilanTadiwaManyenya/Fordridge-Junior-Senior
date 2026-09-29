@@ -105,13 +105,14 @@ export default function PortalDashboard() {
     ].includes(view)
   )
     return <Navigate to="/portal" replace />
-  const nav = (path, label) => (
+  const nav = (path, label, icon) => (
     <NavLink
       end={path === '/portal'}
       to={path}
       className={({ isActive }) => (isActive ? 'active' : '')}
     >
-      {label}
+      <span className="portal-nav-icon" aria-hidden="true">{icon}</span>
+      <span>{label}</span>
     </NavLink>
   )
   async function logout() {
@@ -121,7 +122,7 @@ export default function PortalDashboard() {
   }
   return (
     <main className="dashboard">
-      <aside>
+      <aside className="portal-sidebar">
         <Link to="/portal" className="portal-mark">
           <img src={crest} alt="Fordridge crest" />
           <span>
@@ -131,31 +132,42 @@ export default function PortalDashboard() {
           </span>
         </Link>
         <nav>
-          {nav('/portal', 'Overview')}
-          {admin && nav('/portal/learners', 'Learners')}
-          {records && nav('/portal/records', 'Records')}
-          {nav('/portal/announcements', 'Announcements')}
-          {nav('/portal/timetable', 'Timetable')}
-          {fees && nav('/portal/fees', 'Finance')}
-          {admin && nav('/portal/staff', 'Staff')}
+          <span className="portal-nav-label">Workspace</span>
+          {nav('/portal', 'Overview', '⌂')}
+          {admin && nav('/portal/learners', 'Learners', '◉')}
+          {records && nav('/portal/records', 'Records', '▤')}
+          {nav('/portal/announcements', 'Announcements', '✦')}
+          {nav('/portal/timetable', 'Timetable', '◷')}
+          <span className="portal-nav-label portal-nav-label-secondary">Management</span>
+          {fees && nav('/portal/fees', 'Finance', '$')}
+          {admin && nav('/portal/staff', 'Staff', '♙')}
           {['staff', 'admin'].includes(profile.role) && (
             <a
               href="https://inventory-management-system-3xi2f.sevalla.page/"
               target="_blank"
               rel="noopener noreferrer"
             >
-              Inventory & POS ↗
+              <span className="portal-nav-icon" aria-hidden="true">▣</span>
+              <span>Inventory & POS</span><span aria-hidden="true">↗</span>
             </a>
           )}
-          {nav('/portal/account', 'Account settings')}
+          {nav('/portal/account', 'Account settings', '⚙')}
         </nav>
-        <button onClick={logout}>Sign out</button>
+        <div className="portal-account-summary">
+          <span className="portal-avatar">{profile.full_name?.split(' ').map((part) => part[0]).slice(0, 2).join('') || 'F'}</span>
+          <span><strong>{profile.full_name || 'Fordridge account'}</strong><small>{profile.role} portal</small></span>
+        </div>
+        <button className="portal-signout" onClick={logout}>Sign out <span aria-hidden="true">→</span></button>
       </aside>
       <section
         className={
           view === 'fees' ? 'dashboard-main fees-main' : 'dashboard-main'
         }
       >
+        <div className="portal-topbar">
+          <div><span>Fordridge Schools</span><b>{profile.campus?.name || 'School portal'}</b></div>
+          <div className="portal-topbar-status"><i /><span>Secure session</span></div>
+        </div>
         {view === 'fees' ? (
           <FeesDashboard profile={profile} user={user} />
         ) : ['learners', 'staff'].includes(view) ? (
@@ -170,28 +182,37 @@ export default function PortalDashboard() {
           <AdminOverview profile={profile} />
         ) : (
           <>
-            <header>
-              <p className="eyebrow">
-                {profile.campus?.name || 'Fordridge Schools'}
-              </p>
-              <h1>
-                Good day, {profile.full_name?.split(' ')[0] || 'welcome'}.
-              </h1>
-              <p>View your school updates and records.</p>
-            </header>
+            <section className="portal-welcome">
+              <div>
+                <p className="eyebrow">Your school day</p>
+                <h1>Good day, {profile.full_name?.split(' ')[0] || 'welcome'}.</h1>
+                <p>Stay on top of what matters, from campus updates to your learner's progress.</p>
+                <div className="portal-welcome-actions"><Link to="/portal/timetable">View timetable <span>→</span></Link><Link to="/portal/announcements">Latest notices</Link></div>
+              </div>
+              <div className="portal-welcome-mark"><span>FORDRIDGE</span><strong>Learn<br/>Excel<br/>Achieve</strong></div>
+            </section>
             <div className="dashboard-grid">
               <Link className="dashboard-action" to="/portal/announcements">
+                <span className="dashboard-card-icon">✦</span>
+                <p>Campus updates</p>
                 <h2>Announcements</h2>
-                <p>Read campus notices.</p>
+                <span>Read school notices and important updates.</span>
+                <b>Open notices <em>→</em></b>
               </Link>
               <Link className="dashboard-action" to="/portal/timetable">
+                <span className="dashboard-card-icon">◷</span>
+                <p>Your routine</p>
                 <h2>Timetable</h2>
-                <p>See your weekly lessons.</p>
+                <span>See your week at a glance and prepare ahead.</span>
+                <b>View schedule <em>→</em></b>
               </Link>
               {records && (
                 <Link className="dashboard-action" to="/portal/records">
+                  <span className="dashboard-card-icon">▤</span>
+                  <p>Progress hub</p>
                   <h2>Learner records</h2>
-                  <p>Attendance and academic progress.</p>
+                  <span>Attendance and academic progress in one place.</span>
+                  <b>Open records <em>→</em></b>
                 </Link>
               )}
             </div>
