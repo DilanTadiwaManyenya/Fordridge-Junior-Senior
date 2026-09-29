@@ -12,6 +12,7 @@ dist
 dist-ssr
 *.local
 .env
+.portal-test-tools/
 
 # Editor directories and files
 .vscode/*

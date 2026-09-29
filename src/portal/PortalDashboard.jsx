@@ -1,51 +1,203 @@
-import { useEffect, useState } from 'react'
-import { Link, Navigate, NavLink, useLocation, useNavigate } from 'react-router-dom'
+import { useCallback, useEffect, useState } from 'react'
+import {
+  Link,
+  Navigate,
+  NavLink,
+  useLocation,
+  useNavigate,
+} from 'react-router-dom'
 import crest from '../assets/fordridge-crest.jpeg'
 import { isSupabaseConfigured, supabase } from '../lib/supabase'
 import FeesDashboard from './FeesDashboard'
 import AdminOverview from './AdminOverview'
+import Directory from './Directory'
+import SchoolContent from './SchoolContent'
+import LearnerRecords from './LearnerRecords'
+import AccountSettings from './AccountSettings'
+import { workflowError } from './workflow'
+import './workflow.css'
 
-const labels = { announcements: 'Announcements', timetable: 'Timetable', learners: 'Learners', records: 'Records', staff: 'Staff' }
-
-export default function PortalDashboard({ fees = false }) {
-  const [state, setState] = useState({ loading: isSupabaseConfigured, profile: null, user: null })
-  const navigate = useNavigate()
-  const location = useLocation()
-  const routeView = location.pathname.split('/')[2] || 'overview'
-  const view = fees ? 'fees' : routeView
-  useEffect(() => { if (!isSupabaseConfigured) return; supabase.auth.getUser().then(async ({ data }) => { if (!data.user) return setState({ loading: false, profile: null, user: null }); const { data: profile } = await supabase.from('profiles').select('full_name,role,campus:campuses(name,code)').eq('id', data.user.id).single(); setState({ loading: false, profile, user: data.user }) }) }, [])
-  if (state.loading) return <div className="loading">Loading your portal…</div>
+export default function PortalDashboard() {
+  const [state, setState] = useState({
+    loading: true,
+    profile: null,
+    user: null,
+    error: '',
+  })
+  const navigate = useNavigate(),
+    location = useLocation()
+  const view = location.pathname.split('/')[2] || 'overview'
+  const load = useCallback(async () => {
+    setState((s) => ({ ...s, loading: true, error: '' }))
+    try {
+      if (!isSupabaseConfigured)
+        throw new Error(
+          'Portal configuration is unavailable. Please contact the school office.',
+        )
+      const { data, error } = await supabase.auth.getUser()
+      if (error && error.name !== 'AuthSessionMissingError') throw error
+      if (!data.user) {
+        setState({ loading: false, profile: null, user: null, error: '' })
+        return
+      }
+      const result = await supabase
+        .from('profiles')
+        .select('id,full_name,role,campus_id,campus:campuses(name,code)')
+        .eq('id', data.user.id)
+        .single()
+      if (result.error) throw result.error
+      if (!result.data)
+        throw new Error(
+          'Your school profile is not ready. Contact the school office.',
+        )
+      setState({
+        loading: false,
+        profile: result.data,
+        user: data.user,
+        error: '',
+      })
+    } catch (err) {
+      setState((s) => ({ ...s, loading: false, error: workflowError(err) }))
+    }
+  }, [])
+  useEffect(() => {
+    load()
+    const { data } =
+      supabase?.auth.onAuthStateChange((event) => {
+        if (event === 'SIGNED_OUT')
+          setState({ loading: false, profile: null, user: null, error: '' })
+      }) || {}
+    return () => data?.subscription.unsubscribe()
+  }, [load])
+  if (state.loading)
+    return (
+      <div className="loading" role="status">
+        Loading your portal…
+      </div>
+    )
+  if (state.error)
+    return (
+      <section className="workflow-panel">
+        <h1>Unable to load your portal</h1>
+        <p role="alert">{state.error}</p>
+        <button onClick={load}>Try again</button>{' '}
+        <Link to="/portal/login">Back to sign in</Link>
+      </section>
+    )
   if (!state.profile) return <Navigate to="/portal/login" replace />
-  const { profile, user } = state
-  const role = profile.role[0].toUpperCase() + profile.role.slice(1)
-  const isAdmin = profile.role === 'admin'
-  const canViewFees = ['student', 'parent', 'admin'].includes(profile.role)
-  const canUseInventory = ['staff', 'admin'].includes(profile.role)
-  const adminOnly = ['learners', 'records', 'staff']
-  if ((view === 'fees' && !canViewFees) || (adminOnly.includes(view) && !isAdmin)) return <Navigate to="/portal" replace />
-  const navItem = (to, text) => <NavLink end={to === '/portal'} to={to} className={({ isActive }) => isActive ? 'active' : ''}>{text}</NavLink>
-  return <main className="dashboard"><aside><Link to="/portal" className="portal-mark"><img src={crest} alt="Fordridge crest" /><span>FORDRIDGE<br /><b>PORTAL</b></span></Link><nav>{navItem('/portal', 'Overview')}{isAdmin && <>{navItem('/portal/learners', 'Learners')}{navItem('/portal/records', 'Records')}</>}{navItem('/portal/announcements', 'Announcements')}{navItem('/portal/timetable', 'Timetable')}{canViewFees && navItem('/portal/fees', 'Finance')}{isAdmin && navItem('/portal/staff', 'Staff')}{canUseInventory && <a href="https://inventory-management-system-3xi2f.sevalla.page/" target="_blank" rel="noopener noreferrer">Inventory &amp; POS <span aria-hidden="true">↗</span></a>}</nav><button onClick={async () => { await supabase.auth.signOut(); navigate('/portal/login') }}>Sign out</button></aside><section className={view === 'fees' ? 'dashboard-main fees-main' : 'dashboard-main'}>{view === 'fees' ? <FeesDashboard profile={profile} user={user} /> : view === 'overview' && isAdmin ? <AdminOverview profile={profile} /> : view === 'overview' ? <Overview profile={profile} role={role} /> : <PortalView view={view} profile={profile} role={role} />}</section></main>
-}
-
-function Overview({ profile, role }) { return <><header><div><p className="eyebrow">{profile.campus?.name || 'Fordridge Schools'}</p><h1>Good day, {profile.full_name?.split(' ')[0] || role}.</h1><p className="dashboard-intro">Everything important for your school day, in one secure place.</p></div><span className="role-pill">{role}</span></header><div className="dashboard-grid"><Link to="/portal/announcements" className="dashboard-action"><p>ANNOUNCEMENTS</p><h2>Stay informed</h2><span>Read the latest campus notices.</span><b>View notices →</b></Link><Link to="/portal/timetable" className="dashboard-action"><p>QUICK ACCESS</p><h2>Your timetable</h2><span>See your weekly schedule at a glance.</span><b>Open timetable →</b></Link><article><p>YOUR CAMPUS</p><h2>{profile.campus?.name || 'Assigned campus'}</h2><span>{profile.campus?.code || 'Campus details will appear here.'}</span></article></div><section className="empty-panel"><p className="eyebrow">Portal guide</p><h2>Choose a section to get started</h2><p>Use Announcements for school updates and Timetable for your weekly programme. Your account only shows the areas you are authorised to access.</p></section></> }
-
-function PortalView({ view, profile, role }) { if (['learners', 'records', 'staff'].includes(view)) return <ManagementView view={view} profile={profile} role={role} />; const title = labels[view] || 'Portal'; const campus = profile.campus?.name || 'Fordridge Schools'; const content = { announcements: ['School notices', 'No announcements have been published yet.', 'When the school shares an update, it will appear here for your campus.'], timetable: ['Weekly programme', 'Your timetable is being prepared.', 'Your class schedule will appear here once it is published.'], learners: ['Learner directory', 'No learner directory is available yet.', 'Learner records can be managed here as they are added to the portal.'], records: ['School records', 'No records are available yet.', 'Attendance and academic record tools will appear here when connected.'], staff: ['Staff directory', 'No staff records are available yet.', 'Staff information will appear here when it is published.'] }[view] || []
-return <section className="portal-page"><header><div><p className="eyebrow">{campus}</p><h1>{title}</h1><p className="dashboard-intro">{view === 'announcements' ? 'School communications for you.' : `${role} portal`}</p></div><span className="role-pill">{role}</span></header><section className="portal-content-card"><div className="portal-page-icon" aria-hidden="true">{view === 'announcements' ? '✦' : view === 'timetable' ? '◷' : '◈'}</div><p className="eyebrow">{content[0]}</p><h2>{content[1]}</h2><p>{content[2]}</p></section><DefaultContent view={view} /></section> }
-function ManagementView({ view, profile, role }) {
-  const [items, setItems] = useState([])
-  const [loading, setLoading] = useState(isSupabaseConfigured)
-  const [query, setQuery] = useState('')
-  useEffect(() => { let active = true; if (!isSupabaseConfigured || view === 'records') { setLoading(false); return }; const roles = view === 'learners' ? ['student'] : ['staff', 'teacher', 'admin']; supabase.from('profiles').select('id,full_name,role,admission_number,class_level,class_stream,enrollment_status,campus:campuses(name,code)').in('role', roles).order('full_name').then(({ data }) => { if (active) { setItems(data || []); setLoading(false) } }); return () => { active = false } }, [view])
-  const title = labels[view]
-  const matching = items.filter(item => `${item.full_name || ''} ${item.admission_number || ''} ${item.class_level || ''} ${item.campus?.name || ''}`.toLowerCase().includes(query.toLowerCase()))
-  if (view === 'records') return <RecordsWorkspace role={role} profile={profile} />
-  const isLearner = view === 'learners'
-  return <section className="management-page"><header><div><p className="eyebrow">Fordridge administration</p><h1>{title}</h1><p className="dashboard-intro">{isLearner ? 'A secure, searchable view of learner enrolment and class details.' : 'A clear directory of Fordridge teaching and administrative team members.'}</p></div><button className="primary-action" type="button" onClick={() => alert(`New ${isLearner ? 'learner' : 'staff member'} creation will be connected to the admissions workflow.`)}>+ Add {isLearner ? 'learner' : 'staff member'}</button></header><section className="management-stats"><article><span>{isLearner ? 'Learners enrolled' : 'Team members'}</span><strong>{items.length}</strong><small>Current portal records</small></article><article><span>{isLearner ? 'Records complete' : 'Active accounts'}</span><strong>{items.filter(item => isLearner ? item.admission_number && item.class_level : item.role).length}</strong><small>Ready for daily use</small></article><article><span>Campus scope</span><strong>{profile.campus?.code || 'All'}</strong><small>{profile.campus?.name || 'Fordridge Schools'}</small></article></section><section className="directory-card"><div className="directory-toolbar"><div><h2>{isLearner ? 'Learner directory' : 'Staff directory'}</h2><p>{loading ? 'Loading secure records…' : `${matching.length} record${matching.length === 1 ? '' : 's'} shown`}</p></div><label className="search-field"><span aria-hidden="true">⌕</span><input value={query} onChange={event => setQuery(event.target.value)} placeholder={`Search ${isLearner ? 'name, admission number or class' : 'name or campus'}`} /></label></div>{loading ? <p className="directory-empty">Loading records…</p> : matching.length ? <div className="directory-table-wrap"><table className="directory-table"><thead><tr><th>{isLearner ? 'Learner' : 'Staff member'}</th><th>{isLearner ? 'Admission no.' : 'Role'}</th><th>{isLearner ? 'Class' : 'Campus'}</th><th>{isLearner ? 'Campus' : 'Account status'}</th><th aria-label="Open record" /></tr></thead><tbody>{matching.map(item => <tr key={item.id}><td><span className="record-avatar">{(item.full_name || '?').split(' ').map(part => part[0]).slice(0, 2).join('')}</span><strong>{item.full_name || (isLearner ? 'Unnamed learner' : 'Unnamed staff member')}</strong></td><td>{isLearner ? item.admission_number || 'Not assigned' : <span className="record-tag">{item.role || 'Staff'}</span>}</td><td>{isLearner ? [item.class_level, item.class_stream].filter(Boolean).join(' · ') || 'Not assigned' : item.campus?.name || 'Fordridge Schools'}</td><td>{isLearner ? item.campus?.name || 'Not assigned' : <span className="status-live">Active</span>}</td><td><button className="table-action" type="button" aria-label={`Open ${item.full_name || 'record'}`} onClick={() => alert(`Detailed ${isLearner ? 'learner' : 'staff'} profiles will open here when profile editing is enabled.`)}>View</button></td></tr>)}</tbody></table></div> : <div className="directory-empty"><strong>{isLearner ? 'Your learner directory is ready' : 'Your staff directory is ready'}</strong><p>Records added to Fordridge will appear here automatically.</p></div>}</section></section>
-}
-
-function RecordsWorkspace({ role, profile }) { const [active, setActive] = useState('overview'); const cards = [{ id: 'attendance', name: 'Attendance', detail: 'Daily class registers and absence follow-up', icon: '✓' }, { id: 'academic', name: 'Academic progress', detail: 'Assessments, subject marks and report cards', icon: '⌁' }, { id: 'wellbeing', name: 'Wellbeing & conduct', detail: 'Pastoral notes and support plans', icon: '♡' }]; return <section className="records-page"><header><div><p className="eyebrow">Fordridge administration</p><h1>Records centre</h1><p className="dashboard-intro">A secure home for the records that support every learner’s journey.</p></div><span className="role-pill">{role}</span></header><section className="records-hero"><div><p className="eyebrow">{profile.campus?.name || 'Fordridge Schools'}</p><h2>Good records. Better decisions.</h2><p>Use one consistent place for attendance, academic progress and learner wellbeing.</p></div><div className="records-hero-stat"><strong>3</strong><span>record areas<br />ready to connect</span></div></section><section className="record-switcher" aria-label="Record area">{[{id:'overview',name:'Overview'},...cards].map(item => <button key={item.id} className={active === item.id ? 'active' : ''} onClick={() => setActive(item.id)}>{item.name}</button>)}</section>{active === 'overview' ? <section className="record-grid">{cards.map(card => <button className="record-card" key={card.id} onClick={() => setActive(card.id)}><span>{card.icon}</span><h2>{card.name}</h2><p>{card.detail}</p><b>Open module →</b></button>)}</section> : <section className="record-detail"><span className="record-detail-icon">{cards.find(card => card.id === active)?.icon}</span><p className="eyebrow">{cards.find(card => card.id === active)?.name}</p><h2>Ready for Fordridge data</h2><p>This module has a clear home in the portal. Connect the relevant school workflow to start seeing secure, live records here.</p><button className="primary-action" type="button" onClick={() => setActive('overview')}>Back to records</button></section>}</section> }
-function DefaultContent({ view }) {
-  if (view === 'announcements') return <section className="starter-content"><div className="starter-heading"><div><p className="eyebrow">Getting started</p><h2>Make the most of your portal</h2></div><span className="starter-label">Portal guide</span></div><div className="starter-grid"><article><span className="starter-icon">01</span><h3>Keep notifications on</h3><p>New school notices will be highlighted here as soon as they are published for your campus.</p></article><article><span className="starter-icon">02</span><h3>Check your timetable</h3><p>Use the Timetable section for your current programme once class schedules are released.</p></article><article><span className="starter-icon">03</span><h3>Need assistance?</h3><p>Contact the school office for account, class or campus questions that need support.</p></article></div></section>
-  if (view === 'timetable') return <section className="starter-content"><div className="starter-heading"><div><p className="eyebrow">What to expect</p><h2>Your day, clearly organised</h2></div><span className="starter-label">Personal schedule</span></div><div className="schedule-preview"><article><span>1</span><div><strong>Your lessons</strong><p>Subject, teacher and room details will appear once your class programme is published.</p></div></article><article><span>2</span><div><strong>Important changes</strong><p>Any approved timetable update will be shown here so you can plan with confidence.</p></div></article><article><span>3</span><div><strong>One view for the week</strong><p>Switch between school days and see your full learning week at a glance.</p></div></article></div></section>
-  return null
+  const { profile, user } = state,
+    admin = profile.role === 'admin'
+  const fees = ['student', 'parent', 'admin'].includes(profile.role)
+  const records = ['student', 'parent', 'admin'].includes(profile.role)
+  if (
+    (['learners', 'staff'].includes(view) && !admin) ||
+    (view === 'fees' && !fees) ||
+    (view === 'records' && !records) ||
+    ![
+      'overview',
+      'learners',
+      'staff',
+      'fees',
+      'records',
+      'announcements',
+      'timetable',
+      'account',
+    ].includes(view)
+  )
+    return <Navigate to="/portal" replace />
+  const nav = (path, label) => (
+    <NavLink
+      end={path === '/portal'}
+      to={path}
+      className={({ isActive }) => (isActive ? 'active' : '')}
+    >
+      {label}
+    </NavLink>
+  )
+  async function logout() {
+    const { error } = await supabase.auth.signOut()
+    if (error) setState((s) => ({ ...s, error: error.message }))
+    else navigate('/portal/login')
+  }
+  return (
+    <main className="dashboard">
+      <aside>
+        <Link to="/portal" className="portal-mark">
+          <img src={crest} alt="Fordridge crest" />
+          <span>
+            FORDRIDGE
+            <br />
+            <b>PORTAL</b>
+          </span>
+        </Link>
+        <nav>
+          {nav('/portal', 'Overview')}
+          {admin && nav('/portal/learners', 'Learners')}
+          {records && nav('/portal/records', 'Records')}
+          {nav('/portal/announcements', 'Announcements')}
+          {nav('/portal/timetable', 'Timetable')}
+          {fees && nav('/portal/fees', 'Finance')}
+          {admin && nav('/portal/staff', 'Staff')}
+          {['staff', 'admin'].includes(profile.role) && (
+            <a
+              href="https://inventory-management-system-3xi2f.sevalla.page/"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              Inventory & POS ↗
+            </a>
+          )}
+          {nav('/portal/account', 'Account settings')}
+        </nav>
+        <button onClick={logout}>Sign out</button>
+      </aside>
+      <section
+        className={
+          view === 'fees' ? 'dashboard-main fees-main' : 'dashboard-main'
+        }
+      >
+        {view === 'fees' ? (
+          <FeesDashboard profile={profile} user={user} />
+        ) : ['learners', 'staff'].includes(view) ? (
+          <Directory key={view} view={view} />
+        ) : view === 'records' ? (
+          <LearnerRecords profile={profile} user={user} />
+        ) : ['announcements', 'timetable'].includes(view) ? (
+          <SchoolContent key={view} view={view} profile={profile} user={user} />
+        ) : view === 'account' ? (
+          <AccountSettings />
+        ) : admin ? (
+          <AdminOverview profile={profile} />
+        ) : (
+          <>
+            <header>
+              <p className="eyebrow">
+                {profile.campus?.name || 'Fordridge Schools'}
+              </p>
+              <h1>
+                Good day, {profile.full_name?.split(' ')[0] || 'welcome'}.
+              </h1>
+              <p>View your school updates and records.</p>
+            </header>
+            <div className="dashboard-grid">
+              <Link className="dashboard-action" to="/portal/announcements">
+                <h2>Announcements</h2>
+                <p>Read campus notices.</p>
+              </Link>
+              <Link className="dashboard-action" to="/portal/timetable">
+                <h2>Timetable</h2>
+                <p>See your weekly lessons.</p>
+              </Link>
+              {records && (
+                <Link className="dashboard-action" to="/portal/records">
+                  <h2>Learner records</h2>
+                  <p>Attendance and academic progress.</p>
+                </Link>
+              )}
+            </div>
+          </>
+        )}
+      </section>
+    </main>
+  )
 }
