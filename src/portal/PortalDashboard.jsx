@@ -21,6 +21,7 @@ import ClassAssignments from './ClassAssignments'
 import ExpenseCashbook from './ExpenseCashbook'
 import ActivityLog from './ActivityLog'
 import NotificationCenter from './NotificationCenter'
+import AttendanceHistory from './AttendanceHistory'
 import { workflowError } from './workflow'
 import './workflow.css'
 
@@ -106,6 +107,7 @@ export default function PortalDashboard() {
     (view === 'records' && !records) ||
     (view === 'reports' && !reports) ||
     (view === 'attendance' && !attendance) ||
+    (view === 'attendance-history' && !attendance) ||
     (view === 'assignments' && !assignments) ||
     (view === 'cashbook' && !admin) ||
     (view === 'activity' && !admin) ||
@@ -117,6 +119,7 @@ export default function PortalDashboard() {
       'records',
       'reports',
       'attendance',
+      'attendance-history',
       'assignments',
       'cashbook',
       'activity',
@@ -171,6 +174,7 @@ export default function PortalDashboard() {
           {records && nav('/portal/records', 'Records', '▤')}
           {reports && nav('/portal/reports', 'Progress reports', '▥')}
           {attendance && nav('/portal/attendance', 'Class attendance', '✓')}
+          {attendance && nav('/portal/attendance-history', 'Attendance history', '◷')}
           {assignments && nav('/portal/assignments', 'Class assignments', '⌘')}
           {nav('/portal/announcements', 'Announcements', '✦')}
           {nav('/portal/notifications', 'Notifications', '●')}
@@ -220,6 +224,8 @@ export default function PortalDashboard() {
           <ProgressReports profile={profile} />
         ) : view === 'attendance' ? (
           <BulkAttendance profile={profile} />
+        ) : view === 'attendance-history' ? (
+          <AttendanceHistory />
         ) : view === 'assignments' ? (
           <ClassAssignments profile={profile} />
         ) : view === 'cashbook' ? (
