@@ -14,6 +14,7 @@ import Directory from './Directory'
 import SchoolContent from './SchoolContent'
 import LearnerRecords from './LearnerRecords'
 import AccountSettings from './AccountSettings'
+import PortalOverview from './PortalOverview'
 import { workflowError } from './workflow'
 import './workflow.css'
 
@@ -195,44 +196,7 @@ export default function PortalDashboard() {
           <AccountSettings />
         ) : admin ? (
           <AdminOverview profile={profile} />
-        ) : (
-          <>
-            <section className="portal-welcome">
-              <div>
-                <p className="eyebrow">Your school day</p>
-                <h1>Good day, {profile.full_name?.split(' ')[0] || 'welcome'}.</h1>
-                <p>Stay on top of what matters, from campus updates to your learner's progress.</p>
-                <div className="portal-welcome-actions"><Link to="/portal/timetable">View timetable <span>→</span></Link><Link to="/portal/announcements">Latest notices</Link></div>
-              </div>
-              <div className="portal-welcome-mark"><span>FORDRIDGE</span><strong>Learn<br/>Excel<br/>Achieve</strong></div>
-            </section>
-            <div className="dashboard-grid">
-              <Link className="dashboard-action" to="/portal/announcements">
-                <span className="dashboard-card-icon">✦</span>
-                <p>Campus updates</p>
-                <h2>Announcements</h2>
-                <span>Read school notices and important updates.</span>
-                <b>Open notices <em>→</em></b>
-              </Link>
-              <Link className="dashboard-action" to="/portal/timetable">
-                <span className="dashboard-card-icon">◷</span>
-                <p>Your routine</p>
-                <h2>Timetable</h2>
-                <span>See your week at a glance and prepare ahead.</span>
-                <b>View schedule <em>→</em></b>
-              </Link>
-              {records && (
-                <Link className="dashboard-action" to="/portal/records">
-                  <span className="dashboard-card-icon">▤</span>
-                  <p>Progress hub</p>
-                  <h2>Learner records</h2>
-                  <span>Attendance and academic progress in one place.</span>
-                  <b>Open records <em>→</em></b>
-                </Link>
-              )}
-            </div>
-          </>
-        )}
+        ) : <PortalOverview profile={profile} user={user} />}
       </section>
     </main>
   )
