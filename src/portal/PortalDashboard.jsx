@@ -22,6 +22,7 @@ import ExpenseCashbook from './ExpenseCashbook'
 import ActivityLog from './ActivityLog'
 import NotificationCenter from './NotificationCenter'
 import AttendanceHistory from './AttendanceHistory'
+import LearningAnalytics from './LearningAnalytics'
 import { workflowError } from './workflow'
 import './workflow.css'
 
@@ -101,6 +102,7 @@ export default function PortalDashboard() {
   const reports = ['student', 'parent', 'teacher', 'admin'].includes(profile.role)
   const attendance = ['teacher', 'admin'].includes(profile.role)
   const assignments = ['teacher', 'admin'].includes(profile.role)
+  const analytics = ['teacher', 'admin'].includes(profile.role)
   if (
     (['learners', 'staff'].includes(view) && !admin) ||
     (view === 'fees' && !fees) ||
@@ -108,6 +110,7 @@ export default function PortalDashboard() {
     (view === 'reports' && !reports) ||
     (view === 'attendance' && !attendance) ||
     (view === 'attendance-history' && !attendance) ||
+    (view === 'analytics' && !analytics) ||
     (view === 'assignments' && !assignments) ||
     (view === 'cashbook' && !admin) ||
     (view === 'activity' && !admin) ||
@@ -120,6 +123,7 @@ export default function PortalDashboard() {
       'reports',
       'attendance',
       'attendance-history',
+      'analytics',
       'assignments',
       'cashbook',
       'activity',
@@ -175,6 +179,7 @@ export default function PortalDashboard() {
           {reports && nav('/portal/reports', 'Progress reports', '▥')}
           {attendance && nav('/portal/attendance', 'Class attendance', '✓')}
           {attendance && nav('/portal/attendance-history', 'Attendance history', '◷')}
+          {analytics && nav('/portal/analytics', 'Academic analytics', '▤')}
           {assignments && nav('/portal/assignments', 'Class assignments', '⌘')}
           {nav('/portal/announcements', 'Announcements', '✦')}
           {nav('/portal/notifications', 'Notifications', '●')}
@@ -226,6 +231,8 @@ export default function PortalDashboard() {
           <BulkAttendance profile={profile} />
         ) : view === 'attendance-history' ? (
           <AttendanceHistory />
+        ) : view === 'analytics' ? (
+          <LearningAnalytics />
         ) : view === 'assignments' ? (
           <ClassAssignments profile={profile} />
         ) : view === 'cashbook' ? (
