@@ -161,3 +161,22 @@
     padding: 16px;
   }
 }
+
+.report-sign-cell {
+  color: var(--maroon);
+  font-family: 'Playfair Display', serif;
+  font-weight: 700;
+  text-align: center;
+}
+.report-approvals {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 18px;
+  margin-top: 26px;
+  padding-top: 18px;
+  border-top: 1px solid var(--line);
+}
+.report-approvals span, .report-approvals strong { display: block; }
+.report-approvals span { margin-bottom: 24px; color: var(--muted); font-size: .72rem; text-transform: uppercase; letter-spacing: .06em; }
+.report-approvals strong { padding-top: 7px; border-top: 1px solid var(--ink); font-size: .85rem; }
+@media (max-width: 650px) { .report-approvals { grid-template-columns: 1fr; } }
