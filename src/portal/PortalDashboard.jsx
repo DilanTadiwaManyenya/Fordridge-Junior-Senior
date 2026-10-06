@@ -89,7 +89,7 @@ export default function PortalDashboard() {
   const { profile, user } = state,
     admin = profile.role === 'admin'
   const fees = ['student', 'parent', 'admin'].includes(profile.role)
-  const records = ['student', 'parent', 'admin'].includes(profile.role)
+  const records = ['student', 'parent', 'teacher', 'admin'].includes(profile.role)
   if (
     (['learners', 'staff'].includes(view) && !admin) ||
     (view === 'fees' && !fees) ||

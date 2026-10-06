@@ -14,6 +14,8 @@ const blank = () => ({
 })
 export default function LearnerRecords({ profile, user }) {
   const admin = profile.role === 'admin'
+  const teacher = profile.role === 'teacher'
+  const canManage = admin || teacher
   const [items, setItems] = useState([]),
     [students, setStudents] = useState([]),
     [draft, setDraft] = useState(null),
@@ -34,12 +36,14 @@ export default function LearnerRecords({ profile, user }) {
         .limit(500)
       if (r.error) throw r.error
       setItems(r.data)
-      if (admin) {
-        const s = await supabase
+      if (canManage) {
+        let request = supabase
           .from('profiles')
           .select('id,full_name,admission_number')
           .eq('role', 'student')
           .order('full_name')
+        if (teacher) request = request.eq('campus_id', profile.campus_id)
+        const s = await request
         if (s.error) throw s.error
         setStudents(s.data)
       }
@@ -48,7 +52,7 @@ export default function LearnerRecords({ profile, user }) {
     } finally {
       setLoading(false)
     }
-  }, [admin])
+  }, [canManage, profile.campus_id, teacher])
   useEffect(() => {
     load()
   }, [load])
@@ -108,7 +112,7 @@ export default function LearnerRecords({ profile, user }) {
           <p className="eyebrow">Fordridge Schools</p>
           <h1>Learner records</h1>
         </div>
-        {admin && (
+        {canManage && (
           <button className="primary-action" onClick={() => setDraft(blank())}>
             + Add record
           </button>
@@ -158,7 +162,10 @@ export default function LearnerRecords({ profile, user }) {
                   })
                 }
               >
-                {['attendance', 'academic', 'wellbeing'].map((value) => (
+                {(admin
+                  ? ['attendance', 'academic', 'wellbeing']
+                  : ['attendance', 'academic']
+                ).map((value) => (
                   <option key={value}>{value}</option>
                 ))}
               </select>
@@ -267,7 +274,7 @@ export default function LearnerRecords({ profile, user }) {
                   <th>Learner</th>
                   <th>Record</th>
                   <th>Details</th>
-                  {admin && <th>Edit</th>}
+                  {canManage && <th>Edit</th>}
                 </tr>
               </thead>
               <tbody>
@@ -286,12 +293,12 @@ export default function LearnerRecords({ profile, user }) {
                           : '')}
                       <p>{item.notes}</p>
                     </td>
-                    {admin && (
+                    {canManage && (
                       <td>
                         {item.created_by === user.id ? (
                           <button onClick={() => setDraft(item)}>Edit</button>
                         ) : (
-                          <span>Recorded by another administrator</span>
+                          <span>Recorded by another staff member</span>
                         )}
                       </td>
                     )}
