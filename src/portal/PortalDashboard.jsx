@@ -18,6 +18,7 @@ import { workflowError } from './workflow'
 import './workflow.css'
 
 export default function PortalDashboard() {
+  const [mobileNavOpen, setMobileNavOpen] = useState(false)
   const [state, setState] = useState({
     loading: true,
     profile: null,
@@ -110,6 +111,7 @@ export default function PortalDashboard() {
       end={path === '/portal'}
       to={path}
       className={({ isActive }) => (isActive ? 'active' : '')}
+      onClick={() => setMobileNavOpen(false)}
     >
       <span className="portal-nav-icon" aria-hidden="true">{icon}</span>
       <span>{label}</span>
@@ -122,7 +124,7 @@ export default function PortalDashboard() {
   }
   return (
     <main className="dashboard">
-      <aside className="portal-sidebar">
+      <aside className={`portal-sidebar${mobileNavOpen ? ' mobile-nav-open' : ''}`}>
         <Link to="/portal" className="portal-mark">
           <img src={crest} alt="Fordridge crest" />
           <span>
@@ -131,7 +133,17 @@ export default function PortalDashboard() {
             <b>PORTAL</b>
           </span>
         </Link>
-        <nav>
+        <button
+          type="button"
+          className="portal-menu-toggle"
+          onClick={() => setMobileNavOpen((open) => !open)}
+          aria-expanded={mobileNavOpen}
+          aria-controls="portal-navigation"
+        >
+          <span aria-hidden="true">{mobileNavOpen ? '×' : '☰'}</span>
+          <span>{mobileNavOpen ? 'Close' : 'Menu'}</span>
+        </button>
+        <nav id="portal-navigation">
           <span className="portal-nav-label">Workspace</span>
           {nav('/portal', 'Overview', '⌂')}
           {admin && nav('/portal/learners', 'Learners', '◉')}
@@ -146,6 +158,7 @@ export default function PortalDashboard() {
               href="https://inventory-management-system-3xi2f.sevalla.page/"
               target="_blank"
               rel="noopener noreferrer"
+              onClick={() => setMobileNavOpen(false)}
             >
               <span className="portal-nav-icon" aria-hidden="true">▣</span>
               <span>Inventory & POS</span><span aria-hidden="true">↗</span>
@@ -153,11 +166,13 @@ export default function PortalDashboard() {
           )}
           {nav('/portal/account', 'Account settings', '⚙')}
         </nav>
-        <div className="portal-account-summary">
+        <div className="portal-sidebar-footer">
+          <div className="portal-account-summary">
           <span className="portal-avatar">{profile.full_name?.split(' ').map((part) => part[0]).slice(0, 2).join('') || 'F'}</span>
           <span><strong>{profile.full_name || 'Fordridge account'}</strong><small>{profile.role} portal</small></span>
         </div>
-        <button className="portal-signout" onClick={logout}>Sign out <span aria-hidden="true">→</span></button>
+          <button className="portal-signout" onClick={logout}>Sign out <span aria-hidden="true">→</span></button>
+        </div>
       </aside>
       <section
         className={

@@ -1,1 +1,1 @@
-export {default as SiteHome}from'./SiteHome'
+export { HomePage, AboutPage, JuniorPage, SeniorPage, AdmissionsPage, ContactPage, SiteLayout } from './PublicSite'
