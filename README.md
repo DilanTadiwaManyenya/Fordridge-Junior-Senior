@@ -1,3 +1,25 @@
+# Fordridge Junior & Senior School
+
+A full-stack React and Supabase platform for Fordridge Schools in Harare, Zimbabwe.
+
+## Highlights
+
+- Public Junior and Senior School website with admissions, gallery, contact, and enquiry flows.
+- Secure portal for administrators, teachers, parents, and learners.
+- Attendance, bulk marks, announcements, finance, and formal report workflows.
+- Released-report snapshots preserve issued marks, grades, rankings, signatories, and approvals.
+
+## Run locally
+
+```bash
+npm install
+npm run dev
+```
+
+Run `npm run build` for a production verification. Apply Supabase migrations from `supabase/migrations` before using portal workflows.
+
+---
+
 # React + Vite
 
 This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
