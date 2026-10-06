@@ -180,3 +180,15 @@
 .report-approvals span { margin-bottom: 24px; color: var(--muted); font-size: .72rem; text-transform: uppercase; letter-spacing: .06em; }
 .report-approvals strong { padding-top: 7px; border-top: 1px solid var(--ink); font-size: .85rem; }
 @media (max-width: 650px) { .report-approvals { grid-template-columns: 1fr; } }
+
+@media print {
+  @page { size: A4 portrait; margin: 12mm; }
+  .progress-report-sheet { min-height: 260mm; }
+  .progress-report-heading { break-inside: avoid; }
+  .report-summary, .report-approvals, .progress-report-total { break-inside: avoid; }
+  .workflow-table { width: 100%; border-collapse: collapse; }
+  .workflow-table th, .workflow-table td { padding: 8px 6px; }
+  .workflow-table thead { display: table-header-group; }
+  .workflow-table tr { break-inside: avoid; }
+  .report-sign-cell { color: #6b0929 !important; }
+}
