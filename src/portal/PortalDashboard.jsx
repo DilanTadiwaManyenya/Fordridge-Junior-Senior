@@ -15,6 +15,7 @@ import SchoolContent from './SchoolContent'
 import LearnerRecords from './LearnerRecords'
 import AccountSettings from './AccountSettings'
 import PortalOverview from './PortalOverview'
+import ProgressReports from './ProgressReports'
 import { workflowError } from './workflow'
 import './workflow.css'
 
@@ -91,16 +92,19 @@ export default function PortalDashboard() {
     admin = profile.role === 'admin'
   const fees = ['student', 'parent', 'admin'].includes(profile.role)
   const records = ['student', 'parent', 'teacher', 'admin'].includes(profile.role)
+  const reports = ['student', 'parent', 'teacher', 'admin'].includes(profile.role)
   if (
     (['learners', 'staff'].includes(view) && !admin) ||
     (view === 'fees' && !fees) ||
     (view === 'records' && !records) ||
+    (view === 'reports' && !reports) ||
     ![
       'overview',
       'learners',
       'staff',
       'fees',
       'records',
+      'reports',
       'announcements',
       'timetable',
       'account',
@@ -149,6 +153,7 @@ export default function PortalDashboard() {
           {nav('/portal', 'Overview', '⌂')}
           {admin && nav('/portal/learners', 'Learners', '◉')}
           {records && nav('/portal/records', 'Records', '▤')}
+          {reports && nav('/portal/reports', 'Progress reports', '▥')}
           {nav('/portal/announcements', 'Announcements', '✦')}
           {nav('/portal/timetable', 'Timetable', '◷')}
           <span className="portal-nav-label portal-nav-label-secondary">Management</span>
@@ -190,6 +195,8 @@ export default function PortalDashboard() {
           <Directory key={view} view={view} />
         ) : view === 'records' ? (
           <LearnerRecords profile={profile} user={user} />
+        ) : view === 'reports' ? (
+          <ProgressReports profile={profile} />
         ) : ['announcements', 'timetable'].includes(view) ? (
           <SchoolContent key={view} view={view} profile={profile} user={user} />
         ) : view === 'account' ? (

@@ -11,6 +11,8 @@ const blank = () => ({
   attendance_status: 'present',
   score: '',
   max_score: '',
+  academic_year: String(new Date().getFullYear()),
+  academic_term: 'Term 1',
 })
 export default function LearnerRecords({ profile, user }) {
   const admin = profile.role === 'admin'
@@ -79,6 +81,8 @@ export default function LearnerRecords({ profile, user }) {
           draft.kind === 'academic' && draft.max_score !== ''
             ? Number(draft.max_score)
             : null,
+        academic_year: draft.kind === 'academic' ? Number(draft.academic_year) : null,
+        academic_term: draft.kind === 'academic' ? draft.academic_term : null,
         created_by: draft.created_by || user.id,
       }
       if (!payload.title) throw new Error('Enter a title or subject.')
@@ -206,6 +210,22 @@ export default function LearnerRecords({ profile, user }) {
             )}
             {draft.kind === 'academic' && (
               <>
+                <label>
+                  Academic year
+                  <input
+                    type="number"
+                    min="2000"
+                    required
+                    value={draft.academic_year ?? ''}
+                    onChange={(e) => setDraft({ ...draft, academic_year: e.target.value })}
+                  />
+                </label>
+                <label>
+                  Term
+                  <select value={draft.academic_term || 'Term 1'} onChange={(e) => setDraft({ ...draft, academic_term: e.target.value })}>
+                    {['Term 1', 'Term 2', 'Term 3'].map((value) => <option key={value}>{value}</option>)}
+                  </select>
+                </label>
                 {[
                   ['score', 'Mark'],
                   ['max_score', 'Out of'],
