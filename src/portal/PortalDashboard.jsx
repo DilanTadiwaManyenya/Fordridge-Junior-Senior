@@ -26,6 +26,7 @@ import LearningAnalytics from './LearningAnalytics'
 import BulkMarks from './BulkMarks'
 import BulkLearnerImport from './BulkLearnerImport'
 import ReportSettings from './ReportSettings'
+import GradeBands from './GradeBands'
 import { workflowError } from './workflow'
 import './workflow.css'
 
@@ -117,6 +118,7 @@ export default function PortalDashboard() {
     (view === 'marks' && !attendance) ||
     (view === 'import-learners' && !admin) ||
     (view === 'report-settings' && !admin) ||
+    (view === 'grade-bands' && !admin) ||
     (view === 'assignments' && !assignments) ||
     (view === 'cashbook' && !admin) ||
     (view === 'activity' && !admin) ||
@@ -133,6 +135,7 @@ export default function PortalDashboard() {
       'marks',
       'import-learners',
       'report-settings',
+      'grade-bands',
       'assignments',
       'cashbook',
       'activity',
@@ -186,6 +189,7 @@ export default function PortalDashboard() {
           {admin && nav('/portal/learners', 'Learners', '◉')}
           {admin && nav('/portal/import-learners', 'Bulk learner import', '⇧')}
           {admin && nav('/portal/report-settings', 'Report settings', '▣')}
+          {admin && nav('/portal/grade-bands', 'Grade bands', 'A')}
           {records && nav('/portal/records', 'Records', '▤')}
           {reports && nav('/portal/reports', 'Progress reports', '▥')}
           {attendance && nav('/portal/attendance', 'Class attendance', '✓')}
@@ -239,6 +243,8 @@ export default function PortalDashboard() {
           <BulkLearnerImport />
         ) : view === 'report-settings' ? (
           <ReportSettings />
+        ) : view === 'grade-bands' ? (
+          <GradeBands />
         ) : view === 'records' ? (
           <LearnerRecords profile={profile} user={user} />
         ) : view === 'reports' ? (
