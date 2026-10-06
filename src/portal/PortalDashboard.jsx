@@ -17,6 +17,7 @@ import AccountSettings from './AccountSettings'
 import PortalOverview from './PortalOverview'
 import ProgressReports from './ProgressReports'
 import BulkAttendance from './BulkAttendance'
+import ClassAssignments from './ClassAssignments'
 import { workflowError } from './workflow'
 import './workflow.css'
 
@@ -95,12 +96,14 @@ export default function PortalDashboard() {
   const records = ['student', 'parent', 'teacher', 'admin'].includes(profile.role)
   const reports = ['student', 'parent', 'teacher', 'admin'].includes(profile.role)
   const attendance = ['teacher', 'admin'].includes(profile.role)
+  const assignments = ['teacher', 'admin'].includes(profile.role)
   if (
     (['learners', 'staff'].includes(view) && !admin) ||
     (view === 'fees' && !fees) ||
     (view === 'records' && !records) ||
     (view === 'reports' && !reports) ||
     (view === 'attendance' && !attendance) ||
+    (view === 'assignments' && !assignments) ||
     ![
       'overview',
       'learners',
@@ -109,6 +112,7 @@ export default function PortalDashboard() {
       'records',
       'reports',
       'attendance',
+      'assignments',
       'announcements',
       'timetable',
       'account',
@@ -159,6 +163,7 @@ export default function PortalDashboard() {
           {records && nav('/portal/records', 'Records', '▤')}
           {reports && nav('/portal/reports', 'Progress reports', '▥')}
           {attendance && nav('/portal/attendance', 'Class attendance', '✓')}
+          {assignments && nav('/portal/assignments', 'Class assignments', '⌘')}
           {nav('/portal/announcements', 'Announcements', '✦')}
           {nav('/portal/timetable', 'Timetable', '◷')}
           <span className="portal-nav-label portal-nav-label-secondary">Management</span>
@@ -204,6 +209,8 @@ export default function PortalDashboard() {
           <ProgressReports profile={profile} />
         ) : view === 'attendance' ? (
           <BulkAttendance profile={profile} />
+        ) : view === 'assignments' ? (
+          <ClassAssignments profile={profile} />
         ) : ['announcements', 'timetable'].includes(view) ? (
           <SchoolContent key={view} view={view} profile={profile} user={user} />
         ) : view === 'account' ? (

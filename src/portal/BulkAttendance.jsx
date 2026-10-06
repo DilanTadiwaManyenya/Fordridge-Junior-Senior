@@ -11,7 +11,8 @@ export default function BulkAttendance({ profile }) {
     const { data, error } = await query
     if (error) { setError(workflowError(error)); return }
     setLearners(data || [])
-    const groups = [...new Set((data || []).filter(item => item.class_level).map(item => `${item.class_level}||${item.class_stream || ''}`))]
+    let groups = [...new Set((data || []).filter(item => item.class_level).map(item => `${item.class_level}||${item.class_stream || ''}`))]
+    if (!admin) { const assignments = await supabase.from('teacher_class_assignments').select('class_level,class_stream').eq('teacher_id', profile.id); if (assignments.error) { setError(workflowError(assignments.error)); return } const allowed = new Set((assignments.data || []).map(item => `${item.class_level}||${item.class_stream || ''}`)); groups = groups.filter(item => allowed.has(item)) }
     setClasses(groups)
     setClassKey(current => current || groups[0] || '')
   }, [admin, profile.campus_id])
