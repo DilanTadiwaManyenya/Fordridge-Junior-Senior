@@ -180,6 +180,7 @@
 .report-approvals span { margin-bottom: 24px; color: var(--muted); font-size: .72rem; text-transform: uppercase; letter-spacing: .06em; }
 .report-approvals strong { padding-top: 7px; border-top: 1px solid var(--ink); font-size: .85rem; }
 @media (max-width: 650px) { .report-approvals { grid-template-columns: 1fr; } }
+.report-release-row{display:flex;align-items:center;justify-content:space-between;gap:18px;padding:15px 0;border-top:1px solid var(--line)}.report-release-row:first-of-type{border-top:0}.report-release-row strong,.report-release-row small{display:block}.report-release-row small{margin-top:5px;color:var(--muted);font-size:.78rem}
 
 @media print {
   @page { size: A4 portrait; margin: 12mm; }
