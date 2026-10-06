@@ -19,6 +19,7 @@ import ProgressReports from './ProgressReports'
 import BulkAttendance from './BulkAttendance'
 import ClassAssignments from './ClassAssignments'
 import ExpenseCashbook from './ExpenseCashbook'
+import ActivityLog from './ActivityLog'
 import { workflowError } from './workflow'
 import './workflow.css'
 
@@ -106,6 +107,7 @@ export default function PortalDashboard() {
     (view === 'attendance' && !attendance) ||
     (view === 'assignments' && !assignments) ||
     (view === 'cashbook' && !admin) ||
+    (view === 'activity' && !admin) ||
     ![
       'overview',
       'learners',
@@ -116,6 +118,7 @@ export default function PortalDashboard() {
       'attendance',
       'assignments',
       'cashbook',
+      'activity',
       'announcements',
       'timetable',
       'account',
@@ -172,6 +175,7 @@ export default function PortalDashboard() {
           <span className="portal-nav-label portal-nav-label-secondary">Management</span>
           {fees && nav('/portal/fees', 'Finance', '$')}
           {admin && nav('/portal/cashbook', 'Expense cashbook', '¤')}
+          {admin && nav('/portal/activity', 'Activity log', '◫')}
           {admin && nav('/portal/staff', 'Staff', '♙')}
           {['staff', 'admin'].includes(profile.role) && (
             <a
@@ -217,6 +221,8 @@ export default function PortalDashboard() {
           <ClassAssignments profile={profile} />
         ) : view === 'cashbook' ? (
           <ExpenseCashbook />
+        ) : view === 'activity' ? (
+          <ActivityLog />
         ) : ['announcements', 'timetable'].includes(view) ? (
           <SchoolContent key={view} view={view} profile={profile} user={user} />
         ) : view === 'account' ? (
