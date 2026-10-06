@@ -6,8 +6,11 @@ import { isSupabaseConfigured, supabase } from '../lib/supabase'
 import './public-site.css'
 
 const navItems = [
-  ['About', '/about'], ['Junior School', '/junior-school'], ['Senior School', '/senior-school'], ['Admissions', '/admissions'], ['Contact', '/contact'],
+  ['About', '/about'], ['Junior School', '/junior-school'], ['Senior School', '/senior-school'], ['Gallery', '/gallery'], ['Admissions', '/admissions'], ['Contact', '/contact'],
 ]
+
+const galleryImages = Object.values(import.meta.glob('../assets/images/*.{jpeg,jpg,png,webp}', { eager: true, import: 'default' }))
+const shuffleImages = (images) => [...images].sort(() => Math.random() - 0.5)
 
 function PageTitle({ title, description }) {
   useEffect(() => {
@@ -59,6 +62,11 @@ export function AboutPage() { return <><PageTitle title="About" description="Lea
 const activities = [{ title: 'Sport and wellbeing', text: '[EDIT THIS] Add school sporting and wellbeing opportunities.' }, { title: 'Culture and creativity', text: '[EDIT THIS] Add clubs, arts and cultural activities.' }, { title: 'Leadership and service', text: '[EDIT THIS] Add leadership and community initiatives.' }]
 export function JuniorPage() { return <><PageTitle title="Junior School" description="Discover Fordridge Junior School." /><PageHero eyebrow="Junior School" title="A confident beginning." text="Our Junior School provides a caring environment in which young learners can build strong foundations." /><Section title="Junior School overview"><p className="intro-copy">[EDIT THIS] Add a concise overview of the Junior School, its year groups and learning approach.</p></Section><Section title="Curriculum" muted><Cards items={[{ title: 'Core learning', text: '[EDIT THIS] Describe the Junior School curriculum.' }, { title: 'Learning support', text: '[EDIT THIS] Describe learner support and enrichment.' }, { title: 'Growing independence', text: '[EDIT THIS] Describe how learners develop confidence and responsibility.' }]} /></Section><Section title="Activities"><Cards items={activities} /></Section></> }
 export function SeniorPage() { return <><PageTitle title="Senior School" description="Discover Fordridge Senior School programmes." /><PageHero eyebrow="Senior School" title="Ready for what’s next." text="Fordridge Senior School supports learners to deepen their knowledge, discover their strengths and prepare for future opportunities." /><Section title="Senior School overview"><p className="intro-copy">[EDIT THIS] Add a concise overview of the Senior School, its year groups and learning environment.</p></Section><Section title="Academic pathways" muted><Cards items={[{ title: 'O-Level', text: 'Learners may prepare for ZIMSEC and Cambridge O-Level pathways. [EDIT THIS] Confirm available examination options.' }, { title: 'A-Level', text: 'Learners may prepare for ZIMSEC and Cambridge A-Level pathways. [EDIT THIS] Confirm available examination options.' }]} /></Section><Section title="Subject streams"><Cards items={[{ title: 'Arts', text: '[EDIT THIS] List available Arts subjects.' }, { title: 'Commercials', text: '[EDIT THIS] List available Commercial subjects.' }, { title: 'Sciences', text: '[EDIT THIS] List available Science subjects.' }]} /></Section><Section title="Beyond the classroom" muted><Cards items={activities} /></Section></> }
+
+export function GalleryPage() {
+  const [images, setImages] = useState(() => shuffleImages(galleryImages))
+  return <><PageTitle title="Gallery" description="A glimpse of life at Fordridge Junior and Senior School." /><PageHero eyebrow="Gallery" title="Life at Fordridge." text="A selection of moments from our school community." /><Section title="School gallery"><div className="gallery-toolbar"><p className="intro-copy">Images are shown in a new random order each time you visit.</p><button className="gallery-shuffle" onClick={() => setImages(shuffleImages(galleryImages))}>Shuffle images</button></div><div className="gallery-grid">{images.map((image, index) => <figure key={image}><img src={image} alt={`Fordridge school life, photo ${index + 1}`} loading="lazy" /><figcaption>Fordridge school life</figcaption></figure>)}</div></Section></>
+}
 
 function EnquiryForm({ kind = 'enquiry' }) {
   const [form, setForm] = useState({ name: '', email: '', phone: '', message: '' }); const [status, setStatus] = useState(''); const [sending, setSending] = useState(false)

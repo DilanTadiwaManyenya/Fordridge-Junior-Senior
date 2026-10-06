@@ -2,9 +2,9 @@ export const schoolInfo = {
   name: 'Fordridge Senior School',
   shortName: 'Fordridge',
   motto: 'LEARN | EXCEL | ACHIEVE',
-  address: 'Kirkman Road, opposite Madokero Mall, Harare, Zimbabwe',
-  phone: '[EDIT THIS]',
-  email: '[EDIT THIS]',
+  address: '8940 Kirkman Road, Tynwald, Harare, Zimbabwe',
+  phone: '+263 777 542 577, +263 719 614 039',
+  email: 'fordridgeseniorschool@gmail.com',
   whatsapp: '[EDIT THIS]',
   socialLinks: {
     facebook: '[EDIT THIS]',

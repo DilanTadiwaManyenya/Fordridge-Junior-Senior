@@ -1,1 +1,1 @@
-export { HomePage, AboutPage, JuniorPage, SeniorPage, AdmissionsPage, ContactPage, SiteLayout } from './PublicSite'
+export { HomePage, AboutPage, JuniorPage, SeniorPage, GalleryPage, AdmissionsPage, ContactPage, SiteLayout } from './PublicSite'
