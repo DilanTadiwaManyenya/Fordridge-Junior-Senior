@@ -24,6 +24,7 @@ import NotificationCenter from './NotificationCenter'
 import AttendanceHistory from './AttendanceHistory'
 import LearningAnalytics from './LearningAnalytics'
 import BulkMarks from './BulkMarks'
+import BulkLearnerImport from './BulkLearnerImport'
 import { workflowError } from './workflow'
 import './workflow.css'
 
@@ -113,6 +114,7 @@ export default function PortalDashboard() {
     (view === 'attendance-history' && !attendance) ||
     (view === 'analytics' && !analytics) ||
     (view === 'marks' && !attendance) ||
+    (view === 'import-learners' && !admin) ||
     (view === 'assignments' && !assignments) ||
     (view === 'cashbook' && !admin) ||
     (view === 'activity' && !admin) ||
@@ -127,6 +129,7 @@ export default function PortalDashboard() {
       'attendance-history',
       'analytics',
       'marks',
+      'import-learners',
       'assignments',
       'cashbook',
       'activity',
@@ -178,6 +181,7 @@ export default function PortalDashboard() {
           <span className="portal-nav-label">Workspace</span>
           {nav('/portal', 'Overview', '⌂')}
           {admin && nav('/portal/learners', 'Learners', '◉')}
+          {admin && nav('/portal/import-learners', 'Bulk learner import', '⇧')}
           {records && nav('/portal/records', 'Records', '▤')}
           {reports && nav('/portal/reports', 'Progress reports', '▥')}
           {attendance && nav('/portal/attendance', 'Class attendance', '✓')}
@@ -227,6 +231,8 @@ export default function PortalDashboard() {
           <FeesDashboard profile={profile} user={user} />
         ) : ['learners', 'staff'].includes(view) ? (
           <Directory key={view} view={view} />
+        ) : view === 'import-learners' ? (
+          <BulkLearnerImport />
         ) : view === 'records' ? (
           <LearnerRecords profile={profile} user={user} />
         ) : view === 'reports' ? (
