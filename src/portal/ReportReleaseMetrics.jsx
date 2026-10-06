@@ -1,0 +1,11 @@
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import { supabase } from '../lib/supabase'
+import { workflowError } from './workflow'
+
+export default function ReportReleaseMetrics() {
+  const [snapshots, setSnapshots] = useState([]), [loading, setLoading] = useState(true), [error, setError] = useState('')
+  const load = useCallback(async () => { setLoading(true); const { data, error: loadError } = await supabase.from('report_release_snapshots').select('academic_year,academic_term,average_percent,class_rank,released_at,publication:report_publications!report_release_snapshots_publication_id_fkey(campus:campuses(name))'); if (loadError) setError(workflowError(loadError)); else setSnapshots(data || []); setLoading(false) }, [])
+  useEffect(() => { load() }, [load])
+  const periods = useMemo(() => Object.values(snapshots.reduce((groups, item) => { const key = `${item.publication?.campus?.name || 'Fordridge Schools'}-${item.academic_year}-${item.academic_term}-${item.released_at}`; const current = groups[key] || { ...item, count: 0, sum: 0, ranked: 0 }; current.count += 1; current.sum += Number(item.average_percent || 0); current.ranked += item.class_rank ? 1 : 0; groups[key] = current; return groups }, {})).sort((a, b) => new Date(b.released_at) - new Date(a.released_at)), [snapshots])
+  return <section><header className="workflow-heading"><div><p className="eyebrow">Formal reports</p><h1>Release dashboard</h1><p className="progress-report-note">A management summary of official report snapshots already issued.</p></div></header>{error && <p className="workflow-error" role="alert">{error}</p>}{loading ? <p role="status">Loading release metrics…</p> : <section className="report-release-metrics">{periods.map(item => <article key={`${item.academic_year}-${item.academic_term}-${item.released_at}`}><span>{item.publication?.campus?.name || 'Fordridge Schools'} · {item.academic_year} · {item.academic_term}</span><strong>{item.count}</strong><small>Learner reports issued</small><p>Average: {(item.sum / item.count).toFixed(1)}% · Rankings: {item.ranked}/{item.count}</p><em>Released {new Date(item.released_at).toLocaleString()}</em></article>)}{!periods.length && <p className="portal-empty-copy">No report periods have been released yet.</p>}</section>}</section>
+}

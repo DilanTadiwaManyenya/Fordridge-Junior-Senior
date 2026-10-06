@@ -32,6 +32,7 @@ import ReportReadiness from './ReportReadiness'
 import ReportArchive from './ReportArchive'
 import OfficialReports from './OfficialReports'
 import ReportApprovalRegister from './ReportApprovalRegister'
+import ReportReleaseMetrics from './ReportReleaseMetrics'
 import { workflowError } from './workflow'
 import './workflow.css'
 
@@ -129,6 +130,7 @@ export default function PortalDashboard() {
     (view === 'report-archive' && !reports) ||
     (view === 'official-reports' && !reports) ||
     (view === 'report-approvals' && !admin) ||
+    (view === 'report-dashboard' && !admin) ||
     (view === 'assignments' && !assignments) ||
     (view === 'cashbook' && !admin) ||
     (view === 'activity' && !admin) ||
@@ -151,6 +153,7 @@ export default function PortalDashboard() {
       'report-archive',
       'official-reports',
       'report-approvals',
+      'report-dashboard',
       'assignments',
       'cashbook',
       'activity',
@@ -208,6 +211,7 @@ export default function PortalDashboard() {
           {admin && nav('/portal/report-release', 'Report release', '✓')}
           {admin && nav('/portal/report-readiness', 'Report readiness', '◷')}
           {admin && nav('/portal/report-approvals', 'Approval register', '▤')}
+          {admin && nav('/portal/report-dashboard', 'Report dashboard', '◉')}
           {records && nav('/portal/records', 'Records', '▤')}
           {reports && nav('/portal/reports', 'Progress reports', '▥')}
           {reports && nav('/portal/report-archive', 'Report archive', '▤')}
@@ -275,6 +279,8 @@ export default function PortalDashboard() {
           <OfficialReports />
         ) : view === 'report-approvals' ? (
           <ReportApprovalRegister />
+        ) : view === 'report-dashboard' ? (
+          <ReportReleaseMetrics />
         ) : view === 'records' ? (
           <LearnerRecords profile={profile} user={user} />
         ) : view === 'reports' ? (
