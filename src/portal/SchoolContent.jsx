@@ -68,6 +68,7 @@ export default function SchoolContent({ view, profile, user }) {
             class_stream: '',
             room: '',
             audience_role: 'student',
+            audience_roles: [],
           },
     )
   }
@@ -95,10 +96,11 @@ export default function SchoolContent({ view, profile, user }) {
               profile.role === 'teacher' ? user.id : draft.teacher_id || null,
           }
         : {
-            campus_id: draft.campus_id,
-            title: draft.title.trim(),
-            body: draft.body.trim(),
-            author_id: draft.author_id || user.id,
+          campus_id: draft.campus_id,
+          title: draft.title.trim(),
+          body: draft.body.trim(),
+          author_id: draft.author_id || user.id,
+          audience_roles: draft.audience_roles || [],
             published_at: draft.publish
               ? draft.published_at || new Date().toISOString()
               : null,
@@ -262,6 +264,26 @@ export default function SchoolContent({ view, profile, user }) {
                   >
                     <option value="draft">Draft — staff only</option>
                     <option value="published">Publish to campus</option>
+                  </select>
+                </label>
+                <label>
+                  Audience
+                  <select
+                    value={(draft.audience_roles || []).join(',')}
+                    onChange={(e) =>
+                      setDraft({
+                        ...draft,
+                        audience_roles: e.target.value
+                          ? e.target.value.split(',')
+                          : [],
+                      })
+                    }
+                  >
+                    <option value="">Everyone at this campus</option>
+                    <option value="student">Students and their parents</option>
+                    <option value="parent">Parents only</option>
+                    <option value="teacher,staff">Teachers and staff</option>
+                    <option value="admin">Administrators only</option>
                   </select>
                 </label>
               </>
