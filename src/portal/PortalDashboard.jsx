@@ -29,6 +29,7 @@ import ReportSettings from './ReportSettings'
 import GradeBands from './GradeBands'
 import ReportPublication from './ReportPublication'
 import ReportReadiness from './ReportReadiness'
+import ReportArchive from './ReportArchive'
 import { workflowError } from './workflow'
 import './workflow.css'
 
@@ -123,6 +124,7 @@ export default function PortalDashboard() {
     (view === 'grade-bands' && !admin) ||
     (view === 'report-release' && !admin) ||
     (view === 'report-readiness' && !admin) ||
+    (view === 'report-archive' && !reports) ||
     (view === 'assignments' && !assignments) ||
     (view === 'cashbook' && !admin) ||
     (view === 'activity' && !admin) ||
@@ -142,6 +144,7 @@ export default function PortalDashboard() {
       'grade-bands',
       'report-release',
       'report-readiness',
+      'report-archive',
       'assignments',
       'cashbook',
       'activity',
@@ -200,6 +203,7 @@ export default function PortalDashboard() {
           {admin && nav('/portal/report-readiness', 'Report readiness', '◷')}
           {records && nav('/portal/records', 'Records', '▤')}
           {reports && nav('/portal/reports', 'Progress reports', '▥')}
+          {reports && nav('/portal/report-archive', 'Report archive', '▤')}
           {attendance && nav('/portal/attendance', 'Class attendance', '✓')}
           {attendance && nav('/portal/attendance-history', 'Attendance history', '◷')}
           {analytics && nav('/portal/analytics', 'Academic analytics', '▤')}
@@ -257,6 +261,8 @@ export default function PortalDashboard() {
           <ReportPublication />
         ) : view === 'report-readiness' ? (
           <ReportReadiness />
+        ) : view === 'report-archive' ? (
+          <ReportArchive />
         ) : view === 'records' ? (
           <LearnerRecords profile={profile} user={user} />
         ) : view === 'reports' ? (
