@@ -28,6 +28,7 @@ import BulkLearnerImport from './BulkLearnerImport'
 import ReportSettings from './ReportSettings'
 import GradeBands from './GradeBands'
 import ReportPublication from './ReportPublication'
+import ReportReadiness from './ReportReadiness'
 import { workflowError } from './workflow'
 import './workflow.css'
 
@@ -121,6 +122,7 @@ export default function PortalDashboard() {
     (view === 'report-settings' && !admin) ||
     (view === 'grade-bands' && !admin) ||
     (view === 'report-release' && !admin) ||
+    (view === 'report-readiness' && !admin) ||
     (view === 'assignments' && !assignments) ||
     (view === 'cashbook' && !admin) ||
     (view === 'activity' && !admin) ||
@@ -139,6 +141,7 @@ export default function PortalDashboard() {
       'report-settings',
       'grade-bands',
       'report-release',
+      'report-readiness',
       'assignments',
       'cashbook',
       'activity',
@@ -194,6 +197,7 @@ export default function PortalDashboard() {
           {admin && nav('/portal/report-settings', 'Report settings', '▣')}
           {admin && nav('/portal/grade-bands', 'Grade bands', 'A')}
           {admin && nav('/portal/report-release', 'Report release', '✓')}
+          {admin && nav('/portal/report-readiness', 'Report readiness', '◷')}
           {records && nav('/portal/records', 'Records', '▤')}
           {reports && nav('/portal/reports', 'Progress reports', '▥')}
           {attendance && nav('/portal/attendance', 'Class attendance', '✓')}
@@ -251,6 +255,8 @@ export default function PortalDashboard() {
           <GradeBands />
         ) : view === 'report-release' ? (
           <ReportPublication />
+        ) : view === 'report-readiness' ? (
+          <ReportReadiness />
         ) : view === 'records' ? (
           <LearnerRecords profile={profile} user={user} />
         ) : view === 'reports' ? (
