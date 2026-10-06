@@ -20,6 +20,7 @@ import BulkAttendance from './BulkAttendance'
 import ClassAssignments from './ClassAssignments'
 import ExpenseCashbook from './ExpenseCashbook'
 import ActivityLog from './ActivityLog'
+import NotificationCenter from './NotificationCenter'
 import { workflowError } from './workflow'
 import './workflow.css'
 
@@ -119,6 +120,7 @@ export default function PortalDashboard() {
       'assignments',
       'cashbook',
       'activity',
+      'notifications',
       'announcements',
       'timetable',
       'account',
@@ -171,6 +173,7 @@ export default function PortalDashboard() {
           {attendance && nav('/portal/attendance', 'Class attendance', '✓')}
           {assignments && nav('/portal/assignments', 'Class assignments', '⌘')}
           {nav('/portal/announcements', 'Announcements', '✦')}
+          {nav('/portal/notifications', 'Notifications', '●')}
           {nav('/portal/timetable', 'Timetable', '◷')}
           <span className="portal-nav-label portal-nav-label-secondary">Management</span>
           {fees && nav('/portal/fees', 'Finance', '$')}
@@ -225,6 +228,8 @@ export default function PortalDashboard() {
           <ActivityLog />
         ) : ['announcements', 'timetable'].includes(view) ? (
           <SchoolContent key={view} view={view} profile={profile} user={user} />
+        ) : view === 'notifications' ? (
+          <NotificationCenter user={user} />
         ) : view === 'account' ? (
           <AccountSettings />
         ) : admin ? (
