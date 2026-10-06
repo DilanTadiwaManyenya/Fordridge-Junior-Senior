@@ -16,6 +16,7 @@ import LearnerRecords from './LearnerRecords'
 import AccountSettings from './AccountSettings'
 import PortalOverview from './PortalOverview'
 import ProgressReports from './ProgressReports'
+import BulkAttendance from './BulkAttendance'
 import { workflowError } from './workflow'
 import './workflow.css'
 
@@ -93,11 +94,13 @@ export default function PortalDashboard() {
   const fees = ['student', 'parent', 'admin'].includes(profile.role)
   const records = ['student', 'parent', 'teacher', 'admin'].includes(profile.role)
   const reports = ['student', 'parent', 'teacher', 'admin'].includes(profile.role)
+  const attendance = ['teacher', 'admin'].includes(profile.role)
   if (
     (['learners', 'staff'].includes(view) && !admin) ||
     (view === 'fees' && !fees) ||
     (view === 'records' && !records) ||
     (view === 'reports' && !reports) ||
+    (view === 'attendance' && !attendance) ||
     ![
       'overview',
       'learners',
@@ -105,6 +108,7 @@ export default function PortalDashboard() {
       'fees',
       'records',
       'reports',
+      'attendance',
       'announcements',
       'timetable',
       'account',
@@ -154,6 +158,7 @@ export default function PortalDashboard() {
           {admin && nav('/portal/learners', 'Learners', '◉')}
           {records && nav('/portal/records', 'Records', '▤')}
           {reports && nav('/portal/reports', 'Progress reports', '▥')}
+          {attendance && nav('/portal/attendance', 'Class attendance', '✓')}
           {nav('/portal/announcements', 'Announcements', '✦')}
           {nav('/portal/timetable', 'Timetable', '◷')}
           <span className="portal-nav-label portal-nav-label-secondary">Management</span>
@@ -197,6 +202,8 @@ export default function PortalDashboard() {
           <LearnerRecords profile={profile} user={user} />
         ) : view === 'reports' ? (
           <ProgressReports profile={profile} />
+        ) : view === 'attendance' ? (
+          <BulkAttendance profile={profile} />
         ) : ['announcements', 'timetable'].includes(view) ? (
           <SchoolContent key={view} view={view} profile={profile} user={user} />
         ) : view === 'account' ? (
