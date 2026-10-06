@@ -18,6 +18,8 @@ npm run dev
 
 Run `npm run build` for a production verification. Apply Supabase migrations from `supabase/migrations` before using portal workflows.
 
+Read the [formal report workflow](docs/REPORT_WORKFLOW.md) for the release and audit design.
+
 ---
 
 # React + Vite
