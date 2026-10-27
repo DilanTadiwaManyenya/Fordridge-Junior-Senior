@@ -73,9 +73,40 @@ export default function PortalDashboard() {
         throw new Error(
           'Your school profile is not ready. Contact the school office.',
         )
+      const [contextResult, membershipResult] = await Promise.all([
+        supabase.rpc('resolve_active_portal_context'),
+        supabase
+          .from('user_role_memberships')
+          .select('role,campus_id,is_primary,campus:campuses(name,code)')
+          .order('role'),
+      ])
+      if (contextResult.error) throw contextResult.error
+      if (membershipResult.error) throw membershipResult.error
+      const context = Array.isArray(contextResult.data)
+        ? contextResult.data[0]
+        : contextResult.data
+      if (!context?.active_role)
+        throw new Error('Your active role could not be loaded. Contact the school office.')
+      const memberships = membershipResult.data || []
+      const activeMembership = memberships.find(
+        (item) =>
+          item.role === context.active_role &&
+          item.campus_id === context.active_campus_id,
+      )
       setState({
         loading: false,
-        profile: result.data,
+        profile: {
+          ...result.data,
+          primary_role: result.data.role,
+          role: context.active_role,
+          campus_id: context.active_campus_id,
+          campus:
+            activeMembership?.campus ||
+            (context.active_campus_id === result.data.campus_id
+              ? result.data.campus
+              : null),
+          role_memberships: memberships,
+        },
         user: data.user,
         error: '',
       })
@@ -188,8 +219,31 @@ export default function PortalDashboard() {
     if (error) setState((s) => ({ ...s, error: error.message }))
     else navigate('/portal/login')
   }
+  async function switchRole(event) {
+    const [role, campusId = ''] = event.target.value.split('|')
+    if (role === profile.role && (campusId || null) === profile.campus_id) return
+    setState((s) => ({ ...s, loading: true, error: '' }))
+    const { error } = await supabase.rpc('switch_active_portal_role', {
+      p_role: role,
+      p_campus_id: campusId || null,
+    })
+    if (error) {
+      setState((s) => ({ ...s, loading: false, error: workflowError(error) }))
+      return
+    }
+    await load()
+  }
+  const membershipLabel = (item) => {
+    const roleName =
+      item.role === 'admin'
+        ? item.campus_id
+          ? 'Campus Admin'
+          : 'Main Admin'
+        : item.role[0].toUpperCase() + item.role.slice(1)
+    return `${roleName}${item.campus?.name ? ` · ${item.campus.name}` : ''}`
+  }
   return (
-    <main className="dashboard">
+    <main className="dashboard" key={`${profile.id}:${profile.role}:${profile.campus_id || 'all'}`}>
       <aside className={`portal-sidebar${mobileNavOpen ? ' mobile-nav-open' : ''}`}>
         <Link to="/portal" className="portal-mark">
           <img src={crest} alt="Fordridge crest" />
@@ -269,6 +323,27 @@ export default function PortalDashboard() {
       >
         <div className="portal-topbar">
           <div><span>Fordridge Schools</span><b>{profile.campus?.name || 'School portal'}</b></div>
+          <label className="portal-role-switcher">
+            <span>Active role</span>
+            {profile.role_memberships.length > 1 ? (
+              <select
+                aria-label="Active role"
+                value={`${profile.role}|${profile.campus_id || ''}`}
+                onChange={switchRole}
+              >
+                {profile.role_memberships.map((item) => {
+                  const key = `${item.role}|${item.campus_id || ''}`
+                  const deferredCampusAdmin =
+                    item.role === 'admin' && item.campus_id && !item.is_primary
+                  return (
+                    <option key={key} value={key} disabled={Boolean(deferredCampusAdmin)}>
+                      {membershipLabel(item)}{deferredCampusAdmin ? ' · scoped access pending' : ''}
+                    </option>
+                  )
+                })}
+              </select>
+            ) : <strong>{membershipLabel(profile.role_memberships[0] || { role: profile.role })}</strong>}
+          </label>
           <div className="portal-topbar-status"><i /><span>Secure session</span></div>
         </div>
         {view === 'fees' ? (

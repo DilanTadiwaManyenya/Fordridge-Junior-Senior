@@ -7,6 +7,7 @@ const db = new PGlite()
 await db.exec(`create role authenticated; create role anon; create schema auth;
 create table auth.users(id uuid primary key,raw_user_meta_data jsonb default '{}'::jsonb);
 create function auth.uid() returns uuid language sql stable as $$select nullif(current_setting('request.jwt.claim.sub',true),'')::uuid$$;
+create function auth.jwt() returns jsonb language sql stable as $$select coalesce(nullif(current_setting('request.jwt.claims',true),'')::jsonb,'{}'::jsonb)$$;
 grant usage on schema public,auth to authenticated,anon;
 alter default privileges in schema public grant all on tables to authenticated;
 alter default privileges in schema public grant all on sequences to authenticated;`)
@@ -85,8 +86,12 @@ const fee = (
 ).rows[0].id
 async function as(name) {
   await db.exec('reset role')
+  const userId = ids[name] || ''
   await db.query("select set_config('request.jwt.claim.sub',$1,false)", [
-    ids[name] || '',
+    userId,
+  ])
+  await db.query("select set_config('request.jwt.claims',$1,false)", [
+    JSON.stringify(userId ? { session_id: userId } : {}),
   ])
   await db.exec('set role authenticated')
 }
@@ -94,6 +99,11 @@ async function rejects(fn, pattern) {
   await assert.rejects(fn, pattern)
 }
 await as('admin')
+assert.deepEqual(
+  (await db.query('select active_role,active_campus_id from resolve_active_portal_context()')).rows,
+  [{ active_role: 'admin', active_campus_id: null }],
+  'a new Supabase session starts with its primary role and campus',
+)
 const term = await db.query(
   "select * from create_term_fee_record($1,'Form 1','ZIMSEC',1,2026,'Term 3',null)",
   [ids.student],
@@ -413,6 +423,10 @@ await db.query(
   "select grant_portal_role($1,'admin',null,'Approved secondary Main Admin role')",
   ['00000000-0000-4000-8000-000000000010'],
 )
+await db.query(
+  "select grant_portal_role($1,'admin',$2,'Approved Campus Admin role')",
+  ['00000000-0000-4000-8000-000000000010', campus],
+)
 assert.equal(
   (await db.query("select role from user_role_memberships where id=$1", [accountantGrant])).rows[0].role,
   'accountant',
@@ -451,31 +465,91 @@ await db.query(
   ['00000000-0000-4000-8000-000000000010', campus],
 )
 assert.deepEqual(
-  (await db.query("select role,is_primary from user_role_memberships where user_id='00000000-0000-4000-8000-000000000010' order by role")).rows,
+  (await db.query("select role,is_primary,campus_id is not null as campus_scoped from user_role_memberships where user_id='00000000-0000-4000-8000-000000000010' order by role,campus_id")).rows,
   [
-    { role: 'accountant', is_primary: false },
-    { role: 'admin', is_primary: false },
-    { role: 'teacher', is_primary: true },
+    { role: 'accountant', is_primary: false, campus_scoped: true },
+    { role: 'admin', is_primary: false, campus_scoped: true },
+    { role: 'admin', is_primary: false, campus_scoped: false },
+    { role: 'teacher', is_primary: true, campus_scoped: true },
   ],
   'provisioning replaces the temporary signup role while preserving separately granted roles',
+)
+const roleTargetId = '00000000-0000-4000-8000-000000000010'
+const roleTargetSession = '10000000-0000-4000-8000-000000000001'
+await db.exec('reset role')
+await db.query("select set_config('request.jwt.claim.sub',$1,false)", [roleTargetId])
+await db.query("select set_config('request.jwt.claims',$1,false)", [JSON.stringify({ session_id: roleTargetSession })])
+await db.exec('set role authenticated')
+assert.deepEqual(
+  (await db.query('select active_role,active_campus_id from resolve_active_portal_context()')).rows,
+  [{ active_role: 'teacher', active_campus_id: campus }],
+  'a session initializes to the provisioned primary role and campus',
+)
+assert.deepEqual(
+  (await db.query("select active_role,active_campus_id from switch_active_portal_role('accountant',$1)", [campus])).rows,
+  [{ active_role: 'accountant', active_campus_id: campus }],
+  'a user can switch only to an explicitly granted role and scope',
+)
+await rejects(
+  () => db.query("select switch_active_portal_role('admin',$1)", [campus]),
+  /Campus Admin switching requires the scoped policy stage/,
+)
+assert.deepEqual(
+  (await db.query("select active_role,active_campus_id from switch_active_portal_role('admin',null)")).rows,
+  [{ active_role: 'admin', active_campus_id: null }],
+  'a school-wide Main Admin membership can be selected in its own session',
+)
+assert.equal(
+  (await db.query('select my_role()::text as role')).rows[0].role,
+  'teacher',
+  'legacy database authorization stays on the primary role until Stage 15 policy migration',
+)
+assert.deepEqual(
+  (await db.query("select active_role,active_campus_id from switch_active_portal_role('teacher',$1)", [campus])).rows,
+  [{ active_role: 'teacher', active_campus_id: campus }],
+  'the user can return to the primary context',
+)
+await db.exec('reset role')
+const otherSession = '10000000-0000-4000-8000-000000000002'
+await db.query("select set_config('request.jwt.claim.sub',$1,false)", [roleTargetId])
+await db.query("select set_config('request.jwt.claims',$1,false)", [JSON.stringify({ session_id: otherSession })])
+await db.exec('set role authenticated')
+assert.deepEqual(
+  (await db.query('select active_role,active_campus_id from resolve_active_portal_context()')).rows,
+  [{ active_role: 'teacher', active_campus_id: campus }],
+  'role switching in one session does not change another session',
+)
+await as('admin')
+await db.query(
+  "select revoke_portal_role($1,'admin',$2,'Campus admin scope test complete')",
+  [roleTargetId, campus],
 )
 await db.query(
   "select revoke_portal_role($1,'accountant',$2,'Finance role no longer needed')",
   ['00000000-0000-4000-8000-000000000010', campus],
+)
+assert.ok(
+  Number((await db.query("select count(*) from audit_trail where entity_type='role_membership' and entity_id='00000000-0000-4000-8000-000000000010'")).rows[0].count) >= 4,
+  'role grant, provisioning and revocation are written to the audit trail',
 )
 assert.equal(
   (await db.query("select count(*) from user_role_memberships where user_id='00000000-0000-4000-8000-000000000010' and role='accountant'")).rows[0].count,
   0,
   'Main Admin can revoke an additional grant with an audit reason',
 )
+await db.exec('reset role')
+await db.query("select set_config('request.jwt.claim.sub',$1,false)", [roleTargetId])
+await db.query("select set_config('request.jwt.claims',$1,false)", [JSON.stringify({ session_id: roleTargetSession })])
+await db.exec('set role authenticated')
+assert.deepEqual(
+  (await db.query('select active_role,active_campus_id from resolve_active_portal_context()')).rows,
+  [{ active_role: 'teacher', active_campus_id: campus }],
+  'a revoked active membership resets to the primary role on reload',
+)
 assert.equal(
   (await db.query("select count(*) from user_role_memberships where user_id='00000000-0000-4000-8000-000000000010' and role='admin'")).rows[0].count,
   1,
   'additional role grants remain stored separately from the primary role',
-)
-assert.ok(
-  Number((await db.query("select count(*) from audit_trail where entity_type='role_membership' and entity_id='00000000-0000-4000-8000-000000000010'")).rows[0].count) >= 4,
-  'role grant, provisioning and revocation are written to the audit trail',
 )
 await db.exec('reset role')
 await db.query("select set_config('request.jwt.claim.sub',$1,false)", ['00000000-0000-4000-8000-000000000010'])

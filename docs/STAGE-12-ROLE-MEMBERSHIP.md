@@ -12,12 +12,12 @@ Approval basis: owner approval of the 85-stage roadmap, Stage 7 access matrix, a
 - Main Admin grant/revoke/primary-role operations reject self-management, require a reason and write the action to the existing audit trail.
 - Public signup continues to allow only Student or Parent and creates a matching primary membership.
 - Admin account provisioning synchronizes the temporary signup role with the provisioned Teacher/Staff/Student role and requires Main Admin authority.
-- Existing authorization remains based on Fordridge's current `profiles.role`; no role switch or permission expansion is introduced in this stage.
+- Existing authorization remains based on Fordridge's current `profiles.role`; role activation is implemented separately in [Stage 13](STAGE-13-ACTIVE-ROLE-SWITCHING.md), while database policy enforcement is deferred to Stage 15.
 
 ## Implementation
 
 - Added `20261010000000_role_membership_storage.sql` with `user_role_memberships`, legacy-role backfill, one-primary-role and unique-scope constraints, read-only RLS, and authenticated grant/revoke/primary-provisioning RPCs.
-- Added Main Admin detection from the user's primary school-wide `admin` membership. Campus Admin remains an `admin` membership scoped to its campus; it cannot grant roles through these school-wide grant RPCs. Secondary memberships remain stored but inactive until Stage 13.
+- Added Main Admin detection from the user's primary school-wide `admin` membership. Campus Admin remains an `admin` membership scoped to its campus; it cannot grant roles through these school-wide grant RPCs. Secondary memberships are stored without silently replacing the primary profile role.
 - Added audit events for role grants, revocations and primary-role provisioning. Primary roles must be changed through the protected provisioning RPC; additional memberships can be explicitly revoked.
 - Updated the protected signup trigger and `create-portal-account` Edge Function to keep role memberships synchronized with the profile and require Main Admin for account provisioning.
 - Did not seed any actual accounts or copy Reliance users, credentials or configuration.
@@ -32,4 +32,4 @@ Approval basis: owner approval of the 85-stage roadmap, Stage 7 access matrix, a
 ## Deployment and next stage
 
 - The migration has not been applied to Supabase and the Edge Function has not been deployed. Production migration/deployment needs separate owner approval.
-- Stage 13 adds active-role switching. It must validate membership and reset scoped state; it must not combine permissions from multiple roles. Review it separately before implementation because it changes permission selection at sign-in/runtime.
+- Stage 13 adds per-session active-role switching. Database policies continue to use the legacy primary role until Stage 15; do not deploy active-role UI before that enforcement work and separate production approval.

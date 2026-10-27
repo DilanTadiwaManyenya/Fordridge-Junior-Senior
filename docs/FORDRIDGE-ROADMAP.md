@@ -1,7 +1,7 @@
 # Fordridge portal roadmap inspired by Reliance
 
 Updated: 27 October 2026
-Current checkpoint: Stages 1–12 complete; Stage 13 awaits focused approval/review
+Current checkpoint: Stages 1–12 complete; Stage 13 active-role switching implemented and under review
 
 ## Purpose
 
@@ -37,7 +37,7 @@ The evidence and limitations are in [Stage 2 inventory](STAGE-02-INVENTORY.md), 
 
 ## Stage sequence
 
-Stages 1–11 are completed foundation, catalogue and teacher-scope work. The owner approved the Stage 7 capability matrix on 27 October 2026. Stage 12 adds safe role membership storage; Stage 13 introduces active-role switching and needs focused review before implementation.
+Stages 1–12 are completed foundation, catalogue, teacher-scope and role-membership work. The owner approved the Stage 7 capability matrix on 27 October 2026. Stage 13 adds per-session active-role switching; Stage 15 must enforce that context in database policies before frontend release.
 
 | Stage | Small deliverable | Acceptance check / dependency |
 | --- | --- | --- |

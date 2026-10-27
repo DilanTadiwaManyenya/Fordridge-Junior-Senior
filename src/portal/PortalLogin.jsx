@@ -4,7 +4,7 @@ import crest from '../assets/fordridge-crest.jpeg'
 import { isSupabaseConfigured, supabase } from '../lib/supabase'
 import PasswordInput from './PasswordInput'
 import PhoneNumberField, { toE164 } from './PhoneNumberField'
-import { canEnterPortal, workflowError } from './workflow'
+import { workflowError } from './workflow'
 
 export default function PortalLogin({
   portalRole = 'student',
@@ -25,6 +25,8 @@ export default function PortalLogin({
   const [recover, setRecover] = useState(false)
   const roleTitle = portalRole[0].toUpperCase() + portalRole.slice(1)
   async function enter(user) {
+    const permittedRoles =
+      portalRole === 'staff' ? ['staff', 'teacher', 'admin'] : [portalRole]
     const result = await supabase
       .from('profiles')
       .select('role')
@@ -34,11 +36,32 @@ export default function PortalLogin({
       throw new Error(
         'Signed in, but your school profile could not be loaded. Please retry or contact the school office.',
       )
-    if (!canEnterPortal(result.data?.role, portalRole)) {
+    const memberships = await supabase
+      .from('user_role_memberships')
+      .select('role,campus_id,is_primary')
+      .in('role', permittedRoles)
+      .order('campus_id')
+    if (memberships.error) throw memberships.error
+    const selected =
+      memberships.data?.find(
+        (item) => item.role === portalRole && item.is_primary,
+      ) ||
+      memberships.data?.find((item) => item.role === portalRole) ||
+      memberships.data?.find((item) => item.is_primary) ||
+      memberships.data?.[0]
+    if (!selected) {
       await supabase.auth.signOut()
       throw new Error(
         `This account cannot access the ${roleTitle.toLowerCase()} portal. Choose the matching portal.`,
       )
+    }
+    const activeRole = await supabase.rpc('switch_active_portal_role', {
+      p_role: selected.role,
+      p_campus_id: selected.campus_id,
+    })
+    if (activeRole.error) {
+      await supabase.auth.signOut()
+      throw activeRole.error
     }
     navigate('/portal')
   }
