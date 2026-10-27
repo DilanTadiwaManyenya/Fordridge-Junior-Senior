@@ -1,28 +1,33 @@
-# Stage 5: pre-change validation baseline
+# Stage 5: pre-change validation baseline and follow-up
 
 Date: 27 October 2026
-Starting commit: a760eaf
-Scope: validation only; no application code changes
+Baseline commit: a760eaf
+Follow-up changes: Fordridge report-signatories SQL migrations
 
-## Results
+## Original baseline
 
-| Check | Result | Notes |
+| Check | Original result | Notes |
 | --- | --- | --- |
-| `npm run build` | Passed | Vite 8.3.0 transformed 251 modules. Existing warning: generated JavaScript chunk is 735.40 kB (196.66 kB gzip), above the 500 kB notice. |
-| `npm run lint` | Passed with warnings | Oxlint exits 0 and reports existing React effect setState warnings across page components, plus a missing `selected` dependency warning in BulkMarks.jsx. These are baseline findings; this stage changed no application source. |
-| `node scripts/test-portal.mjs` | Failed | PGlite parser rejects the PL/pgSQL in `supabase/migrations/20261006140000_report_signatories.sql` (`report_subject_signatories`), with `mismatched parentheses at or near ";"`. The isolated database suite therefore cannot establish the remaining migration/RLS assertions. No live database was accessed. |
-| `node scripts/test-portal-browser.mjs` | Could not launch | Playwright reports that its configured Chromium headless shell executable is missing under the local Playwright cache. The browser test body did not run. No browser was installed in this stage. |
+| `npm run build` | Passed | Vite 8.3.0 transformed 251 modules. The generated JavaScript chunk was 735.40 kB (196.66 kB gzip), above the 500 kB notice. |
+| `npm run lint` | Passed with warnings | Oxlint exited 0 with existing React effect setState warnings and a missing `selected` dependency warning in BulkMarks.jsx. |
+| `node scripts/test-portal.mjs` | Failed | PGlite rejected malformed PL/pgSQL in the live signatory function migration, then the copied snapshot function had the same malformed initials expression. |
+| `node scripts/test-portal-browser.mjs` | Could not launch | The Playwright Chromium headless shell executable was missing. The browser test body did not run. |
 
-The local Vite server started successfully on 127.0.0.1:5179 for the browser attempt and was stopped afterward. Browser tests are written to mock Supabase requests; no school records were used.
+## Stage 5 follow-up
 
-## Interpretation and follow-up
+Source inspection found that the teacher initials expression passed only one argument to `coalesce` and gave `nullif` an em dash comparison rather than an empty-string comparison. The whitespace regex also used excess backslashes. The report release snapshot trigger repeated the same expression.
 
-The application bundles successfully. Lint warnings and the report-signatories database-suite parse failure predate the first feature implementation in this roadmap. Preserve these results as the comparison point; don't attribute them to subsequent stages.
+Both expressions now use a correctly escaped whitespace split, return a fallback em dash for blank initials, and parse as valid SQL/PLpgSQL. The existing role, learner, campus and class authorization checks remain unchanged.
 
-Before feature work depends on the isolated database suite, Stage 5 follow-up should determine whether the PGlite/PL/pgSQL parser limitation can be worked around safely or whether the migration routine needs a valid, tested correction. Compare with actual PostgreSQL syntax and the isolated test harness; never weaken or skip the report access checks to make the suite pass. Browser-suite follow-up requires installing/locating the project's expected Playwright browser in an authorised local environment.
+After correcting both migrations, `node scripts/test-portal.mjs` passes:
 
-Live Supabase migration status, RLS and Edge Function deployment, SMS delivery, and Vercel deployment remain outside this local baseline and are unverified.
+> PASS: migrations, atomic payments, retry safety, rollback, profile permissions, published notices, class scoping, guardian access, private records and teacher login.
 
-## Workspace state
+This applies all local migration files to isolated PGlite. It does not connect to or modify Fordridge production. Build and lint were not rerun; the change is confined to SQL function expressions. The browser test remains unrun because Chromium is absent. No browser was installed in this follow-up.
 
-The only intended repository change is this baseline record. Existing ignored test tooling and application files were not modified. Diff whitespace checks are run before commit. Stage 6 updates the master roadmap/tracker with verified feature mappings and completed stages.
+## Remaining validation work
+
+- Install or locate the project's expected Playwright browser in an authorised local environment, then run `node scripts/test-portal-browser.mjs` against the local app.
+- Keep production migration history, effective RLS, deployed functions, SMS delivery and hosted frontend status marked unverified until separately checked.
+
+The original baseline results remain historical evidence. The follow-up result records the correction and the isolated-suite pass; don't report the original PGlite failure as still present.

@@ -6,7 +6,7 @@ begin
   if new.published_at is not null and (tg_op='INSERT' or old.published_at is null) then
     update public.report_release_snapshots s
     set subject_signatories=coalesce((
-      select jsonb_object_agg(a.subject, coalesce(nullif(array_to_string(array(select upper(left(part,1)) from unnest(regexp_split_to_array(trim(t.full_name), '\\s+')) part),''),'—'))
+      select jsonb_object_agg(a.subject, coalesce(nullif(array_to_string(array(select upper(left(part,1)) from unnest(regexp_split_to_array(trim(t.full_name), '\s+')) part), ''), ''), '—'))
       from public.teacher_class_assignments a
       join public.profiles t on t.id=a.teacher_id
       join public.profiles learner on learner.id=s.student_id

@@ -13,7 +13,7 @@ begin
   ) then raise exception 'Not allowed'; end if;
   return query
     select a.subject,
-      coalesce(nullif(array_to_string(array(select upper(left(part, 1)) from unnest(regexp_split_to_array(trim(p.full_name), '\\s+')) part), ''), '—')
+      coalesce(nullif(array_to_string(array(select upper(left(part, 1)) from unnest(regexp_split_to_array(trim(p.full_name), '\s+')) part), ''), ''), '—')
     from public.teacher_class_assignments a
     join public.profiles p on p.id=a.teacher_id
     where a.campus_id=learner.campus_id

@@ -131,7 +131,7 @@ Stages 1–5 are completed foundation records. Stages 7 onward are planned; thei
 
 - The build passes, with a 735.40 kB minified JavaScript chunk warning.
 - Lint exits successfully with React effect update warnings and a missing `selected` dependency warning in BulkMarks.jsx.
-- The isolated database suite fails when PGlite parses `report_subject_signatories` in `supabase/migrations/20261006140000_report_signatories.sql`. Preserve the authorization logic while checking PostgreSQL syntax and test harness support.
-- The mocked browser suite has no installed Playwright Chromium executable. Run it after the browser dependency is available.
+- Stage 5 follow-up corrected malformed initials expressions in the live and snapshot signatory migrations. The isolated database suite now passes in PGlite, including policy and payment assertions.
+- The mocked browser suite still has no installed Playwright Chromium executable. Run it after the browser dependency is available.
 
 Stages 7–20 establish access and class foundations. Do not roll out a new administrator/accountant capability until both page gates and database rules agree. No production deployment is certified by a local build or mock test.
