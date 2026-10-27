@@ -355,28 +355,38 @@ await rejects(
   /Choose a confirmed class/,
 )
 const seniorCampus = (await db.query("select id from campuses where code='senior'")).rows[0].id
-const seniorFormOne = (await db.query(
-  "insert into school_classes(campus_id,class_level) values($1,'Form 1') returning id",
+const seniorSixthForm = (await db.query(
+  "insert into school_classes(campus_id,class_level) values($1,'Sixth Form') returning id",
   [seniorCampus],
 )).rows[0].id
+const seniorStreamA = (await db.query(
+  "insert into school_class_streams(class_id,stream_name) values($1,'Example A') returning id",
+  [seniorSixthForm],
+)).rows[0].id
+const seniorStreamB = (await db.query(
+  "insert into school_class_streams(class_id,stream_name) values($1,'Example B') returning id",
+  [seniorSixthForm],
+)).rows[0].id
 const seniorLearnerId = '00000000-0000-4000-8000-000000000011'
+const otherSeniorLearnerId = '00000000-0000-4000-8000-000000000012'
 await db.exec('reset role')
-await db.query('insert into auth.users(id,raw_user_meta_data) values($1,$2)', [
-  seniorLearnerId,
-  JSON.stringify({ full_name: 'Senior Test Learner' }),
-])
-await db.query(
-  "update profiles set campus_id=$1,class_level='Form 1',class_stream=null,enrollment_status='active' where id=$2",
-  [seniorCampus, seniorLearnerId],
-)
+for (const [id, name, stream] of [
+  [seniorLearnerId, 'Sixth Form Example A Learner', 'Example A'],
+  [otherSeniorLearnerId, 'Sixth Form Example B Learner', 'Example B'],
+]) {
+  await db.query('insert into auth.users(id,raw_user_meta_data) values($1,$2)', [
+    id,
+    JSON.stringify({ full_name: name }),
+  ])
+  await db.query(
+    "update profiles set campus_id=$1,class_level='Sixth Form',class_stream=$2,enrollment_status='active' where id=$3",
+    [seniorCampus, stream, id],
+  )
+}
 await as('admin')
 await db.query(
-  "insert into teacher_class_assignments(teacher_id,campus_id,class_level,class_id,subject) values($1,$2,'Form 1',$3,null)",
-  [ids.teacher, seniorCampus, seniorFormOne],
-)
-await db.query(
-  "insert into teacher_class_assignments(teacher_id,campus_id,class_level,class_id,subject,assignment_kind) values($1,$2,'Form 1',$3,'Biology','subject')",
-  [ids.teacher, seniorCampus, seniorFormOne],
+  "insert into teacher_class_assignments(teacher_id,campus_id,class_level,class_stream,class_id,class_stream_id,subject,assignment_kind) values($1,$2,'Sixth Form','Example A',$3,$4,'Biology','subject')",
+  [ids.teacher, seniorCampus, seniorSixthForm, seniorStreamA],
 )
 await db.query(
   "select grant_portal_role($1,'teacher',$2,'Approved second campus teaching assignment')",
@@ -414,12 +424,12 @@ assert.equal(
   false,
 )
 assert.equal(
-  (await db.query('select teacher_has_class_assignment($1,$2,$3) as allowed', [seniorCampus, 'Form 1', 'B'])).rows[0].allowed,
+  (await db.query('select teacher_has_class_assignment($1,$2,$3) as allowed', [seniorCampus, 'Sixth Form', 'Example A'])).rows[0].allowed,
   false,
   'a junior campus assignment does not grant senior campus access',
 )
 assert.equal(
-  (await db.query('select teacher_has_subject_assignment($1,$2,$3,$4) as allowed', [seniorCampus, 'Form 1', null, 'Biology'])).rows[0].allowed,
+  (await db.query('select teacher_has_subject_assignment($1,$2,$3,$4) as allowed', [seniorCampus, 'Sixth Form', 'Example A', 'Biology'])).rows[0].allowed,
   false,
   'a subject assignment from another active campus is not enabled',
 )
@@ -434,19 +444,39 @@ assert.deepEqual(
   'a multi-campus teacher can explicitly switch campus context',
 )
 assert.equal(
-  (await db.query('select teacher_has_class_assignment($1,$2,$3) as allowed', [seniorCampus, 'Form 1', null])).rows[0].allowed,
-  true,
-  'the assigned campus class is available after switching context',
+  (await db.query('select teacher_has_class_assignment($1,$2,$3) as allowed', [seniorCampus, 'Sixth Form', 'Example A'])).rows[0].allowed,
+  false,
+  'a subject-only Sixth Form allocation does not grant class-register access',
 )
 assert.equal(
-  (await db.query('select teacher_has_subject_assignment($1,$2,$3,$4) as allowed', [seniorCampus, 'Form 1', null, 'Biology'])).rows[0].allowed,
+  (await db.query('select teacher_has_subject_assignment($1,$2,$3,$4) as allowed', [seniorCampus, 'Sixth Form', 'Example A', 'Biology'])).rows[0].allowed,
   true,
-  'the active-campus subject allocation becomes available after switching',
+  'the assigned Sixth Form subject and stream are available after switching context',
+)
+assert.equal(
+  (await db.query('select teacher_has_subject_assignment($1,$2,$3,$4) as allowed', [seniorCampus, 'Sixth Form', 'Example B', 'Biology'])).rows[0].allowed,
+  false,
+  'the Sixth Form subject allocation does not include another stream',
+)
+assert.equal(
+  (await db.query('select teacher_has_subject_assignment($1,$2,$3,$4) as allowed', [seniorCampus, 'Sixth Form', 'Example A', 'Chemistry'])).rows[0].allowed,
+  false,
+  'the Sixth Form stream allocation does not include another subject',
 )
 assert.equal(
   (await db.query('select count(*) from profiles where id=$1', [seniorLearnerId])).rows[0].count,
   1,
-  'assigned senior learner appears only in the matching active campus context',
+  'assigned Sixth Form learner appears only in the matching active campus context',
+)
+assert.equal(
+  (await db.query('select count(*) from profiles where id=$1', [otherSeniorLearnerId])).rows[0].count,
+  0,
+  'an unassigned Sixth Form stream learner is not visible',
+)
+await db.query("select record_bulk_marks('Biology Quiz','Biology',current_date,2026,'Term 1',100,$1::jsonb)", [JSON.stringify([{ student_id: seniorLearnerId, score: 80 }])])
+await rejects(
+  () => db.query("select record_bulk_marks('Biology Quiz','Biology',current_date,2026,'Term 1',100,$1::jsonb)", [JSON.stringify([{ student_id: otherSeniorLearnerId, score: 80 }])]),
+  /Subject is not allocated/,
 )
 await db.query("select switch_active_portal_role('teacher',$1)", [campus])
 await db.query('select record_bulk_attendance(current_date,$1::jsonb)', [JSON.stringify([{ student_id: ids.stream_student, attendance_status: 'present' }])])

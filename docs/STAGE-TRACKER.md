@@ -27,6 +27,7 @@ A stage is Complete only after its deliverable and relevant checks are recorded 
 | 17 | Complete | Campus-scoped Accountant fee operations | [0f479c3](https://github.com/DilanTadiwaManyenya/Fordridge-Junior-Senior/commit/0f479c3); [Stage 17 record](STAGE-17-ACCOUNTANT-FINANCE.md); isolated payment/RLS suite, build, lint and diff checks pass; cashbook and expense operations remain unavailable pending campus attribution |
 | 18 | Complete | Teacher My class and active-campus subject workspace | [4cb42e4](https://github.com/DilanTadiwaManyenya/Fordridge-Junior-Senior/commit/4cb42e4); [Stage 18 record](STAGE-18-TEACHER-WORKSPACE.md); isolated assignment/RLS suite, build, lint and diff checks pass; no class/stream data seeded |
 | 19 | Complete | Junior ECD/Grade My class scope regression coverage | [4b562a1](https://github.com/DilanTadiwaManyenya/Fordridge-Junior-Senior/commit/4b562a1); [Stage 19 record](STAGE-19-JUNIOR-WORKSPACE-RULES.md); portal suite, build, lint and diff checks pass; synthetic fixtures only |
+| 20 | Validated; commit/push pending | Senior Sixth Form stream-and-subject access regression coverage | [Stage 20 record](STAGE-20-SENIOR-COURSEWORK-ACCESS.md); portal suite, build, lint and diff checks pass; synthetic fixtures only |
 
 ## Stage 5 follow-up status
 

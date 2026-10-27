@@ -2,6 +2,12 @@
 
 These changes are implemented locally. Do not deploy the frontend before applying the database migrations below. The Supabase CLI access check returned HTTP 403 for the account available in this session, so no production database changes or function deployments were performed.
 
+## Current staff sign-in database blocker
+
+The staff sign-in screen reports that the latest database update is needed when its role-membership query or active-role switching RPC is missing from the connected Supabase schema. The current frontend reads `public.user_role_memberships` and calls `public.switch_active_portal_role(text, uuid)`. The local migrations that introduce these are `supabase/migrations/20261010000000_role_membership_storage.sql` and `supabase/migrations/20261011000000_active_role_contexts.sql`; active-role-aware authorization also depends on `20261012000000_active_role_authorization.sql`.
+
+This is evidence of a schema/frontend deployment mismatch, not evidence that the entered password is wrong. The live migration history and schema have not been verified from this workspace, and the Supabase CLI is not installed here. Before fixing the production sign-in error, an authorised operator must inspect the linked migration history, identify the full ordered set of pending migrations (including prerequisites), review them, and get the required owner approval before applying them. Do not apply only the three files named above if earlier migrations are pending. After the approved migration sequence is applied, verify staff login with an approved test account and confirm the active-role RPC works. Do not copy credentials into this repository.
+
 ## Deployment order
 
 1. Sign in to Supabase using an account with access to Fordridge project `ufyegiyhnhdvxiagcjpa`.

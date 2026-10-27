@@ -1,7 +1,7 @@
 # Fordridge portal roadmap inspired by Reliance
 
 Updated: 27 October 2026
-Current checkpoint: Stages 1–19 complete; Stage 20 is next
+Current checkpoint: Stages 1–19 complete; Stage 20 implementation in progress
 
 ## Purpose
 
@@ -60,7 +60,7 @@ Stages 1–17 are completed foundation, catalogue, teacher-scope, role-membershi
 | 17 | Define accountant finance scope | If approved, write and read access is explicit and campus scoped. |
 | 18 | Verify teacher workspace entry | Class overview/My class and Subject allocations match assignment type. |
 | 19 | Verify ECD/Grade workspace rules | Junior ECD and Grade teacher capabilities are explicit and checked. [Stage record](STAGE-19-JUNIOR-WORKSPACE-RULES.md) |
-| 20 | Verify senior coursework access | Sixth Form and stream-specific subjects match assigned learners. |
+| 20 | Verify senior coursework access | Sixth Form and stream-specific subjects match assigned learners. [Stage record](STAGE-20-SENIOR-COURSEWORK-ACCESS.md) |
 | 21 | Apply verified sidebar group labels | Workspace and Academic services use verified names and no dead links. |
 | 22 | Align finance/admin navigation | Finance and Administration groups match the role capability matrix. |
 | 23 | Add role-specific accountant navigation | Accountant Workspace opens only authorised finance/support screens. |
