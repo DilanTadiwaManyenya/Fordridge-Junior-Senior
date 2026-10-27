@@ -1,7 +1,7 @@
 # Stage 11: separate subject allocations
 
 Date: 27 October 2026
-Status: implemented locally; isolated tests and frontend build pass; commit/push pending
+Status: complete; committed and pushed to `origin/master` as `1ff87d7`
 Approval basis: owner approval of the 85-stage roadmap and Reliance-inspired Stage 7 access matrix
 
 ## Acceptance scope
