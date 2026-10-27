@@ -38,6 +38,29 @@ assert.deepEqual(
   'subject-only allocations do not appear as class-register assignments',
 )
 
+const juniorWorkspaceLearners = [
+  { id: 'ecd-one', campus_id: 'junior', class_level: 'ECD', class_stream: null, full_name: 'ECD Test Learner' },
+  { id: 'grade-blue', campus_id: 'junior', class_level: 'Grade 3', class_stream: 'Example stream', full_name: 'Grade Test Learner' },
+  { id: 'grade-other', campus_id: 'junior', class_level: 'Grade 3', class_stream: 'Other example stream', full_name: 'Other Grade Test Learner' },
+]
+const juniorWorkspaceView = buildTeacherClassScopes([
+  { assignment_kind: 'class', campus_id: 'junior', class_level: 'ECD', class_stream: null },
+  { assignment_kind: 'class', campus_id: 'junior', class_level: 'Grade 3', class_stream: 'Example stream' },
+], juniorWorkspaceLearners)
+assert.deepEqual(
+  juniorWorkspaceView.map((scope) => [scope.class_level, scope.learners.map((learner) => learner.id)]),
+  [
+    ['ECD', ['ecd-one']],
+    ['Grade 3', ['grade-blue']],
+  ],
+  'Junior ECD whole-class and Grade stream scopes use the same assignment-bound roster rules (synthetic fixtures)',
+)
+assert.equal(
+  canOpenTeacherMyClass('teacher', juniorWorkspaceView.length > 0),
+  true,
+  'an assigned Junior ECD/Grade teacher can enter My class',
+)
+
 const db = new PGlite()
 await db.exec(`create role authenticated; create role anon; create schema auth;
 create table auth.users(id uuid primary key,raw_user_meta_data jsonb default '{}'::jsonb);
