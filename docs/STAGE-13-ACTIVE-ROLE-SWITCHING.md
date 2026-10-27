@@ -1,7 +1,7 @@
 # Stage 13: active role switching
 
 Date: 27 October 2026
-Status: implemented locally; checks pass; commit/push pending
+Status: complete; committed and pushed to `origin/master` as `31f60c9`
 Approval basis: owner instruction to continue to Stage 13 after Stage 12
 
 ## Acceptance scope

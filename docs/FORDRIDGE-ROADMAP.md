@@ -1,7 +1,7 @@
 # Fordridge portal roadmap inspired by Reliance
 
 Updated: 27 October 2026
-Current checkpoint: Stages 1–12 complete; Stage 13 active-role switching implemented and under review
+Current checkpoint: Stages 1–13 complete; Stage 14 profile loading is next
 
 ## Purpose
 
