@@ -43,4 +43,3 @@ comment on table public.school_classes is
   'Canonical Fordridge class levels. Created empty; school-approved names are entered through the admin Classes workspace.';
 comment on table public.school_class_streams is
   'Optional streams below a Fordridge class. No stream names or capacities are preconfigured.';
-
