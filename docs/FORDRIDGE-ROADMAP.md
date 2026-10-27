@@ -1,7 +1,7 @@
 # Fordridge portal roadmap inspired by Reliance
 
 Updated: 27 October 2026
-Current checkpoint: Stages 1–13 complete; Stage 14 profile loading implemented and under review
+Current checkpoint: Stages 1–14 complete; Stage 15 awaits owner approval
 
 ## Purpose
 

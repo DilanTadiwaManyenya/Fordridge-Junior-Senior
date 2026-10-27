@@ -1,7 +1,7 @@
 # Stage 14: bound portal profile loading
 
 Date: 27 October 2026
-Status: implemented locally; checks pass; commit/push pending
+Status: complete; committed and pushed to `origin/master` as `dbf1762`
 Approval basis: approved roadmap; stage is limited to request handling and recovery
 
 ## Acceptance scope

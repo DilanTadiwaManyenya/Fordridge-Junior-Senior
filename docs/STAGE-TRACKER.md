@@ -21,7 +21,7 @@ A stage is Complete only after its deliverable and relevant checks are recorded 
 | 11 | Complete | Separate Subject allocations and subject-scoped Markbook writes | [1ff87d7](https://github.com/DilanTadiwaManyenya/Fordridge-Junior-Senior/commit/1ff87d7); [Stage 11 record](STAGE-11-SUBJECT-ALLOCATIONS.md); isolated tests, build and lint pass |
 | 12 | Complete | Server-controlled role memberships and audited grants | [e8afb27](https://github.com/DilanTadiwaManyenya/Fordridge-Junior-Senior/commit/e8afb27); [Stage 12 record](STAGE-12-ROLE-MEMBERSHIP.md); isolated tests, build and lint pass; live migration/function deployment pending |
 | 13 | Complete | Per-session active-role switching and workspace reset | [31f60c9](https://github.com/DilanTadiwaManyenya/Fordridge-Junior-Senior/commit/31f60c9); [Stage 13 record](STAGE-13-ACTIVE-ROLE-SWITCHING.md); isolated tests, build and lint pass; database policy enforcement remains Stage 15 |
-| 14 | Implemented; awaiting commit/push | Bounded profile, role-context and membership loading with retry | [Stage 14 record](STAGE-14-PROFILE-LOADING.md); isolated timeout checks, build and lint pass |
+| 14 | Complete | Bounded profile, role-context and membership loading with retry | [dbf1762](https://github.com/DilanTadiwaManyenya/Fordridge-Junior-Senior/commit/dbf1762); [Stage 14 record](STAGE-14-PROFILE-LOADING.md); isolated timeout checks, build and lint pass |
 
 ## Stage 5 follow-up status
 
