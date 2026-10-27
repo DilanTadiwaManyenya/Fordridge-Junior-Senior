@@ -1,7 +1,7 @@
 # Fordridge portal roadmap inspired by Reliance
 
 Updated: 27 October 2026
-Current checkpoint: Stages 1–14 complete; Stage 15 implementation validated and awaiting push
+Current checkpoint: Stages 1–14 complete; Stage 15 validated and committed locally, push pending because GitHub HTTPS is unreachable
 
 ## Purpose
 
