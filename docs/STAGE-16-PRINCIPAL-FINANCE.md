@@ -1,7 +1,7 @@
 # Stage 16: Principal read-only finance
 
 Date: 27 October 2026
-Status: implementation validated; awaiting stage commit and push
+Status: complete; implementation commit `caf9461` pushed to `origin/master`
 Approval basis: owner-approved Stage 7 access matrix (Principal Finance is read-only within the assigned campus)
 
 ## Acceptance scope
@@ -25,6 +25,7 @@ Approval basis: owner-approved Stage 7 access matrix (Principal Finance is read-
 - `npm run build` — PASS. Existing large JavaScript chunk warning remains (756.25 kB minified).
 - `npm run lint` — PASS (exit 0); existing React effect/hook and unused-parameter warnings remain.
 - `git diff --check` — PASS.
+- Implementation commit `caf9461` — pushed to the verified Fordridge remote.
 - Browser suite — not run; Playwright Chromium remains unavailable per the Stage 5 baseline.
 
 ## Deployment and limitations
