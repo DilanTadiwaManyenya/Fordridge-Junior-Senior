@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { readFile, readdir } from 'node:fs/promises'
 import { PGlite } from '../.portal-test-tools/node_modules/@electric-sql/pglite/dist/index.js'
-import { canEnterPortal } from '../src/portal/workflow.js'
+import { canEnterPortal, withPortalTimeout } from '../src/portal/workflow.js'
 
 const db = new PGlite()
 await db.exec(`create role authenticated; create role anon; create schema auth;
@@ -296,6 +296,16 @@ await as('teacher')
 assert.equal(canEnterPortal('teacher', 'staff'), true)
 assert.equal(canEnterPortal('student', 'staff'), false)
 assert.equal(canEnterPortal('parent', 'student'), false)
+assert.equal(
+  await withPortalTimeout(() => Promise.resolve('ready'), 100),
+  'ready',
+  'portal timeout wrapper returns successful requests',
+)
+await assert.rejects(
+  withPortalTimeout(() => new Promise(() => {}), 5),
+  /portal took too long to respond/,
+  'portal timeout wrapper rejects stalled requests',
+)
 await rejects(() => pay(1), /Administrator/)
 const wholeClassLearners = await db.query(
   "select id from profiles where role='student' order by id",

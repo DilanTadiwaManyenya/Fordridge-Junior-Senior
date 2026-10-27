@@ -31,4 +31,4 @@ Approval basis: owner instruction to continue to Stage 13 after Stage 12
 ## Deployment and next stage
 
 - The migration has not been applied to Supabase and the frontend has not been deployed. Stage 15's active-role policy migration must be completed before this UI can be released. Production migration/deployment needs separate owner approval.
-- Stage 14 bounds profile loading and recovery; continue in roadmap order.
+- Stage 14 bounds profile loading and recovery; see [the Stage 14 record](STAGE-14-PROFILE-LOADING.md).

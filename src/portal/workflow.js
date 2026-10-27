@@ -14,3 +14,29 @@ export function canEnterPortal(role, portal) {
     ? ['staff', 'teacher', 'admin'].includes(role)
     : role === portal
 }
+
+export function withPortalTimeout(operation, timeoutMs = 12000) {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(
+      () =>
+        reject(
+          new Error(
+            'The portal took too long to respond. Check your connection and try again.',
+          ),
+        ),
+      timeoutMs,
+    )
+    Promise.resolve()
+      .then(() => (typeof operation === 'function' ? operation() : operation))
+      .then(
+        (value) => {
+          clearTimeout(timer)
+          resolve(value)
+        },
+        (error) => {
+          clearTimeout(timer)
+          reject(error)
+        },
+      )
+  })
+}

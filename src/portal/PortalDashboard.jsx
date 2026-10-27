@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import {
   Link,
   Navigate,
@@ -36,7 +36,7 @@ import OfficialReports from './OfficialReports'
 import ReportApprovalRegister from './ReportApprovalRegister'
 import ReportReleaseMetrics from './ReportReleaseMetrics'
 import ReportVerification from './ReportVerification'
-import { workflowError } from './workflow'
+import { withPortalTimeout, workflowError } from './workflow'
 import './workflow.css'
 
 export default function PortalDashboard() {
@@ -47,70 +47,75 @@ export default function PortalDashboard() {
     user: null,
     error: '',
   })
+  const loadRequest = useRef(0)
   const navigate = useNavigate(),
     location = useLocation()
   const view = location.pathname.split('/')[2] || 'overview'
   const load = useCallback(async () => {
+    const requestId = ++loadRequest.current
     setState((s) => ({ ...s, loading: true, error: '' }))
     try {
-      if (!isSupabaseConfigured)
-        throw new Error(
-          'Portal configuration is unavailable. Please contact the school office.',
+      const nextState = await withPortalTimeout(async () => {
+        if (!isSupabaseConfigured)
+          throw new Error(
+            'Portal configuration is unavailable. Please contact the school office.',
+          )
+        const { data, error } = await supabase.auth.getUser()
+        if (error && error.name !== 'AuthSessionMissingError') throw error
+        if (!data.user)
+          return { loading: false, profile: null, user: null, error: '' }
+        const result = await supabase
+          .from('profiles')
+          .select('id,full_name,role,campus_id,campus:campuses(name,code)')
+          .eq('id', data.user.id)
+          .single()
+        if (result.error) throw result.error
+        if (!result.data)
+          throw new Error(
+            'Your school profile is not ready. Contact the school office.',
+          )
+        const [contextResult, membershipResult] = await Promise.all([
+          supabase.rpc('resolve_active_portal_context'),
+          supabase
+            .from('user_role_memberships')
+            .select('role,campus_id,is_primary,campus:campuses(name,code)')
+            .order('role'),
+        ])
+        if (contextResult.error) throw contextResult.error
+        if (membershipResult.error) throw membershipResult.error
+        const context = Array.isArray(contextResult.data)
+          ? contextResult.data[0]
+          : contextResult.data
+        if (!context?.active_role)
+          throw new Error('Your active role could not be loaded. Contact the school office.')
+        const memberships = membershipResult.data || []
+        const activeMembership = memberships.find(
+          (item) =>
+            item.role === context.active_role &&
+            item.campus_id === context.active_campus_id,
         )
-      const { data, error } = await supabase.auth.getUser()
-      if (error && error.name !== 'AuthSessionMissingError') throw error
-      if (!data.user) {
-        setState({ loading: false, profile: null, user: null, error: '' })
-        return
-      }
-      const result = await supabase
-        .from('profiles')
-        .select('id,full_name,role,campus_id,campus:campuses(name,code)')
-        .eq('id', data.user.id)
-        .single()
-      if (result.error) throw result.error
-      if (!result.data)
-        throw new Error(
-          'Your school profile is not ready. Contact the school office.',
-        )
-      const [contextResult, membershipResult] = await Promise.all([
-        supabase.rpc('resolve_active_portal_context'),
-        supabase
-          .from('user_role_memberships')
-          .select('role,campus_id,is_primary,campus:campuses(name,code)')
-          .order('role'),
-      ])
-      if (contextResult.error) throw contextResult.error
-      if (membershipResult.error) throw membershipResult.error
-      const context = Array.isArray(contextResult.data)
-        ? contextResult.data[0]
-        : contextResult.data
-      if (!context?.active_role)
-        throw new Error('Your active role could not be loaded. Contact the school office.')
-      const memberships = membershipResult.data || []
-      const activeMembership = memberships.find(
-        (item) =>
-          item.role === context.active_role &&
-          item.campus_id === context.active_campus_id,
-      )
-      setState({
-        loading: false,
-        profile: {
-          ...result.data,
-          primary_role: result.data.role,
-          role: context.active_role,
-          campus_id: context.active_campus_id,
-          campus:
-            activeMembership?.campus ||
-            (context.active_campus_id === result.data.campus_id
-              ? result.data.campus
-              : null),
-          role_memberships: memberships,
-        },
-        user: data.user,
-        error: '',
+        return {
+          loading: false,
+          profile: {
+            ...result.data,
+            primary_role: result.data.role,
+            role: context.active_role,
+            campus_id: context.active_campus_id,
+            campus:
+              activeMembership?.campus ||
+              (context.active_campus_id === result.data.campus_id
+                ? result.data.campus
+                : null),
+            role_memberships: memberships,
+          },
+          user: data.user,
+          error: '',
+        }
       })
+      if (requestId !== loadRequest.current) return
+      setState(nextState)
     } catch (err) {
+      if (requestId !== loadRequest.current) return
       setState((s) => ({ ...s, loading: false, error: workflowError(err) }))
     }
   }, [])
@@ -118,10 +123,15 @@ export default function PortalDashboard() {
     load()
     const { data } =
       supabase?.auth.onAuthStateChange((event) => {
-        if (event === 'SIGNED_OUT')
+        if (event === 'SIGNED_OUT') {
+          loadRequest.current += 1
           setState({ loading: false, profile: null, user: null, error: '' })
+        }
       }) || {}
-    return () => data?.subscription.unsubscribe()
+    return () => {
+      loadRequest.current += 1
+      data?.subscription.unsubscribe()
+    }
   }, [load])
   if (state.loading)
     return (
@@ -223,11 +233,16 @@ export default function PortalDashboard() {
     const [role, campusId = ''] = event.target.value.split('|')
     if (role === profile.role && (campusId || null) === profile.campus_id) return
     setState((s) => ({ ...s, loading: true, error: '' }))
-    const { error } = await supabase.rpc('switch_active_portal_role', {
-      p_role: role,
-      p_campus_id: campusId || null,
-    })
-    if (error) {
+    try {
+      const { error } = await withPortalTimeout(
+        () =>
+          supabase.rpc('switch_active_portal_role', {
+            p_role: role,
+            p_campus_id: campusId || null,
+          }),
+      )
+      if (error) throw error
+    } catch (error) {
       setState((s) => ({ ...s, loading: false, error: workflowError(error) }))
       return
     }
