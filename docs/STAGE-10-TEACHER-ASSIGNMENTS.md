@@ -1,7 +1,8 @@
 # Stage 10: align teacher class assignments
 
 Date: 27 October 2026
-Status: implemented locally; isolated tests, frontend build and lint pass; commit/push pending
+Status: complete; implementation commit pushed to `origin/master`
+Implementation commit: [d226bf2](https://github.com/DilanTadiwaManyenya/Fordridge-Junior-Senior/commit/d226bf2)
 Approval basis: owner approval of the Reliance-inspired Stage 7 access matrix
 
 ## Acceptance scope

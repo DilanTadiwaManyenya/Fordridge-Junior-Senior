@@ -17,7 +17,7 @@ A stage is Complete only after its deliverable and relevant checks are recorded 
 | 7 | Complete: owner approved 27 Oct 2026 | Reliance-inspired role and access matrix | [3f0fa3a](https://github.com/DilanTadiwaManyenya/Fordridge-Junior-Senior/commit/3f0fa3a); owner approval recorded in this checkpoint |
 | 8 | Complete: empty initial catalogue confirmed | Class/stream schema design; no seed data or capacity | User instruction: keep entries unset until allocation is known; design in [Stage 8 document](STAGE-08-CLASS-CATALOGUE-DESIGN.md) |
 | 9 | Complete | Admin Classes screen and empty class/stream tables | [Stage 9 record](STAGE-09-CLASS-CATALOGUE.md); isolated portal suite and production build pass; no live migration deployment |
-| 10 | Implemented; awaiting commit/push | Canonical, campus/class/stream-scoped teacher assignments | [Stage 10 record](STAGE-10-TEACHER-ASSIGNMENTS.md); isolated scope tests, build and lint pass (existing warnings remain) |
+| 10 | Complete | Canonical, campus/class/stream-scoped teacher assignments | [d226bf2](https://github.com/DilanTadiwaManyenya/Fordridge-Junior-Senior/commit/d226bf2); [Stage 10 record](STAGE-10-TEACHER-ASSIGNMENTS.md) |
 
 ## Stage 5 follow-up status
 
