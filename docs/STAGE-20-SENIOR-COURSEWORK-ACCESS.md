@@ -1,7 +1,7 @@
 # Stage 20: Senior coursework access
 
 Date: 27 October 2026  
-Status: validated; implementation commit pending push
+Status: complete; implementation commit `923baab` pushed to `origin/master`
 
 ## Acceptance scope
 
