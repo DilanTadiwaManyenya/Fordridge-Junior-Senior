@@ -4,7 +4,28 @@ import { workflowError } from './workflow'
 
 export default function BulkMarks({ profile }) {
   const admin = profile.role === 'admin'; const [learners, setLearners] = useState([]), [groups, setGroups] = useState([]), [group, setGroup] = useState(''), [marks, setMarks] = useState({}), [error, setError] = useState(''), [notice, setNotice] = useState(''), [saving, setSaving] = useState(false); const [form, setForm] = useState({ title: '', event_date: new Date().toLocaleDateString('en-CA'), academic_year: String(new Date().getFullYear()), academic_term: 'Term 1', max_score: '100' })
-  const load = useCallback(async () => { let students = supabase.from('profiles').select('id,full_name,class_level,class_stream,campus_id').eq('role', 'student').neq('enrollment_status', 'inactive').order('full_name'); if (!admin) students = students.eq('campus_id', profile.campus_id); const { data, error } = await students; if (error) { setError(workflowError(error)); return } let available = [...new Set((data || []).filter(item => item.class_level).map(item => `${item.class_level}||${item.class_stream || ''}`))]; if (!admin) { const assignments = await supabase.from('teacher_class_assignments').select('class_level,class_stream').eq('teacher_id', profile.id); if (assignments.error) { setError(workflowError(assignments.error)); return } const allowed = new Set((assignments.data || []).map(item => `${item.class_level}||${item.class_stream || ''}`)); available = available.filter(item => allowed.has(item)) } setLearners(data || []); setGroups(available); setGroup(current => current || available[0] || '') }, [admin, profile.campus_id, profile.id])
+  const load = useCallback(async () => {
+    let students = supabase.from('profiles').select('id,full_name,class_level,class_stream,campus_id').eq('role', 'student').neq('enrollment_status', 'inactive').order('full_name')
+    if (!admin) students = students.eq('campus_id', profile.campus_id)
+    const { data, error } = await students
+    if (error) { setError(workflowError(error)); return }
+    let available = [...new Set((data || []).filter(item => item.class_level).map(item => `${item.class_level}||${item.class_stream || ''}`))]
+    if (!admin) {
+      const assignments = await supabase.from('teacher_class_assignments').select('campus_id,class_level,class_stream').eq('teacher_id', profile.id)
+      if (assignments.error) { setError(workflowError(assignments.error)); return }
+      available = available.filter(item => {
+        const [level, stream] = item.split('||')
+        return (assignments.data || []).some(assignment =>
+          assignment.campus_id === profile.campus_id
+          && assignment.class_level.trim().toLowerCase() === level.trim().toLowerCase()
+          && (!assignment.class_stream || assignment.class_stream.trim().toLowerCase() === stream.trim().toLowerCase()),
+        )
+      })
+    }
+    setLearners(data || [])
+    setGroups(available)
+    setGroup(current => available.includes(current) ? current : available[0] || '')
+  }, [admin, profile.campus_id, profile.id])
   useEffect(() => { load() }, [load])
   const [level, stream] = group.split('||')
   const selected = learners.filter(item => item.class_level === level && (item.class_stream || '') === stream)

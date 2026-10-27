@@ -14,18 +14,19 @@ A stage is Complete only after its deliverable and relevant checks are recorded 
 | 4 | Complete | Reliance-to-Fordridge implementation map | [a760eaf](https://github.com/DilanTadiwaManyenya/Fordridge-Junior-Senior/commit/a760eaf) |
 | 5 | Complete with follow-up | Build/lint/test baseline; report-signatory SQL fixed | Original: [98bc6f6](https://github.com/DilanTadiwaManyenya/Fordridge-Junior-Senior/commit/98bc6f6); isolated suite passes at [aa11ad0](https://github.com/DilanTadiwaManyenya/Fordridge-Junior-Senior/commit/aa11ad0) |
 | 6 | Complete | Master 85-stage roadmap and tracker | [8664533](https://github.com/DilanTadiwaManyenya/Fordridge-Junior-Senior/commit/8664533) |
-| 7 | Awaiting owner approval | Proposed role and access matrix | [3f0fa3a](https://github.com/DilanTadiwaManyenya/Fordridge-Junior-Senior/commit/3f0fa3a) |
+| 7 | Complete: owner approved 27 Oct 2026 | Reliance-inspired role and access matrix | [3f0fa3a](https://github.com/DilanTadiwaManyenya/Fordridge-Junior-Senior/commit/3f0fa3a); owner approval recorded in this checkpoint |
 | 8 | Complete: empty initial catalogue confirmed | Class/stream schema design; no seed data or capacity | User instruction: keep entries unset until allocation is known; design in [Stage 8 document](STAGE-08-CLASS-CATALOGUE-DESIGN.md) |
-| 9 | Implemented; validation pending | Admin Classes screen and empty class/stream tables | [Stage 9 record](STAGE-09-CLASS-CATALOGUE.md); this checkpoint contains the implementation. No tests or migration deployment performed. |
+| 9 | Complete | Admin Classes screen and empty class/stream tables | [Stage 9 record](STAGE-09-CLASS-CATALOGUE.md); isolated portal suite and production build pass; no live migration deployment |
+| 10 | Implemented; awaiting commit/push | Canonical, campus/class/stream-scoped teacher assignments | [Stage 10 record](STAGE-10-TEACHER-ASSIGNMENTS.md); isolated scope tests, build and lint pass (existing warnings remain) |
 
 ## Stage 5 follow-up status
 
 Both report-signatory migrations now parse, and `node scripts/test-portal.mjs` passes in isolated PGlite: migration application, atomic payments/retries/rollback, profile permissions, published notices, class scoping, guardian access, private records and teacher login. Production was not accessed.
 
-The browser suite remains unrun because Playwright Chromium is missing. No new tests were run in Stage 9.
+The browser suite remains unrun because Playwright Chromium is missing. The isolated portal suite now covers whole-class and stream assignments, overlap rejection, assigned learner reads, direct attendance/mark RPC scope and wellbeing privacy.
 
 ## Current owner decision
 
-Stage 7's proposed Main Admin, Campus Admin, Principal, Accountant, Teacher, Parent, Student and Staff scopes still await approval. The Classes page currently uses the existing Fordridge admin role and does not introduce campus-specific administrator grants. Stage 10 teacher assignment access must follow the approved matrix.
+The owner approved Stage 7's Main Admin, Campus Admin, Principal, Accountant, Teacher, Parent, Student and Staff matrix for staged implementation. The Classes page still uses Fordridge's existing admin role; campus-specific admin grants and new role membership are later roadmap stages. Stage 10 implements teacher class/stream scope only.
 
 The class catalogue has no preloaded rows. Campus, class labels, streams and capacity remain unset until an admin enters school-confirmed values.

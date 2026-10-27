@@ -12,10 +12,21 @@ export default function BulkAttendance({ profile }) {
     if (error) { setError(workflowError(error)); return }
     setLearners(data || [])
     let groups = [...new Set((data || []).filter(item => item.class_level).map(item => `${item.class_level}||${item.class_stream || ''}`))]
-    if (!admin) { const assignments = await supabase.from('teacher_class_assignments').select('class_level,class_stream').eq('teacher_id', profile.id); if (assignments.error) { setError(workflowError(assignments.error)); return } const allowed = new Set((assignments.data || []).map(item => `${item.class_level}||${item.class_stream || ''}`)); groups = groups.filter(item => allowed.has(item)) }
+    if (!admin) {
+      const assignments = await supabase.from('teacher_class_assignments').select('campus_id,class_level,class_stream').eq('teacher_id', profile.id)
+      if (assignments.error) { setError(workflowError(assignments.error)); return }
+      groups = groups.filter(item => {
+        const [level, stream] = item.split('||')
+        return (assignments.data || []).some(assignment =>
+          assignment.campus_id === profile.campus_id
+          && assignment.class_level.trim().toLowerCase() === level.trim().toLowerCase()
+          && (!assignment.class_stream || assignment.class_stream.trim().toLowerCase() === stream.trim().toLowerCase()),
+        )
+      })
+    }
     setClasses(groups)
-    setClassKey(current => current || groups[0] || '')
-  }, [admin, profile.campus_id])
+    setClassKey(current => groups.includes(current) ? current : groups[0] || '')
+  }, [admin, profile.campus_id, profile.id])
   useEffect(() => { load() }, [load])
   const [level, stream] = classKey.split('||')
   const selected = learners.filter(item => item.class_level === level && (item.class_stream || '') === stream)

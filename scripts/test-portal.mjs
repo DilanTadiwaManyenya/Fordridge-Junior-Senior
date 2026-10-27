@@ -14,7 +14,7 @@ for (const file of (await readdir('supabase/migrations'))
   .filter((f) => f.endsWith('.sql'))
   .sort())
   await db.exec(await readFile(`supabase/migrations/${file}`, 'utf8'))
-const ids = ['admin', 'student', 'parent', 'stranger', 'teacher'].reduce(
+const ids = ['admin', 'student', 'parent', 'stranger', 'teacher', 'stream_teacher', 'stream_student', 'other_student'].reduce(
   (all, name, i) => ({
     ...all,
     [name]: `00000000-0000-4000-8000-00000000000${i + 1}`,
@@ -28,7 +28,7 @@ for (const [name, id] of Object.entries(ids)) {
   )
   await db.query(
     "update public.profiles set role=$1::app_role,campus_id=(select id from campuses where code='junior'),class_level='Form 1' where id=$2",
-    [name === 'stranger' ? 'student' : name, id],
+    [name === 'stranger' || name === 'stream_student' || name === 'other_student' ? 'student' : name === 'stream_teacher' ? 'teacher' : name, id],
   )
 }
 await db.query('insert into student_guardians values($1,$2)', [
@@ -189,14 +189,109 @@ assert.equal(
 await as('stranger')
 assert.equal((await db.query('select * from learner_records')).rows.length, 0)
 assert.equal((await db.query('select * from fee_records')).rows.length, 0)
+await as('admin')
+const formOne = (await db.query(
+  "insert into school_classes(campus_id,class_level) values($1,'Form 1') returning id",
+  [campus],
+)).rows[0].id
+await db.query(
+  "insert into school_classes(campus_id,class_level) values($1,'Form 2')",
+  [campus],
+)
+await db.query(
+  "insert into school_class_streams(class_id,stream_name) values($1,'A') returning id",
+  [formOne],
+)
+const streamB = (await db.query(
+  "insert into school_class_streams(class_id,stream_name) values($1,'B') returning id",
+  [formOne],
+)).rows[0].id
+await db.query('select admin_update_profile($1,$2,$3,$4,$5,$6,$7)', [ids.student, 'Updated Student', campus, 'F001', 'Form 1', 'A', 'active'])
+await db.query('select admin_update_profile($1,$2,$3,$4,$5,$6,$7)', [ids.stream_student, 'Stream B Learner', campus, 'B001', 'Form 1', 'B', 'active'])
+await db.query('select admin_update_profile($1,$2,$3,$4,$5,$6,$7)', [ids.other_student, 'Other Class Learner', campus, 'F201', 'Form 2', '', 'active'])
+await db.query('select admin_update_profile($1,$2,$3,$4,$5,$6,$7)', [ids.stranger, 'Unassigned Learner', campus, 'U001', 'Form 2', '', 'active'])
+await db.query('select admin_update_profile($1,$2,$3,$4,$5,$6,$7)', [ids.stream_teacher, 'Stream Teacher', campus, null, null, null, null])
+await db.query(
+  "insert into teacher_class_assignments(teacher_id,campus_id,class_level,class_id,subject) values($1,$2,'Form 1',$3,null)",
+  [ids.teacher, campus, formOne],
+)
+await db.query(
+  "insert into teacher_class_assignments(teacher_id,campus_id,class_level,class_stream,class_id,class_stream_id,subject) values($1,$2,'Form 1','B',$3,$4,null)",
+  [ids.stream_teacher, campus, formOne, streamB],
+)
+await db.query(
+  "insert into teacher_class_assignments(teacher_id,campus_id,class_level,class_id,subject) values($1,$2,'Form 1',$3,'Science')",
+  [ids.teacher, campus, formOne],
+)
+await rejects(
+  () => db.query(
+    "insert into teacher_class_assignments(teacher_id,campus_id,class_level,class_stream,class_id,class_stream_id,subject) values($1,$2,'Form 1','B',$3,$4,'science')",
+    [ids.stream_teacher, campus, formOne, streamB],
+  ),
+  /overlapping teacher assignment/,
+)
+await rejects(
+  () => db.query(
+    "insert into teacher_class_assignments(teacher_id,campus_id,class_level,subject) values($1,$2,'Form 1','Art')",
+    [ids.teacher, campus],
+  ),
+  /Choose a confirmed class/,
+)
 await as('teacher')
 assert.equal(canEnterPortal('teacher', 'staff'), true)
 assert.equal(canEnterPortal('student', 'staff'), false)
 assert.equal(canEnterPortal('parent', 'student'), false)
 await rejects(() => pay(1), /Administrator/)
+const wholeClassLearners = await db.query(
+  "select id from profiles where role='student' order by id",
+)
+assert.deepEqual(
+  wholeClassLearners.rows.map(row => row.id).sort(),
+  [ids.student, ids.stream_student].sort(),
+  'a whole-class assignment covers every stream but not another class',
+)
+assert.equal(
+  (await db.query('select teacher_has_class_assignment($1,$2,$3) as allowed', [campus, 'Form 1', 'B'])).rows[0].allowed,
+  true,
+)
+assert.equal(
+  (await db.query('select teacher_has_class_assignment($1,$2,$3) as allowed', [campus, 'Form 2', null])).rows[0].allowed,
+  false,
+)
+const seniorCampus = (await db.query("select id from campuses where code='senior'")).rows[0].id
+assert.equal(
+  (await db.query('select teacher_has_class_assignment($1,$2,$3) as allowed', [seniorCampus, 'Form 1', 'B'])).rows[0].allowed,
+  false,
+  'a junior campus assignment does not grant senior campus access',
+)
+await db.query('select record_bulk_attendance(current_date,$1::jsonb)', [JSON.stringify([{ student_id: ids.stream_student, attendance_status: 'present' }])])
+await db.query("select record_bulk_marks('Science',current_date,2026,'Term 1',100,$1::jsonb)", [JSON.stringify([{ student_id: ids.stream_student, score: 75 }])])
+await rejects(
+  () => db.query('select record_bulk_attendance(current_date,$1::jsonb)', [JSON.stringify([{ student_id: ids.other_student, attendance_status: 'present' }])]),
+  /outside an assigned class/,
+)
+await rejects(
+  () => db.query("select record_bulk_marks('Science',current_date,2026,'Term 1',100,$1::jsonb)", [JSON.stringify([{ student_id: ids.other_student, score: 75 }])]),
+  /outside an assigned class/,
+)
+assert.equal(
+  (await db.query("select count(*) from learner_records where student_id=$1 and kind='wellbeing'", [ids.student])).rows[0].count,
+  0,
+  'teacher assignment does not reveal wellbeing records',
+)
+await as('stream_teacher')
+assert.deepEqual(
+  (await db.query("select id from profiles where role='student'")).rows.map(row => row.id),
+  [ids.stream_student],
+  'a stream assignment exposes only learners in that stream',
+)
+await rejects(
+  () => db.query('select record_bulk_attendance(current_date,$1::jsonb)', [JSON.stringify([{ student_id: ids.student, attendance_status: 'late' }])]),
+  /outside an assigned class/,
+)
 await as('')
 await rejects(() => pay(1), /Administrator/)
 await db.close()
 console.log(
-  'PASS: migrations, atomic payments, retry safety, rollback, profile permissions, published notices, class scoping, guardian access, private records and teacher login.',
+  'PASS: migrations, atomic payments, retry safety, rollback, scoped whole-class/stream assignments, assignment overlap rejection, teacher profile/record/RPC scope, guardian access, private records and teacher login.',
 )

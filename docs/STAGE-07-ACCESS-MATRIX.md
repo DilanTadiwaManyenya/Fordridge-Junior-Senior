@@ -1,12 +1,16 @@
 # Stage 7: proposed access capability matrix
 
 Date: 27 October 2026
-Status: review-ready proposal; no permissions changed
+Status: approved by the Fordridge owner for staged implementation; no production permissions changed
 Fordridge starting commit: 8664533
 
-## Decision requested
+## Owner approval
 
-Review and approve this proposed role and data-scope model before Stage 12 adds multiple role grants or any feature widens access. This document is a design proposal, not a deployed policy. Fordridge currently has student, parent, teacher, staff and admin profiles, and many admin policies grant broad access. Reliance provides useful capability examples, but Fordridge's school leaders must confirm the proposed principal/accountant scope and who can approve school-wide actions.
+The Fordridge owner approved this Reliance-inspired role and access matrix on 27 October 2026. Implement capabilities in roadmap order, enforcing each capability in database policies/RPCs as well as the UI. Approval of the design does not approve applying migrations to production or deploying the application; obtain that approval at the production deployment stage.
+
+## Approved design
+
+This approved role and data-scope model guides the staged implementation before multiple role grants or later features widen access. It is not a deployed policy. Fordridge currently has student, parent, teacher, staff and admin profiles, and many admin policies grant broad access. The owner approved the Reliance-inspired scopes below for implementation in roadmap order.
 
 ## Scope model
 
@@ -92,9 +96,9 @@ This matrix requires a carefully staged redesign before copying Reliance role ta
 
 The proposal's Main Admin/Campus Admin is an admin role plus a trusted scope grant, not automatically a new role string. Principal and accountant are proposed capabilities that Fordridge's owner must approve. They are not added to the enum in this stage. Likewise, whether campus administrators can manage their campus or only central admin can manage both must be approved and verified against school operations.
 
-Do not apply code, SQL or production permission updates from this design document. First resolve the owner decisions in the next section.
+Apply the approved design through the roadmap's small implementation stages. Production migration and deployment still require separate approval.
 
-## Owner decisions required
+## Approved matrix decisions
 
 1. Approve or edit the roles: Main Admin, Campus Admin, Principal, Accountant, Teacher, Parent, Student, Staff.
 2. Confirm whether Campus Admin may create accounts, set teacher assignments, publish reports, close periods and apply rollover within their campus.
@@ -106,4 +110,4 @@ Do not apply code, SQL or production permission updates from this design documen
 
 ## Stage 7 status
 
-The role/scope proposal and enforcement checklist are ready for review. Permission work has not begun. Stage 7 remains **Awaiting owner approval** until these decisions are confirmed. This checkpoint can be committed and pushed for review; later access-control stages depend on approval.
+The role/scope proposal and enforcement checklist are approved for staged implementation. Stage 7 is **Approved**. This approval does not apply production policies; later access-control stages implement the approved rules in order.
