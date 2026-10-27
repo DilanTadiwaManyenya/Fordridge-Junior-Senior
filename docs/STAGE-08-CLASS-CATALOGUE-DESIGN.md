@@ -1,7 +1,7 @@
 # Stage 8: proposed Fordridge class catalogue
 
 Date: 27 October 2026
-Status: design ready; canonical roster and migration approval pending
+Status: design implemented with an intentionally empty catalogue; school data stays unset
 Starting Fordridge commit: 3f0fa3a
 Related: Stage 7 access matrix is still awaiting owner approval.
 
@@ -72,14 +72,14 @@ This query is a review aid only. Normalized spellings that collide need human co
 ## Relationships to later stages
 
 - Stage 7's role/campus scope approval must precede access-policy changes.
-- Stage 9 builds catalogue management on the approved schema and naming list.
+- Stage 9 adds empty catalogue management; approved names are entered later, without a seeded list.
 - Stage 10 migrates teacher class assignments to canonical identifiers.
 - Stages 11 and 36 scope subject allocation and Markbook to class IDs.
 - Stages 27–35 use the catalogue for import, export, learner changes and parent access.
 - Stages 40–56 depend on reporting-period and placement history designs. Do not use current class to reconstruct a prior report's class.
 - Stages 62–68 may use campus/class configuration for POS scope only after the external product boundary is decided.
 
-## Owner decisions before Stage 9 migration
+## School choices before adding catalogue values or linking existing records
 
 1. Approve official level labels per Junior/Senior campus, including ECD, Grade, form and Sixth Form names.
 2. Confirm which levels have streams and the exact official stream labels/capitalisation.
@@ -88,4 +88,4 @@ This query is a review aid only. Normalized spellings that collide need human co
 5. Confirm whether any individual class can belong to both campuses. The default is each class belongs to exactly one.
 6. Confirm whether class-level subjects should be separate subject-allocation rows, and whether the same teacher may hold multiple subjects for one class.
 
-Stage 8's schema proposal is review-ready. Stage 9 table/UI implementation waits for these school-owned names and Stage 7 access approval. This stage did not create a migration, query a live database, or change code/data.
+Fordridge directed that class names, streams and capacities remain unset while stream allocations are unknown. Stage 9 implements the empty catalogue and requires a school admin to enter each confirmed value later. The Stage 7 role/campus matrix is still awaiting owner approval; the current Classes page keeps Fordridge's existing admin-only access model. No live rows were read or changed.

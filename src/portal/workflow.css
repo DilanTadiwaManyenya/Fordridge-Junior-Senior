@@ -198,3 +198,5 @@
   .workflow-table tr { break-inside: avoid; }
   .report-sign-cell { color: #6b0929 !important; }
 }
+
+.portal-class-stream-list{display:grid;gap:8px;margin:16px 0;padding:0;list-style:none}.portal-class-stream-list li{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 12px;border:1px solid var(--line);border-radius:8px;background:#f8fafc;color:var(--ink);font-size:.84rem}.portal-class-stream-form{grid-template-columns:minmax(0,1fr) auto;align-items:end;margin-top:16px}.portal-class-stream-form label{display:grid;gap:7px;font-size:.82rem;font-weight:800}.portal-class-stream-form input{padding:10px;border:1px solid var(--line);border-radius:7px;background:#fff;color:var(--ink);font:inherit}@media(max-width:640px){.portal-class-stream-form{grid-template-columns:1fr}.portal-class-stream-list li{align-items:flex-start;flex-direction:column}}

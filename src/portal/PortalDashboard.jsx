@@ -11,6 +11,7 @@ import { isSupabaseConfigured, supabase } from '../lib/supabase'
 import FeesDashboard from './FeesDashboard'
 import AdminOverview from './AdminOverview'
 import Directory from './Directory'
+import ClassCatalogue from './ClassCatalogue'
 import SchoolContent from './SchoolContent'
 import LearnerRecords from './LearnerRecords'
 import AccountSettings from './AccountSettings'
@@ -115,7 +116,7 @@ export default function PortalDashboard() {
   const assignments = ['teacher', 'admin'].includes(profile.role)
   const analytics = ['teacher', 'admin'].includes(profile.role)
   if (
-    (['learners', 'staff'].includes(view) && !admin) ||
+    (['learners', 'staff', 'classes'].includes(view) && !admin) ||
     (view === 'fees' && !fees) ||
     (view === 'records' && !records) ||
     (view === 'reports' && !reports) ||
@@ -140,6 +141,7 @@ export default function PortalDashboard() {
       'overview',
       'learners',
       'staff',
+      'classes',
       'fees',
       'records',
       'reports',
@@ -209,6 +211,8 @@ export default function PortalDashboard() {
           {nav('/portal', 'Overview', '⌂')}
           {admin && nav('/portal/learners', 'Learners', '◉')}
           {admin && nav('/portal/import-learners', 'Bulk learner import', '⇧')}
+          {admin && <span className="portal-nav-label portal-nav-label-secondary">Academic services</span>}
+          {admin && nav('/portal/classes', 'Classes', '▦')}
           {admin && nav('/portal/report-settings', 'Report settings', '▣')}
           {admin && nav('/portal/grade-bands', 'Grade bands', 'A')}
           {admin && nav('/portal/report-release', 'Report release', '✓')}
@@ -265,6 +269,8 @@ export default function PortalDashboard() {
         </div>
         {view === 'fees' ? (
           <FeesDashboard profile={profile} user={user} />
+        ) : view === 'classes' ? (
+          <ClassCatalogue />
         ) : ['learners', 'staff'].includes(view) ? (
           <Directory key={view} view={view} />
         ) : view === 'import-learners' ? (
