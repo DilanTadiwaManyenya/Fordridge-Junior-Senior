@@ -34,12 +34,15 @@ const newFee = () => ({
 
 export default function FeesDashboard({ profile, user }) {
   const isAdmin = profile?.role === 'admin'
+  const isPrincipal = profile?.role === 'principal'
+  const canReviewFinance = isAdmin || isPrincipal
   const paymentRequest = useRef(null)
   const paymentLock = useRef(false)
   const [pendingPayment, setPendingPayment] = useState(false)
   const [records, setRecords] = useState([]),
     [students, setStudents] = useState([]),
-    [settings, setSettings] = useState([])
+    [settings, setSettings] = useState([]),
+    [transactions, setTransactions] = useState([])
   const [loading, setLoading] = useState(true),
     [error, setError] = useState(''),
     [query, setQuery] = useState(''),
@@ -59,23 +62,55 @@ export default function FeesDashboard({ profile, user }) {
     setLoading(true)
     setError('')
     try {
-      const r = await supabase
-        .from('fee_records')
-        .select(
-          'id,campus_id,amount,paid_amount,currency,due_date,status,payment_reference,academic_year,academic_term,student:profiles!fee_records_student_id_fkey(full_name),campus:campuses!fee_records_campus_id_fkey(name,code)',
-        )
-        .order('due_date')
+      const r = isPrincipal
+        ? await supabase.rpc('principal_finance_fee_records')
+        : await supabase
+            .from('fee_records')
+            .select(
+              'id,campus_id,amount,paid_amount,currency,due_date,status,payment_reference,academic_year,academic_term,student:profiles!fee_records_student_id_fkey(full_name),campus:campuses!fee_records_campus_id_fkey(name,code)',
+            )
+            .order('due_date')
       if (r.error) setError(r.error.message)
-      else setRecords(r.data || [])
+      else
+        setRecords(
+          isPrincipal
+            ? (r.data || []).map((item) => ({
+                ...item,
+                student: { full_name: item.student_name },
+                campus: { name: item.campus_name, code: item.campus_code },
+              }))
+            : r.data || [],
+        )
     } catch (err) {
       setError(workflowError(err))
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [isPrincipal])
   const loadAdmin = useCallback(async () => {
-    if (!supabase || !isAdmin) return
+    if (!supabase) return
     try {
+      if (isPrincipal) {
+        const [fees, ledger] = await Promise.all([
+          supabase
+            .from('fee_settings')
+            .select('setting_key,setting_value')
+            .order('setting_key'),
+          supabase
+            .from('fee_transactions')
+            .select('id,fee_record_id,amount,payment_method,reference,created_at')
+            .order('created_at', { ascending: false })
+            .limit(100),
+        ])
+        if (fees.error || ledger.error)
+          setError(fees.error?.message || ledger.error?.message)
+        else {
+          setSettings(fees.data || [])
+          setTransactions(ledger.data || [])
+        }
+        return
+      }
+      if (!isAdmin) return
       const [learners, fees] = await Promise.all([
         supabase
           .from('profiles')
@@ -96,7 +131,7 @@ export default function FeesDashboard({ profile, user }) {
     } catch (err) {
       setError(workflowError(err))
     }
-  }, [isAdmin])
+  }, [isAdmin, isPrincipal])
   useEffect(() => {
     loadRecords()
     loadAdmin()
@@ -261,7 +296,9 @@ export default function FeesDashboard({ profile, user }) {
           <p>
             {isAdmin
               ? 'Create server-calculated term fees and record verified payments.'
-              : 'View the fee records available to your account.'}
+              : isPrincipal
+                ? 'Read-only view of your campus fee records and the school fee schedule.'
+                : 'View the fee records available to your account.'}
           </p>
         </div>
         <div>
@@ -286,7 +323,7 @@ export default function FeesDashboard({ profile, user }) {
           </button>
         </div>
       </header>
-      {isAdmin && (
+      {canReviewFinance && (
         <div className="fees-summary">
           <article>
             <span>Fees billed</span>
@@ -301,6 +338,49 @@ export default function FeesDashboard({ profile, user }) {
             <strong>{money(totals.outstanding)}</strong>
           </article>
         </div>
+      )}
+      {isPrincipal && (
+        <section className="fees-card" aria-label="Read-only fee schedule">
+          <h2>School fee schedule</h2>
+          <p>Reference amounts only. Changes require an authorised administrator.</p>
+          <div className="fees-table-wrap">
+            <table>
+              <thead><tr><th>Fee setting</th><th>Amount</th></tr></thead>
+              <tbody>
+                {settings.filter((item) => feeKeys.includes(item.setting_key)).map((item) => (
+                  <tr key={item.setting_key}>
+                    <td>{item.setting_key.replaceAll('_', ' ')}</td>
+                    <td>{money(item.setting_value)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      )}
+      {isPrincipal && (
+        <section className="fees-card" aria-label="Read-only payment ledger">
+          <h2>Recent payments</h2>
+          <div className="fees-table-wrap">
+            <table>
+              <thead>
+                <tr><th>Date</th><th>Fee record</th><th>Method</th><th>Reference</th><th>Amount</th></tr>
+              </thead>
+              <tbody>
+                {transactions.map((item) => (
+                  <tr key={item.id}>
+                    <td>{new Date(item.created_at).toLocaleDateString('en-ZW')}</td>
+                    <td>{item.fee_record_id}</td>
+                    <td>{item.payment_method.replaceAll('_', ' ')}</td>
+                    <td>{item.reference || '—'}</td>
+                    <td>{Number(item.amount).toFixed(2)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            {!transactions.length && <p className="fees-message">No payments are available for this campus.</p>}
+          </div>
+        </section>
       )}
       <section className="fees-card">
         <div className="fees-controls">

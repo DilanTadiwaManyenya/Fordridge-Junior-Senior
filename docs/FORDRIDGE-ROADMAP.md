@@ -1,7 +1,7 @@
 # Fordridge portal roadmap inspired by Reliance
 
 Updated: 27 October 2026
-Current checkpoint: Stages 1–14 complete; Stage 15 validated and committed locally, push pending because GitHub HTTPS is unreachable
+Current checkpoint: Stages 1–15 complete; Stage 16 implementation validated and awaiting push
 
 ## Purpose
 
@@ -37,7 +37,7 @@ The evidence and limitations are in [Stage 2 inventory](STAGE-02-INVENTORY.md), 
 
 ## Stage sequence
 
-Stages 1–13 are completed foundation, catalogue, teacher-scope, role-membership and active-context work. The owner approved the Stage 7 capability matrix on 27 October 2026. Stage 14 bounds profile/context loading; Stage 15 must enforce the selected context in database policies before frontend release.
+Stages 1–15 are completed foundation, catalogue, teacher-scope, role-membership, active-context and active-role authorization work. The owner approved the Stage 7 capability matrix on 27 October 2026. Stage 16 implements the approved Principal read-only fee finance view; campus attribution is still required before Principal access to the cashbook.
 
 | Stage | Small deliverable | Acceptance check / dependency |
 | --- | --- | --- |

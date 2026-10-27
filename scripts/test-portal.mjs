@@ -205,6 +205,10 @@ await rejects(
 await as('student')
 await rejects(() => pay(1), /Administrator/)
 await rejects(
+  () => db.query('select * from principal_finance_fee_records()'),
+  /Principal finance access required/,
+)
+await rejects(
   () =>
     db.query('select admin_update_profile($1,$2,$3,null,null,null,null)', [
       ids.student,
@@ -486,6 +490,18 @@ assert.deepEqual(
 )
 const roleTargetId = '00000000-0000-4000-8000-000000000010'
 const roleTargetSession = '10000000-0000-4000-8000-000000000001'
+await db.query(
+  "select grant_portal_role($1,'principal',$2,'Approved campus read-only finance access')",
+  [roleTargetId, campus],
+)
+const seniorFinanceFee = (await db.query(
+  'insert into fee_records(campus_id,student_id,amount) values($1,$2,50) returning id',
+  [seniorCampus, ids.other_student],
+)).rows[0].id
+await db.query(
+  "select record_fee_payment($1,5,'cash','senior campus test','20000000-0000-4000-8000-000000000001')",
+  [seniorFinanceFee],
+)
 await db.exec('reset role')
 await db.query("select set_config('request.jwt.claim.sub',$1,false)", [roleTargetId])
 await db.query("select set_config('request.jwt.claims',$1,false)", [JSON.stringify({ session_id: roleTargetSession })])
@@ -516,6 +532,78 @@ assert.equal(
   'an Accountant receives no finance table access before its approved capability stage',
 )
 await rejects(() => pay(1), /Administrator/)
+assert.deepEqual(
+  (await db.query("select active_role,active_campus_id from switch_active_portal_role('principal',$1)", [campus])).rows,
+  [{ active_role: 'principal', active_campus_id: campus }],
+  'an assigned Principal can activate the approved campus scope',
+)
+assert.equal(
+  (await db.query('select my_role()::text as role')).rows[0].role,
+  'principal',
+  'database finance authorization follows the selected Principal role',
+)
+assert.ok(
+  Number((await db.query('select count(*) from fee_records where campus_id=$1', [campus])).rows[0].count) > 0,
+  'Principal can read fee records for the assigned campus',
+)
+assert.equal(
+  (await db.query('select count(*) from fee_records where id=$1', [seniorFinanceFee])).rows[0].count,
+  0,
+  'Principal cannot read fee records from another campus',
+)
+assert.ok(
+  Number((await db.query('select count(*) from fee_transactions where campus_id=$1', [campus])).rows[0].count) > 0,
+  'Principal can read payment transactions for the assigned campus',
+)
+assert.equal(
+  (await db.query('select count(*) from fee_transactions where campus_id=$1', [seniorCampus])).rows[0].count,
+  0,
+  'Principal cannot read payment transactions from another campus',
+)
+assert.ok(
+  Number((await db.query('select count(*) from fee_settings')).rows[0].count) > 0,
+  'Principal can read the school-wide fee schedule',
+)
+const principalFeeRows = await db.query('select * from principal_finance_fee_records()')
+assert.ok(principalFeeRows.rows.length > 0)
+assert.ok(principalFeeRows.rows.every((row) => row.campus_id === campus))
+assert.deepEqual(
+  Object.keys(principalFeeRows.rows[0]).sort(),
+  ['academic_term','academic_year','amount','campus_code','campus_id','campus_name','currency','due_date','id','paid_amount','payment_reference','status','student_name'].sort(),
+  'the read-only Principal RPC returns only required fee and learner directory fields',
+)
+assert.equal(
+  (await db.query("select has_function_privilege('anon','public.principal_finance_fee_records()','EXECUTE') as allowed")).rows[0].allowed,
+  false,
+  'anonymous callers cannot execute the Principal finance RPC',
+)
+assert.equal(
+  (await db.query("update fee_settings set setting_value=setting_value+1 where setting_key='fee_olevel_zimsec' returning setting_key")).rows.length,
+  0,
+  'Principal cannot modify school fee settings',
+)
+await rejects(() => pay(1), /Administrator/)
+await rejects(
+  () => db.query("select create_term_fee_record($1,'Form 1','ZIMSEC',1,2026,'Term 1',null)", [ids.student]),
+  /Only administrators/,
+)
+await rejects(
+  () => db.query('insert into fee_records(campus_id,student_id,amount) values($1,$2,25)', [campus, ids.student]),
+  /row-level security/,
+)
+await rejects(
+  () => db.query("insert into fee_transactions(fee_record_id,campus_id,amount,payment_method,recorded_by) values($1,$2,1,'cash',$3)", [fee, campus, roleTargetId]),
+  /permission denied/,
+)
+await rejects(
+  () => db.query("insert into cashbook_expenses(expense_date,category,description,amount) values(current_date,'test','principal write attempt',1)"),
+  /row-level security/,
+)
+assert.equal(
+  Number((await db.query('select count(*) from cashbook_expenses')).rows[0].count),
+  0,
+  'Principal does not receive unscoped cashbook records',
+)
 await rejects(
   () => db.query("select switch_active_portal_role('admin',$1)", [campus]),
   /Campus Admin switching requires the scoped policy stage/,
