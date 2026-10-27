@@ -156,7 +156,7 @@ export default function PortalDashboard() {
     ? { ...loadedProfile, role: 'staff' }
     : loadedProfile
   const admin = profile.role === 'admin'
-  const fees = ['student', 'parent', 'principal', 'admin'].includes(profile.role)
+  const fees = ['student', 'parent', 'principal', 'accountant', 'admin'].includes(profile.role)
   const records = ['student', 'parent', 'teacher', 'admin'].includes(profile.role)
   const reports = ['student', 'parent', 'teacher', 'admin'].includes(profile.role)
   const attendance = ['teacher', 'admin'].includes(profile.role)

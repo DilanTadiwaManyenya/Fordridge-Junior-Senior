@@ -528,10 +528,80 @@ assert.equal(
 )
 assert.equal(
   (await db.query('select count(*) from fee_records')).rows[0].count,
-  0,
-  'an Accountant receives no finance table access before its approved capability stage',
+  Number((await db.query('select count(*) from fee_records where campus_id=$1', [campus])).rows[0].count),
+  'an Accountant reads only its assigned campus fee records',
 )
-await rejects(() => pay(1), /Administrator/)
+assert.equal(
+  (await db.query('select count(*) from fee_records where campus_id=$1', [seniorCampus])).rows[0].count,
+  0,
+  'an Accountant cannot read fee records from another campus',
+)
+const accountantPaymentRequest = '30000000-0000-4000-8000-000000000002'
+const accountantPayment = (await db.query(
+  "select * from record_fee_payment($1,1,'cash','accountant campus payment',$2)",
+  [fee, accountantPaymentRequest],
+)).rows[0]
+assert.equal(accountantPayment.campus_id, campus)
+assert.equal(accountantPayment.recorded_by, roleTargetId)
+assert.equal(
+  (await db.query(
+    "select id from record_fee_payment($1,1,'cash','accountant campus payment',$2)",
+    [fee, accountantPaymentRequest],
+  )).rows[0].id,
+  accountantPayment.id,
+  'accountant payment retries remain idempotent',
+)
+assert.equal(
+  Number((await db.query('select count(*) from fee_transactions where request_id=$1', [accountantPaymentRequest])).rows[0].count),
+  1,
+  'an accountant retry does not duplicate a campus payment',
+)
+await rejects(
+  () => db.query("select * from record_fee_payment($1,1,'cash','wrong campus','30000000-0000-4000-8000-000000000003')", [seniorFinanceFee]),
+  /unavailable in your assigned campus/,
+)
+assert.ok(
+  Number((await db.query('select count(*) from fee_transactions where campus_id=$1', [campus])).rows[0].count) > 0,
+  'Accountant can read assigned-campus payment history',
+)
+const accountantFeeRows = await db.query('select * from accountant_finance_fee_records()')
+assert.ok(accountantFeeRows.rows.length > 0)
+assert.ok(accountantFeeRows.rows.every((row) => row.campus_id === campus))
+assert.deepEqual(
+  Object.keys(accountantFeeRows.rows[0]).sort(),
+  ['academic_term','academic_year','amount','campus_code','campus_id','campus_name','currency','due_date','id','paid_amount','payment_reference','status','student_name'].sort(),
+  'the Accountant RPC returns only required campus fee and learner directory fields',
+)
+assert.ok(
+  Number((await db.query('select count(*) from fee_settings')).rows[0].count) > 0,
+  'Accountant can read the shared fee schedule',
+)
+assert.equal(
+  (await db.query("update fee_settings set setting_value=setting_value+1 where setting_key='fee_olevel_zimsec' returning setting_key")).rows.length,
+  0,
+  'Accountant cannot modify fee settings',
+)
+await rejects(
+  () => db.query('insert into fee_records(campus_id,student_id,amount) values($1,$2,25)', [campus, ids.student]),
+  /row-level security/,
+)
+await rejects(
+  () => db.query("insert into fee_transactions(fee_record_id,campus_id,amount,payment_method,recorded_by) values($1,$2,1,'cash',$3)", [fee, campus, roleTargetId]),
+  /permission denied/,
+)
+await rejects(
+  () => db.query("insert into cashbook_expenses(expense_date,category,description,amount) values(current_date,'test','accountant write attempt',1)"),
+  /row-level security/,
+)
+assert.equal(
+  Number((await db.query('select count(*) from cashbook_expenses')).rows[0].count),
+  0,
+  'Accountant cannot read the unscoped cashbook',
+)
+await rejects(
+  () => db.query('select * from principal_finance_fee_records()'),
+  /Principal finance access required/,
+)
 assert.deepEqual(
   (await db.query("select active_role,active_campus_id from switch_active_portal_role('principal',$1)", [campus])).rows,
   [{ active_role: 'principal', active_campus_id: campus }],

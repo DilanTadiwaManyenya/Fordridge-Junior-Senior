@@ -35,7 +35,10 @@ const newFee = () => ({
 export default function FeesDashboard({ profile, user }) {
   const isAdmin = profile?.role === 'admin'
   const isPrincipal = profile?.role === 'principal'
-  const canReviewFinance = isAdmin || isPrincipal
+  const isAccountant = profile?.role === 'accountant'
+  const canReviewFinance = isAdmin || isPrincipal || isAccountant
+  const canRecordPayment = isAdmin || isAccountant
+  const canViewCampusLedger = isPrincipal || isAccountant
   const paymentRequest = useRef(null)
   const paymentLock = useRef(false)
   const [pendingPayment, setPendingPayment] = useState(false)
@@ -64,7 +67,9 @@ export default function FeesDashboard({ profile, user }) {
     try {
       const r = isPrincipal
         ? await supabase.rpc('principal_finance_fee_records')
-        : await supabase
+        : isAccountant
+          ? await supabase.rpc('accountant_finance_fee_records')
+          : await supabase
             .from('fee_records')
             .select(
               'id,campus_id,amount,paid_amount,currency,due_date,status,payment_reference,academic_year,academic_term,student:profiles!fee_records_student_id_fkey(full_name),campus:campuses!fee_records_campus_id_fkey(name,code)',
@@ -73,7 +78,7 @@ export default function FeesDashboard({ profile, user }) {
       if (r.error) setError(r.error.message)
       else
         setRecords(
-          isPrincipal
+          isPrincipal || isAccountant
             ? (r.data || []).map((item) => ({
                 ...item,
                 student: { full_name: item.student_name },
@@ -86,11 +91,11 @@ export default function FeesDashboard({ profile, user }) {
     } finally {
       setLoading(false)
     }
-  }, [isPrincipal])
+  }, [isPrincipal, isAccountant])
   const loadAdmin = useCallback(async () => {
     if (!supabase) return
     try {
-      if (isPrincipal) {
+      if (isPrincipal || isAccountant) {
         const [fees, ledger] = await Promise.all([
           supabase
             .from('fee_settings')
@@ -131,7 +136,7 @@ export default function FeesDashboard({ profile, user }) {
     } catch (err) {
       setError(workflowError(err))
     }
-  }, [isAdmin, isPrincipal])
+  }, [isAdmin, isPrincipal, isAccountant])
   useEffect(() => {
     loadRecords()
     loadAdmin()
@@ -298,6 +303,8 @@ export default function FeesDashboard({ profile, user }) {
               ? 'Create server-calculated term fees and record verified payments.'
               : isPrincipal
                 ? 'Read-only view of your campus fee records and the school fee schedule.'
+                : isAccountant
+                  ? 'Review your campus fee records and record payments. Charges and reversals require an administrator.'
                 : 'View the fee records available to your account.'}
           </p>
         </div>
@@ -339,7 +346,7 @@ export default function FeesDashboard({ profile, user }) {
           </article>
         </div>
       )}
-      {isPrincipal && (
+      {canViewCampusLedger && (
         <section className="fees-card" aria-label="Read-only fee schedule">
           <h2>School fee schedule</h2>
           <p>Reference amounts only. Changes require an authorised administrator.</p>
@@ -358,7 +365,7 @@ export default function FeesDashboard({ profile, user }) {
           </div>
         </section>
       )}
-      {isPrincipal && (
+      {canViewCampusLedger && (
         <section className="fees-card" aria-label="Read-only payment ledger">
           <h2>Recent payments</h2>
           <div className="fees-table-wrap">
@@ -412,7 +419,7 @@ export default function FeesDashboard({ profile, user }) {
                   <th>Paid</th>
                   <th>Balance</th>
                   <th>Status</th>
-                  {isAdmin && <th />}
+                  {canRecordPayment && <th />}
                 </tr>
               </thead>
               <tbody>
@@ -437,7 +444,7 @@ export default function FeesDashboard({ profile, user }) {
                           {title(r.calculatedStatus)}
                         </span>
                       </td>
-                      {isAdmin && (
+                      {canRecordPayment && (
                         <td>
                           <button
                             className="fees-collect"
@@ -459,7 +466,7 @@ export default function FeesDashboard({ profile, user }) {
                   ))
                 ) : (
                   <tr>
-                    <td colSpan={isAdmin ? 9 : 8} className="fees-message">
+                    <td colSpan={canRecordPayment ? 9 : 8} className="fees-message">
                       No fee records match these filters.
                     </td>
                   </tr>
