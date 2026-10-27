@@ -19,7 +19,7 @@ export default function SubjectAllocations({ profile }) {
       .select('id,class_id,class_stream_id,class_level,class_stream,subject,assignment_kind,teacher_id,teacher:profiles!teacher_class_assignments_teacher_id_fkey(full_name),campus:campuses(id,name)')
       .not('subject', 'is', null)
       .order('class_level')
-    if (!admin) allocationQuery = allocationQuery.eq('teacher_id', profile.id)
+    if (!admin) allocationQuery = allocationQuery.eq('teacher_id', profile.id).eq('campus_id', profile.campus_id)
     const [allocations, staff, schools, catalogue] = await Promise.all([
       allocationQuery,
       admin ? supabase.from('profiles').select('id,full_name,campus_id').eq('role', 'teacher').order('full_name') : Promise.resolve({ data: [], error: null }),
@@ -80,7 +80,7 @@ export default function SubjectAllocations({ profile }) {
 
   return <section>
     <header className="workflow-heading">
-      <div><p className="eyebrow">Teaching workspace</p><h1>Subject allocations</h1><p className="progress-report-note">Allocate a confirmed subject to a teacher, class and optional stream. Markbook writes require this allocation.</p></div>
+      <div><p className="eyebrow">Teaching workspace</p><h1>Subject allocations</h1><p className="progress-report-note">{admin ? 'Allocate a confirmed subject to a teacher, class and optional stream. Markbook writes require this allocation.' : 'Review subjects allocated to your classes and streams. Markbook writes require an allocation; subject-only allocations do not grant class-register attendance access.'}</p></div>
       {admin && <button className="primary-action" onClick={() => { setError(''); setDraft(emptyDraft()) }}>+ Allocate subject</button>}
     </header>
     {error && <p className="workflow-error" role="alert">{error}</p>}

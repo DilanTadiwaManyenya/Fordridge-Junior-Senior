@@ -1,7 +1,7 @@
 # Fordridge portal roadmap inspired by Reliance
 
 Updated: 27 October 2026
-Current checkpoint: Stages 1–17 complete; Stage 18 is next
+Current checkpoint: Stages 1–17 complete; Stage 18 implementation validated and awaiting push
 
 ## Purpose
 
@@ -37,7 +37,7 @@ The evidence and limitations are in [Stage 2 inventory](STAGE-02-INVENTORY.md), 
 
 ## Stage sequence
 
-Stages 1–15 are completed foundation, catalogue, teacher-scope, role-membership, active-context and active-role authorization work. The owner approved the Stage 7 capability matrix on 27 October 2026. Stage 16 implements the approved Principal read-only fee finance view; campus attribution is still required before Principal access to the cashbook.
+Stages 1–17 are completed foundation, catalogue, teacher-scope, role-membership, active-context, Principal read-only finance and Accountant fee-operations work. The owner approved the Stage 7 capability matrix on 27 October 2026. Stage 18 makes teacher class-register and subject workspaces follow the active campus; the Fordridge class catalogue remains empty until school allocation is confirmed.
 
 | Stage | Small deliverable | Acceptance check / dependency |
 | --- | --- | --- |

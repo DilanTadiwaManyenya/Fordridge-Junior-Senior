@@ -19,6 +19,7 @@ import PortalOverview from './PortalOverview'
 import ProgressReports from './ProgressReports'
 import BulkAttendance from './BulkAttendance'
 import ClassAssignments from './ClassAssignments'
+import MyClass from './MyClass'
 import SubjectAllocations from './SubjectAllocations'
 import ExpenseCashbook from './ExpenseCashbook'
 import ActivityLog from './ActivityLog'
@@ -37,6 +38,7 @@ import ReportApprovalRegister from './ReportApprovalRegister'
 import ReportReleaseMetrics from './ReportReleaseMetrics'
 import ReportVerification from './ReportVerification'
 import { withPortalTimeout, workflowError } from './workflow'
+import { canOpenTeacherMyClass } from './teacher-workspace'
 import './workflow.css'
 
 export default function PortalDashboard() {
@@ -94,6 +96,18 @@ export default function PortalDashboard() {
             item.role === context.active_role &&
             item.campus_id === context.active_campus_id,
         )
+        let hasClassAssignment = false
+        if (context.active_role === 'teacher' && context.active_campus_id) {
+          const classAssignment = await supabase
+            .from('teacher_class_assignments')
+            .select('id')
+            .eq('teacher_id', data.user.id)
+            .eq('campus_id', context.active_campus_id)
+            .eq('assignment_kind', 'class')
+            .limit(1)
+          if (classAssignment.error) throw classAssignment.error
+          hasClassAssignment = Boolean(classAssignment.data?.length)
+        }
         return {
           loading: false,
           profile: {
@@ -108,6 +122,7 @@ export default function PortalDashboard() {
                 ? result.data.campus
                 : null),
             role_memberships: memberships,
+            has_class_assignment: hasClassAssignment,
           },
           user: data.user,
           error: '',
@@ -161,6 +176,10 @@ export default function PortalDashboard() {
   const reports = ['student', 'parent', 'teacher', 'admin'].includes(profile.role)
   const attendance = ['teacher', 'admin'].includes(profile.role)
   const assignments = ['teacher', 'admin'].includes(profile.role)
+  const teacherMyClass = canOpenTeacherMyClass(
+    profile.role,
+    profile.has_class_assignment,
+  )
   const analytics = ['teacher', 'admin'].includes(profile.role)
   if (
     (['learners', 'staff', 'classes'].includes(view) && !admin) ||
@@ -181,7 +200,8 @@ export default function PortalDashboard() {
     (view === 'report-approvals' && !admin) ||
     (view === 'report-dashboard' && !admin) ||
     (view === 'report-verification' && !admin) ||
-    (view === 'assignments' && !assignments) ||
+    (view === 'assignments' && !admin) ||
+    (view === 'my-class' && !teacherMyClass) ||
     (view === 'subject-allocations' && !assignments) ||
     (view === 'cashbook' && !admin) ||
     (view === 'activity' && !admin) ||
@@ -208,6 +228,7 @@ export default function PortalDashboard() {
       'report-dashboard',
       'report-verification',
       'assignments',
+      'my-class',
       'subject-allocations',
       'cashbook',
       'activity',
@@ -305,7 +326,8 @@ export default function PortalDashboard() {
           {attendance && nav('/portal/attendance-history', 'Attendance history', '◷')}
           {analytics && nav('/portal/analytics', 'Academic analytics', '▤')}
           {attendance && nav('/portal/marks', 'Bulk mark entry', '✎')}
-          {assignments && nav('/portal/assignments', 'Class assignments', '⌘')}
+          {admin && nav('/portal/assignments', 'Class assignments', '⌘')}
+          {teacherMyClass && nav('/portal/my-class', 'My class', '▦')}
           {assignments && nav('/portal/subject-allocations', 'Subject allocations', '▤')}
           {nav('/portal/announcements', 'Announcements', '✦')}
           {nav('/portal/notifications', 'Notifications', '●')}
@@ -405,6 +427,8 @@ export default function PortalDashboard() {
           <BulkMarks profile={profile} />
         ) : view === 'assignments' ? (
           <ClassAssignments profile={profile} />
+        ) : view === 'my-class' ? (
+          <MyClass profile={profile} />
         ) : view === 'subject-allocations' ? (
           <SubjectAllocations profile={profile} />
         ) : view === 'cashbook' ? (

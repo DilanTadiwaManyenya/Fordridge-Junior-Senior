@@ -2,6 +2,41 @@ import assert from 'node:assert/strict'
 import { readFile, readdir } from 'node:fs/promises'
 import { PGlite } from '../.portal-test-tools/node_modules/@electric-sql/pglite/dist/index.js'
 import { canEnterPortal, withPortalTimeout } from '../src/portal/workflow.js'
+import { buildTeacherClassScopes, canOpenTeacherMyClass } from '../src/portal/teacher-workspace.js'
+
+assert.equal(canOpenTeacherMyClass('teacher', true), true)
+assert.equal(canOpenTeacherMyClass('teacher', false), false)
+assert.equal(canOpenTeacherMyClass('admin', true), false)
+
+const teacherLearners = [
+  { id: 'one', campus_id: 'junior', class_level: 'Form 1', class_stream: 'A', full_name: 'A Learner' },
+  { id: 'two', campus_id: 'junior', class_level: 'Form 1', class_stream: 'B', full_name: 'B Learner' },
+  { id: 'three', campus_id: 'junior', class_level: 'Form 2', class_stream: null, full_name: 'Other Class Learner' },
+  { id: 'four', campus_id: 'senior', class_level: 'Form 1', class_stream: 'A', full_name: 'Other Campus Learner' },
+]
+const wholeClassView = buildTeacherClassScopes([
+  { assignment_kind: 'class', campus_id: 'junior', class_level: 'Form 1', class_stream: null },
+], teacherLearners)
+assert.deepEqual(
+  wholeClassView[0].learners.map((learner) => learner.id),
+  ['one', 'two'],
+  'My class whole-class cards include each assigned stream and campus only',
+)
+const streamClassView = buildTeacherClassScopes([
+  { assignment_kind: 'class', campus_id: 'junior', class_level: 'Form 1', class_stream: 'B' },
+], teacherLearners)
+assert.deepEqual(
+  streamClassView[0].learners.map((learner) => learner.id),
+  ['two'],
+  'My class stream cards show only that stream',
+)
+assert.deepEqual(
+  buildTeacherClassScopes([
+    { assignment_kind: 'subject', campus_id: 'junior', class_level: 'Form 1', class_stream: 'A', subject: 'Maths' },
+  ], teacherLearners),
+  [],
+  'subject-only allocations do not appear as class-register assignments',
+)
 
 const db = new PGlite()
 await db.exec(`create role authenticated; create role anon; create schema auth;
@@ -296,6 +331,34 @@ await rejects(
   ),
   /Choose a confirmed class/,
 )
+const seniorCampus = (await db.query("select id from campuses where code='senior'")).rows[0].id
+const seniorFormOne = (await db.query(
+  "insert into school_classes(campus_id,class_level) values($1,'Form 1') returning id",
+  [seniorCampus],
+)).rows[0].id
+const seniorLearnerId = '00000000-0000-4000-8000-000000000011'
+await db.exec('reset role')
+await db.query('insert into auth.users(id,raw_user_meta_data) values($1,$2)', [
+  seniorLearnerId,
+  JSON.stringify({ full_name: 'Senior Test Learner' }),
+])
+await db.query(
+  "update profiles set campus_id=$1,class_level='Form 1',class_stream=null,enrollment_status='active' where id=$2",
+  [seniorCampus, seniorLearnerId],
+)
+await as('admin')
+await db.query(
+  "insert into teacher_class_assignments(teacher_id,campus_id,class_level,class_id,subject) values($1,$2,'Form 1',$3,null)",
+  [ids.teacher, seniorCampus, seniorFormOne],
+)
+await db.query(
+  "insert into teacher_class_assignments(teacher_id,campus_id,class_level,class_id,subject,assignment_kind) values($1,$2,'Form 1',$3,'Biology','subject')",
+  [ids.teacher, seniorCampus, seniorFormOne],
+)
+await db.query(
+  "select grant_portal_role($1,'teacher',$2,'Approved second campus teaching assignment')",
+  [ids.teacher, seniorCampus],
+)
 await as('teacher')
 assert.equal(canEnterPortal('teacher', 'staff'), true)
 assert.equal(canEnterPortal('student', 'staff'), false)
@@ -327,12 +390,42 @@ assert.equal(
   (await db.query('select teacher_has_class_assignment($1,$2,$3) as allowed', [campus, 'Form 2', null])).rows[0].allowed,
   false,
 )
-const seniorCampus = (await db.query("select id from campuses where code='senior'")).rows[0].id
 assert.equal(
   (await db.query('select teacher_has_class_assignment($1,$2,$3) as allowed', [seniorCampus, 'Form 1', 'B'])).rows[0].allowed,
   false,
   'a junior campus assignment does not grant senior campus access',
 )
+assert.equal(
+  (await db.query('select teacher_has_subject_assignment($1,$2,$3,$4) as allowed', [seniorCampus, 'Form 1', null, 'Biology'])).rows[0].allowed,
+  false,
+  'a subject assignment from another active campus is not enabled',
+)
+assert.equal(
+  (await db.query('select count(*) from profiles where id=$1', [seniorLearnerId])).rows[0].count,
+  0,
+  'the teacher cannot query another assigned campus before switching context',
+)
+assert.deepEqual(
+  (await db.query("select active_role,active_campus_id from switch_active_portal_role('teacher',$1)", [seniorCampus])).rows,
+  [{ active_role: 'teacher', active_campus_id: seniorCampus }],
+  'a multi-campus teacher can explicitly switch campus context',
+)
+assert.equal(
+  (await db.query('select teacher_has_class_assignment($1,$2,$3) as allowed', [seniorCampus, 'Form 1', null])).rows[0].allowed,
+  true,
+  'the assigned campus class is available after switching context',
+)
+assert.equal(
+  (await db.query('select teacher_has_subject_assignment($1,$2,$3,$4) as allowed', [seniorCampus, 'Form 1', null, 'Biology'])).rows[0].allowed,
+  true,
+  'the active-campus subject allocation becomes available after switching',
+)
+assert.equal(
+  (await db.query('select count(*) from profiles where id=$1', [seniorLearnerId])).rows[0].count,
+  1,
+  'assigned senior learner appears only in the matching active campus context',
+)
+await db.query("select switch_active_portal_role('teacher',$1)", [campus])
 await db.query('select record_bulk_attendance(current_date,$1::jsonb)', [JSON.stringify([{ student_id: ids.stream_student, attendance_status: 'present' }])])
 await rejects(
   () => db.query("select record_bulk_marks('Science',current_date,2026,'Term 1',100,$1::jsonb)", [JSON.stringify([{ student_id: ids.stream_student, score: 75 }])]),
