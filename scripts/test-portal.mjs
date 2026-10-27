@@ -10,14 +10,26 @@ create function auth.uid() returns uuid language sql stable as $$select nullif(c
 grant usage on schema public,auth to authenticated,anon;
 alter default privileges in schema public grant all on tables to authenticated;
 alter default privileges in schema public grant all on sequences to authenticated;`)
+const preExistingUserId = '00000000-0000-4000-8000-000000000020'
 for (const file of (await readdir('supabase/migrations'))
   .filter((f) => f.endsWith('.sql'))
-  .sort())
+  .sort()) {
+  if (file === '20261010000000_role_membership_storage.sql') {
+    await db.query(
+      'insert into auth.users(id,raw_user_meta_data) values($1,$2)',
+      [preExistingUserId, JSON.stringify({ full_name: 'Legacy role account', portal_role: 'parent' })],
+    )
+    await db.query(
+      "update public.profiles set role='teacher',campus_id=(select id from campuses where code='junior') where id=$1",
+      [preExistingUserId],
+    )
+  }
   await db.exec(await readFile(`supabase/migrations/${file}`, 'utf8'))
+}
 const ids = ['admin', 'student', 'parent', 'stranger', 'teacher', 'stream_teacher', 'stream_student', 'other_student', 'subject_teacher'].reduce(
   (all, name, i) => ({
     ...all,
-    [name]: `00000000-0000-4000-8000-00000000000${i + 1}`,
+    [name]: `00000000-0000-4000-8000-${String(i + 1).padStart(12, '0')}`,
   }),
   {},
 )
@@ -27,7 +39,11 @@ for (const [name, id] of Object.entries(ids)) {
     [id, JSON.stringify({ full_name: name })],
   )
   await db.query(
-    "update public.profiles set role=$1::app_role,campus_id=(select id from campuses where code='junior'),class_level='Form 1' where id=$2",
+    "update public.profiles set role=$1::app_role,campus_id=case when $1='admin' then null else (select id from campuses where code='junior') end,class_level='Form 1' where id=$2",
+    [name === 'stranger' || name === 'stream_student' || name === 'other_student' ? 'student' : name === 'stream_teacher' || name === 'subject_teacher' ? 'teacher' : name, id],
+  )
+  await db.query(
+    "update public.user_role_memberships set role=$1,campus_id=case when $1='admin' then null else (select id from campuses where code='junior') end where user_id=$2 and is_primary",
     [name === 'stranger' || name === 'stream_student' || name === 'other_student' ? 'student' : name === 'stream_teacher' || name === 'subject_teacher' ? 'teacher' : name, id],
   )
 }
@@ -37,6 +53,30 @@ await db.query('insert into student_guardians values($1,$2)', [
 ])
 const campus = (await db.query("select id from campuses where code='junior'"))
   .rows[0].id
+assert.equal(
+  Number((await db.query('select count(*) from user_role_memberships where is_primary')).rows[0].count),
+  Object.keys(ids).length + 1,
+  'existing profiles are backfilled and new profiles receive a primary membership',
+)
+assert.equal(
+  (await db.query("select role from user_role_memberships where user_id=$1 and is_primary", [ids.admin])).rows[0].role,
+  'admin',
+  'the existing Main Admin primary role is preserved',
+)
+assert.equal(
+  (await db.query('select role from user_role_memberships where user_id=$1 and is_primary', [preExistingUserId])).rows[0].role,
+  'teacher',
+  'migration backfills a legacy profile role and campus without changing it',
+)
+await db.query(
+  "insert into auth.users(id,raw_user_meta_data) values('00000000-0000-4000-8000-000000000010', $1)",
+  [JSON.stringify({ full_name: 'Role target', portal_role: 'parent' })],
+)
+assert.equal(
+  (await db.query("select role from user_role_memberships where user_id='00000000-0000-4000-8000-000000000010' and is_primary")).rows[0].role,
+  'parent',
+  'approved parent signup receives a matching primary membership',
+)
 const fee = (
   await db.query(
     'insert into fee_records(campus_id,student_id,amount) values($1,$2,100) returning id',
@@ -354,9 +394,104 @@ const frozen = (await db.query(
 )).rows[0]
 assert.ok(frozen.assessments.some(item => item.title === 'Quiz 1' && item.subject === 'Science'), 'official snapshots preserve the allocated subject')
 assert.equal(frozen.subject_signatories.Science, 'T', 'whole-class subject allocations appear on stream-specific report snapshots')
+await as('student')
+assert.equal(
+  Number((await db.query('select count(*) from user_role_memberships')).rows[0].count),
+  1,
+  'users can read only their own role memberships',
+)
+await rejects(
+  () => db.query("insert into user_role_memberships(user_id,role,grant_reason) values($1,'admin','self grant')", [ids.student]),
+  /permission denied/,
+)
+await as('admin')
+const accountantGrant = (await db.query(
+  "select grant_portal_role($1,'accountant',$2,'Approved finance role for testing') as id",
+  ['00000000-0000-4000-8000-000000000010', campus],
+)).rows[0].id
+await db.query(
+  "select grant_portal_role($1,'admin',null,'Approved secondary Main Admin role')",
+  ['00000000-0000-4000-8000-000000000010'],
+)
+assert.equal(
+  (await db.query("select role from user_role_memberships where id=$1", [accountantGrant])).rows[0].role,
+  'accountant',
+  'Main Admin can create a campus-scoped additional role grant',
+)
+assert.equal(
+  (await db.query('select grant_portal_role($1,$2,$3,$4) as id', ['00000000-0000-4000-8000-000000000010', 'accountant', campus, 'Approved finance role for testing'])).rows[0].id,
+  accountantGrant,
+  'repeating a role grant does not duplicate membership',
+)
+await rejects(
+  () => db.query("select grant_portal_role($1,'teacher',$2,'Attempted self grant')", [ids.admin, campus]),
+  /cannot grant a role to yourself/,
+)
+await rejects(
+  () => db.query("select revoke_portal_role($1,'parent',null,'Attempted primary revoke')", ['00000000-0000-4000-8000-000000000010']),
+  /Primary role must be changed through account provisioning/,
+)
+await rejects(
+  () => db.query("insert into user_role_memberships(user_id,role,grant_reason) values($1,'teacher','Direct write')", [ids.stranger]),
+  /permission denied/,
+)
+await as('teacher')
+await rejects(
+  () => db.query("select grant_portal_role($1,'accountant',$2,'Teacher cannot grant roles')", ['00000000-0000-4000-8000-000000000010', campus]),
+  /Main administrator access required/,
+)
+await db.exec('reset role')
+await db.query(
+  "update public.profiles set role='teacher',campus_id=$1 where id='00000000-0000-4000-8000-000000000010'",
+  [campus],
+)
+await as('admin')
+await db.query(
+  "select replace_primary_portal_role($1,'teacher'::app_role,$2,'Administrator provisioned teacher account')",
+  ['00000000-0000-4000-8000-000000000010', campus],
+)
+assert.deepEqual(
+  (await db.query("select role,is_primary from user_role_memberships where user_id='00000000-0000-4000-8000-000000000010' order by role")).rows,
+  [
+    { role: 'accountant', is_primary: false },
+    { role: 'admin', is_primary: false },
+    { role: 'teacher', is_primary: true },
+  ],
+  'provisioning replaces the temporary signup role while preserving separately granted roles',
+)
+await db.query(
+  "select revoke_portal_role($1,'accountant',$2,'Finance role no longer needed')",
+  ['00000000-0000-4000-8000-000000000010', campus],
+)
+assert.equal(
+  (await db.query("select count(*) from user_role_memberships where user_id='00000000-0000-4000-8000-000000000010' and role='accountant'")).rows[0].count,
+  0,
+  'Main Admin can revoke an additional grant with an audit reason',
+)
+assert.equal(
+  (await db.query("select count(*) from user_role_memberships where user_id='00000000-0000-4000-8000-000000000010' and role='admin'")).rows[0].count,
+  1,
+  'additional role grants remain stored separately from the primary role',
+)
+assert.ok(
+  Number((await db.query("select count(*) from audit_trail where entity_type='role_membership' and entity_id='00000000-0000-4000-8000-000000000010'")).rows[0].count) >= 4,
+  'role grant, provisioning and revocation are written to the audit trail',
+)
+await db.exec('reset role')
+await db.query("select set_config('request.jwt.claim.sub',$1,false)", ['00000000-0000-4000-8000-000000000010'])
+await db.exec('set role authenticated')
+assert.equal(
+  (await db.query('select is_current_main_admin() as allowed')).rows[0].allowed,
+  false,
+  'a secondary Main Admin grant is not active before Stage 13 role switching',
+)
+await rejects(
+  () => db.query("select grant_portal_role($1,'teacher',$2,'Secondary admin cannot grant')", [ids.student, campus]),
+  /Main administrator access required/,
+)
 await as('')
 await rejects(() => pay(1), /Administrator/)
 await db.close()
 console.log(
-  'PASS: migrations, atomic payments, retry safety, rollback, scoped whole-class/stream assignments, assignment overlap rejection, teacher profile/record/RPC scope, guardian access, private records and teacher login.',
+  'PASS: migrations, atomic payments/retries/rollback, class and subject scope, role membership isolation/grants/revocation/provisioning, teacher profile/record/RPC scope, guardian access, private records and teacher login.',
 )

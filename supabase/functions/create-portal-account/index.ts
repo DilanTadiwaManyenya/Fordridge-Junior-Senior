@@ -31,6 +31,11 @@ Deno.serve(async (request) => {
       .single()
     if (profileError || actor?.role !== 'admin')
       return reply(403, { error: 'Administrator access required' })
+    const { data: isMainAdmin, error: membershipCheckError } = await caller.rpc(
+      'is_current_main_admin',
+    )
+    if (membershipCheckError || !isMainAdmin)
+      return reply(403, { error: 'Main administrator access required' })
     const input = await request.json()
     if (
       !['student', 'teacher', 'staff'].includes(input.role) ||
@@ -90,6 +95,24 @@ Deno.serve(async (request) => {
           ? 'Account created but profile setup failed. Contact the administrator before retrying.'
           : updateError?.message ||
             'Profile setup failed; no account was retained.',
+      })
+    }
+    const { error: membershipError } = await caller.rpc(
+      'replace_primary_portal_role',
+      {
+        p_user_id: data.user.id,
+        p_role: input.role,
+        p_campus_id: campus.id,
+        p_reason: `Administrator provisioned ${input.role} account`,
+      },
+    )
+    if (membershipError) {
+      const cleanup = await admin.auth.admin.deleteUser(data.user.id)
+      return reply(400, {
+        error: cleanup.error
+          ? 'Account created but role setup failed. Contact the administrator before retrying.'
+          : membershipError.message ||
+            'Role setup failed; no account was retained.',
       })
     }
     return reply(200, { id: data.user.id })

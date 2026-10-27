@@ -1,7 +1,7 @@
 # Fordridge portal roadmap inspired by Reliance
 
 Updated: 27 October 2026
-Current checkpoint: Stages 1–11 complete; Stage 12 awaits owner approval
+Current checkpoint: Stages 1–11 complete; Stage 12 role membership implemented and under review
 
 ## Purpose
 
@@ -37,7 +37,7 @@ The evidence and limitations are in [Stage 2 inventory](STAGE-02-INVENTORY.md), 
 
 ## Stage sequence
 
-Stages 1–10 are completed foundation, catalogue and teacher-scope work. The owner approved the Stage 7 capability matrix on 27 October 2026. Stage 11 separates Subject allocations and Markbook subject writes; later stages remain in their agreed order.
+Stages 1–11 are completed foundation, catalogue and teacher-scope work. The owner approved the Stage 7 capability matrix on 27 October 2026. Stage 12 adds safe role membership storage; Stage 13 introduces active-role switching and needs focused review before implementation.
 
 | Stage | Small deliverable | Acceptance check / dependency |
 | --- | --- | --- |

@@ -19,6 +19,7 @@ A stage is Complete only after its deliverable and relevant checks are recorded 
 | 9 | Complete | Admin Classes screen and empty class/stream tables | [Stage 9 record](STAGE-09-CLASS-CATALOGUE.md); isolated portal suite and production build pass; no live migration deployment |
 | 10 | Complete | Canonical, campus/class/stream-scoped teacher assignments | [d226bf2](https://github.com/DilanTadiwaManyenya/Fordridge-Junior-Senior/commit/d226bf2); [Stage 10 record](STAGE-10-TEACHER-ASSIGNMENTS.md) |
 | 11 | Complete | Separate Subject allocations and subject-scoped Markbook writes | [1ff87d7](https://github.com/DilanTadiwaManyenya/Fordridge-Junior-Senior/commit/1ff87d7); [Stage 11 record](STAGE-11-SUBJECT-ALLOCATIONS.md); isolated tests, build and lint pass |
+| 12 | Implemented; awaiting commit/push | Server-controlled role memberships and audited grants | [Stage 12 record](STAGE-12-ROLE-MEMBERSHIP.md); isolated tests, build and lint pass; live migration/function deployment pending |
 
 ## Stage 5 follow-up status
 

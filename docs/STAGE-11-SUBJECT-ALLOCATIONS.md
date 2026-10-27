@@ -34,4 +34,4 @@ Approval basis: owner approval of the 85-stage roadmap and Reliance-inspired Sta
 
 - The migration has not been applied to Supabase and the frontend has not been deployed. Obtain the separate production-migration/deployment approval required by the owner before applying or releasing this change.
 - The subject allocation workflow reuses Fordridge's existing assignment table and keeps legacy rows intact. No school class, stream, capacity or subject data has been invented.
-- Stage 12 adds server-controlled role membership and active-role support. Because that changes who can hold and switch permissions, pause for owner approval before implementing it.
+- Stage 12 adds server-controlled role membership; see [the Stage 12 record](STAGE-12-ROLE-MEMBERSHIP.md). Stage 13 adds active-role switching and should be reviewed separately before implementation because it changes runtime permission selection.
