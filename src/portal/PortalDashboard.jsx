@@ -100,6 +100,7 @@ export default function PortalDashboard() {
             ...result.data,
             primary_role: result.data.role,
             role: context.active_role,
+            active_role: context.active_role,
             campus_id: context.active_campus_id,
             campus:
               activeMembership?.campus ||
@@ -149,8 +150,12 @@ export default function PortalDashboard() {
       </section>
     )
   if (!state.profile) return <Navigate to="/portal/login" replace />
-  const { profile, user } = state,
-    admin = profile.role === 'admin'
+  const { profile: loadedProfile, user } = state
+  const scopedAdmin = loadedProfile.role === 'admin' && loadedProfile.campus_id
+  const profile = scopedAdmin
+    ? { ...loadedProfile, role: 'staff' }
+    : loadedProfile
+  const admin = profile.role === 'admin'
   const fees = ['student', 'parent', 'admin'].includes(profile.role)
   const records = ['student', 'parent', 'teacher', 'admin'].includes(profile.role)
   const reports = ['student', 'parent', 'teacher', 'admin'].includes(profile.role)
@@ -231,7 +236,7 @@ export default function PortalDashboard() {
   }
   async function switchRole(event) {
     const [role, campusId = ''] = event.target.value.split('|')
-    if (role === profile.role && (campusId || null) === profile.campus_id) return
+    if (role === profile.active_role && (campusId || null) === profile.campus_id) return
     setState((s) => ({ ...s, loading: true, error: '' }))
     try {
       const { error } = await withPortalTimeout(
@@ -343,13 +348,12 @@ export default function PortalDashboard() {
             {profile.role_memberships.length > 1 ? (
               <select
                 aria-label="Active role"
-                value={`${profile.role}|${profile.campus_id || ''}`}
+                value={`${profile.active_role}|${profile.campus_id || ''}`}
                 onChange={switchRole}
               >
                 {profile.role_memberships.map((item) => {
                   const key = `${item.role}|${item.campus_id || ''}`
-                  const deferredCampusAdmin =
-                    item.role === 'admin' && item.campus_id && !item.is_primary
+                  const deferredCampusAdmin = item.role === 'admin' && item.campus_id
                   return (
                     <option key={key} value={key} disabled={Boolean(deferredCampusAdmin)}>
                       {membershipLabel(item)}{deferredCampusAdmin ? ' · scoped access pending' : ''}
@@ -357,7 +361,7 @@ export default function PortalDashboard() {
                   )
                 })}
               </select>
-            ) : <strong>{membershipLabel(profile.role_memberships[0] || { role: profile.role })}</strong>}
+            ) : <strong>{membershipLabel(profile.role_memberships.find((item) => item.role === profile.active_role && item.campus_id === profile.campus_id) || { role: profile.active_role })}</strong>}
           </label>
           <div className="portal-topbar-status"><i /><span>Secure session</span></div>
         </div>

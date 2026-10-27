@@ -500,6 +500,22 @@ assert.deepEqual(
   [{ active_role: 'accountant', active_campus_id: campus }],
   'a user can switch only to an explicitly granted role and scope',
 )
+assert.equal(
+  (await db.query('select my_role()::text as role')).rows[0].role,
+  'accountant',
+  'database authorization follows the active Accountant role instead of the primary role',
+)
+assert.equal(
+  (await db.query('select my_campus_id() as campus_id')).rows[0].campus_id,
+  campus,
+  'database campus scope follows the active membership',
+)
+assert.equal(
+  (await db.query('select count(*) from fee_records')).rows[0].count,
+  0,
+  'an Accountant receives no finance table access before its approved capability stage',
+)
+await rejects(() => pay(1), /Administrator/)
 await rejects(
   () => db.query("select switch_active_portal_role('admin',$1)", [campus]),
   /Campus Admin switching requires the scoped policy stage/,
@@ -511,13 +527,23 @@ assert.deepEqual(
 )
 assert.equal(
   (await db.query('select my_role()::text as role')).rows[0].role,
-  'teacher',
-  'legacy database authorization stays on the primary role until Stage 15 policy migration',
+  'admin',
+  'database authorization follows the verified active Main Admin membership',
+)
+assert.equal(
+  (await db.query('select my_campus_id() as campus_id')).rows[0].campus_id,
+  null,
+  'Main Admin remains school-wide only when the active membership is unscoped',
 )
 assert.deepEqual(
   (await db.query("select active_role,active_campus_id from switch_active_portal_role('teacher',$1)", [campus])).rows,
   [{ active_role: 'teacher', active_campus_id: campus }],
   'the user can return to the primary context',
+)
+assert.equal(
+  (await db.query('select my_role()::text as role')).rows[0].role,
+  'teacher',
+  'database authorization changes back with the active role context',
 )
 await db.exec('reset role')
 const otherSession = '10000000-0000-4000-8000-000000000002'
