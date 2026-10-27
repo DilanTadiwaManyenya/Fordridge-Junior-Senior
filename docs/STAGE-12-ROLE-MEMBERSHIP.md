@@ -1,7 +1,7 @@
 # Stage 12: safe role membership storage
 
 Date: 27 October 2026
-Status: implemented locally; checks pass; commit/push pending
+Status: complete; committed and pushed to `origin/master` as `e8afb27`
 Approval basis: owner approval of the 85-stage roadmap, Stage 7 access matrix, and instruction to continue Stage 12
 
 ## Acceptance scope

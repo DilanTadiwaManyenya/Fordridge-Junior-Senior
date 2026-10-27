@@ -1,7 +1,7 @@
 # Fordridge portal roadmap inspired by Reliance
 
 Updated: 27 October 2026
-Current checkpoint: Stages 1–11 complete; Stage 12 role membership implemented and under review
+Current checkpoint: Stages 1–12 complete; Stage 13 awaits focused approval/review
 
 ## Purpose
 
