@@ -1,7 +1,7 @@
 # Stage 17: campus-scoped Accountant fee operations
 
 Date: 27 October 2026
-Status: implementation validated; awaiting stage commit and push
+Status: complete; implementation commit `0f479c3` pushed to `origin/master`
 Approval basis: owner-approved Stage 7 matrix allows Accountants to record payments in their assigned campus; reversals and deletions stay with Main Admin by default.
 
 ## Acceptance scope
@@ -24,6 +24,7 @@ Approval basis: owner-approved Stage 7 matrix allows Accountants to record payme
 - `npm run build` — PASS. Existing large JavaScript chunk warning remains (757.69 kB minified).
 - `npm run lint` — PASS (exit 0); existing React effect/hook warnings remain.
 - `git diff --check` — PASS.
+- Implementation commit `0f479c3` — pushed to the verified Fordridge remote.
 - Browser suite — not run; Playwright Chromium remains unavailable per the Stage 5 baseline.
 
 ## Deployment and limitations

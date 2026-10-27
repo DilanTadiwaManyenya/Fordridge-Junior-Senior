@@ -24,7 +24,7 @@ A stage is Complete only after its deliverable and relevant checks are recorded 
 | 14 | Complete | Bounded profile, role-context and membership loading with retry | [dbf1762](https://github.com/DilanTadiwaManyenya/Fordridge-Junior-Senior/commit/dbf1762); [Stage 14 record](STAGE-14-PROFILE-LOADING.md); isolated timeout checks, build and lint pass |
 | 15 | Complete | Active-role authorization boundary and scoped-admin route guard | [302e267](https://github.com/DilanTadiwaManyenya/Fordridge-Junior-Senior/commit/302e267); tracker follow-up [86fbcfd](https://github.com/DilanTadiwaManyenya/Fordridge-Junior-Senior/commit/86fbcfd); [Stage 15 record](STAGE-15-ACTIVE-ROLE-AUTHORIZATION.md); isolated migration/policy suite, build, lint and diff checks pass |
 | 16 | Complete | Principal read-only campus fee finance | [caf9461](https://github.com/DilanTadiwaManyenya/Fordridge-Junior-Senior/commit/caf9461); [Stage 16 record](STAGE-16-PRINCIPAL-FINANCE.md); isolated policy/RPC suite, build and lint pass; cashbook remains unavailable because existing entries have no campus attribution |
-| 17 | Implemented; validation passed; awaiting push | Campus-scoped Accountant fee operations | [Stage 17 record](STAGE-17-ACCOUNTANT-FINANCE.md); isolated payment/RLS suite, build, lint and diff checks pass; cashbook and expense operations remain unavailable pending campus attribution |
+| 17 | Complete | Campus-scoped Accountant fee operations | [0f479c3](https://github.com/DilanTadiwaManyenya/Fordridge-Junior-Senior/commit/0f479c3); [Stage 17 record](STAGE-17-ACCOUNTANT-FINANCE.md); isolated payment/RLS suite, build, lint and diff checks pass; cashbook and expense operations remain unavailable pending campus attribution |
 
 ## Stage 5 follow-up status
 
