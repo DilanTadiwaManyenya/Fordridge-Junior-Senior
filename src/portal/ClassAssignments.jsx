@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { workflowError } from './workflow'
 
-const emptyDraft = () => ({ teacher_id: '', campus_id: '', class_id: '', class_stream_id: '', subject: '' })
+const emptyDraft = () => ({ teacher_id: '', campus_id: '', class_id: '', class_stream_id: '' })
 
 export default function ClassAssignments({ profile }) {
   const admin = profile.role === 'admin'
@@ -18,6 +18,7 @@ export default function ClassAssignments({ profile }) {
     const [assignments, staff, schools, catalogue] = await Promise.all([
       supabase.from('teacher_class_assignments')
         .select('id,class_id,class_stream_id,class_level,class_stream,subject,teacher:profiles!teacher_class_assignments_teacher_id_fkey(full_name),campus:campuses(id,name)')
+        .eq('assignment_kind', 'class')
         .order('class_level'),
       admin ? supabase.from('profiles').select('id,full_name,campus_id').eq('role', 'teacher').order('full_name') : Promise.resolve({ data: [], error: null }),
       admin ? supabase.from('campuses').select('id,name').order('name') : Promise.resolve({ data: [], error: null }),
@@ -66,7 +67,6 @@ export default function ClassAssignments({ profile }) {
         campus_id: draft.campus_id,
         class_level: catalogueClass?.class_level || '',
         class_stream: catalogueStream?.stream_name || null,
-        subject: draft.subject.trim() || null,
       }),
     }
     const result = draft.assignment_id
@@ -88,16 +88,15 @@ export default function ClassAssignments({ profile }) {
       {!draft.assignment_id && <label>Campus<select required value={draft.campus_id} onChange={event => setDraft({ ...draft, campus_id: event.target.value, class_id: '', class_stream_id: '' })}><option value="">Select campus</option>{campuses.map(item => <option value={item.id} key={item.id}>{item.name}</option>)}</select></label>}
       <label>Class / form<select required value={draft.class_id} onChange={event => setDraft({ ...draft, class_id: event.target.value, class_stream_id: '' })}><option value="">Select confirmed class</option>{campusClasses.map(item => <option value={item.id} key={item.id}>{item.class_level}</option>)}</select></label>
       <label>Stream<select value={draft.class_stream_id} onChange={event => setDraft({ ...draft, class_stream_id: event.target.value })}><option value="">All streams (whole class)</option>{activeStreams.map(item => <option value={item.id} key={item.id}>{item.stream_name}</option>)}</select></label>
-      {!draft.assignment_id && <label>Subject (optional)<input value={draft.subject} onChange={event => setDraft({ ...draft, subject: event.target.value })} /></label>}
       {!classes.length && <p className="portal-empty-copy">No confirmed classes are in the catalogue yet. Add only school-approved classes in Classes before creating or linking assignments.</p>}
       <div className="workflow-actions"><button className="primary-action" disabled={saving || !draft.class_id}>{saving ? 'Saving…' : draft.assignment_id ? 'Link assignment' : 'Save assignment'}</button><button type="button" onClick={() => setDraft(null)}>Cancel</button></div>
     </form>}
-    <section className="workflow-panel"><div className="workflow-scroll"><table className="workflow-table"><thead><tr><th>Teacher</th><th>Campus</th><th>Class and scope</th><th>Subject</th>{admin && <th>Catalogue</th>}</tr></thead><tbody>{items.map(item => {
+    <section className="workflow-panel"><div className="workflow-scroll"><table className="workflow-table"><thead><tr><th>Teacher</th><th>Campus</th><th>Class and scope</th>{admin && <th>Catalogue</th>}</tr></thead><tbody>{items.map(item => {
       const canonical = Boolean(item.class_id)
       const matchingClass = classes.find(candidate => candidate.id === item.class_id)
       const matchingStream = matchingClass?.streams?.find(candidate => candidate.id === item.class_stream_id)
       const canLink = !canonical && admin && classes.some(candidate => candidate.campus_id === item.campus?.id && candidate.class_level.trim().toLowerCase() === item.class_level.trim().toLowerCase() && (!item.class_stream || candidate.streams?.some(stream => stream.is_active && stream.stream_name.trim().toLowerCase() === item.class_stream.trim().toLowerCase())))
-      return <tr key={item.id}><td>{item.teacher?.full_name}</td><td>{item.campus?.name}</td><td>{matchingClass?.class_level || item.class_level}{(matchingStream?.stream_name || item.class_stream) ? ` · ${matchingStream?.stream_name || item.class_stream}` : ' · All streams'}</td><td>{item.subject || 'Class register'}</td>{admin && <td>{canonical ? 'Linked' : canLink ? <button type="button" onClick={() => startLegacyLink(item)}>Link to catalogue</button> : 'Legacy · pending catalogue match'}</td>}</tr>
+      return <tr key={item.id}><td>{item.teacher?.full_name}</td><td>{item.campus?.name}</td><td>{matchingClass?.class_level || item.class_level}{(matchingStream?.stream_name || item.class_stream) ? ` · ${matchingStream?.stream_name || item.class_stream}` : ' · All streams'}</td>{admin && <td>{canonical ? 'Linked' : canLink ? <button type="button" onClick={() => startLegacyLink(item)}>Link to catalogue</button> : 'Legacy · pending catalogue match'}</td>}</tr>
     })}</tbody></table>{!items.length && <p className="portal-empty-copy">No class assignments have been created yet.</p>}</div></section>
   </section>
 }

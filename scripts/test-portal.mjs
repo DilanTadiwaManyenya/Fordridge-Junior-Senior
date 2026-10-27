@@ -14,7 +14,7 @@ for (const file of (await readdir('supabase/migrations'))
   .filter((f) => f.endsWith('.sql'))
   .sort())
   await db.exec(await readFile(`supabase/migrations/${file}`, 'utf8'))
-const ids = ['admin', 'student', 'parent', 'stranger', 'teacher', 'stream_teacher', 'stream_student', 'other_student'].reduce(
+const ids = ['admin', 'student', 'parent', 'stranger', 'teacher', 'stream_teacher', 'stream_student', 'other_student', 'subject_teacher'].reduce(
   (all, name, i) => ({
     ...all,
     [name]: `00000000-0000-4000-8000-00000000000${i + 1}`,
@@ -28,7 +28,7 @@ for (const [name, id] of Object.entries(ids)) {
   )
   await db.query(
     "update public.profiles set role=$1::app_role,campus_id=(select id from campuses where code='junior'),class_level='Form 1' where id=$2",
-    [name === 'stranger' || name === 'stream_student' || name === 'other_student' ? 'student' : name === 'stream_teacher' ? 'teacher' : name, id],
+    [name === 'stranger' || name === 'stream_student' || name === 'other_student' ? 'student' : name === 'stream_teacher' || name === 'subject_teacher' ? 'teacher' : name, id],
   )
 }
 await db.query('insert into student_guardians values($1,$2)', [
@@ -198,10 +198,10 @@ await db.query(
   "insert into school_classes(campus_id,class_level) values($1,'Form 2')",
   [campus],
 )
-await db.query(
+const streamA = (await db.query(
   "insert into school_class_streams(class_id,stream_name) values($1,'A') returning id",
   [formOne],
-)
+)).rows[0].id
 const streamB = (await db.query(
   "insert into school_class_streams(class_id,stream_name) values($1,'B') returning id",
   [formOne],
@@ -211,6 +211,7 @@ await db.query('select admin_update_profile($1,$2,$3,$4,$5,$6,$7)', [ids.stream_
 await db.query('select admin_update_profile($1,$2,$3,$4,$5,$6,$7)', [ids.other_student, 'Other Class Learner', campus, 'F201', 'Form 2', '', 'active'])
 await db.query('select admin_update_profile($1,$2,$3,$4,$5,$6,$7)', [ids.stranger, 'Unassigned Learner', campus, 'U001', 'Form 2', '', 'active'])
 await db.query('select admin_update_profile($1,$2,$3,$4,$5,$6,$7)', [ids.stream_teacher, 'Stream Teacher', campus, null, null, null, null])
+await db.query('select admin_update_profile($1,$2,$3,$4,$5,$6,$7)', [ids.subject_teacher, 'Subject Teacher', campus, null, null, null, null])
 await db.query(
   "insert into teacher_class_assignments(teacher_id,campus_id,class_level,class_id,subject) values($1,$2,'Form 1',$3,null)",
   [ids.teacher, campus, formOne],
@@ -222,6 +223,10 @@ await db.query(
 await db.query(
   "insert into teacher_class_assignments(teacher_id,campus_id,class_level,class_id,subject) values($1,$2,'Form 1',$3,'Science')",
   [ids.teacher, campus, formOne],
+)
+await db.query(
+  "insert into teacher_class_assignments(teacher_id,campus_id,class_level,class_stream,class_id,class_stream_id,subject,assignment_kind) values($1,$2,'Form 1','A',$3,$4,'English','subject')",
+  [ids.subject_teacher, campus, formOne, streamA],
 )
 await rejects(
   () => db.query(
@@ -265,14 +270,27 @@ assert.equal(
   'a junior campus assignment does not grant senior campus access',
 )
 await db.query('select record_bulk_attendance(current_date,$1::jsonb)', [JSON.stringify([{ student_id: ids.stream_student, attendance_status: 'present' }])])
-await db.query("select record_bulk_marks('Science',current_date,2026,'Term 1',100,$1::jsonb)", [JSON.stringify([{ student_id: ids.stream_student, score: 75 }])])
+await rejects(
+  () => db.query("select record_bulk_marks('Science',current_date,2026,'Term 1',100,$1::jsonb)", [JSON.stringify([{ student_id: ids.stream_student, score: 75 }])]),
+  /Choose an allocated subject/,
+)
+await db.query("select record_bulk_marks('Quiz 1','Science',current_date,2026,'Term 1',100,$1::jsonb)", [JSON.stringify([{ student_id: ids.stream_student, score: 75 }])])
+assert.equal(
+  (await db.query("select subject from learner_records where student_id=$1 and title='Quiz 1'", [ids.stream_student])).rows[0].subject,
+  'Science',
+  'Markbook persists subject separately from the assessment title',
+)
 await rejects(
   () => db.query('select record_bulk_attendance(current_date,$1::jsonb)', [JSON.stringify([{ student_id: ids.other_student, attendance_status: 'present' }])]),
   /outside an assigned class/,
 )
 await rejects(
   () => db.query("select record_bulk_marks('Science',current_date,2026,'Term 1',100,$1::jsonb)", [JSON.stringify([{ student_id: ids.other_student, score: 75 }])]),
-  /outside an assigned class/,
+  /Choose an allocated subject/,
+)
+await rejects(
+  () => db.query("select record_bulk_marks('Quiz 2','Science',current_date,2026,'Term 1',100,$1::jsonb)", [JSON.stringify([{ student_id: ids.other_student, score: 75 }])]),
+  /Subject is not allocated/,
 )
 assert.equal(
   (await db.query("select count(*) from learner_records where student_id=$1 and kind='wellbeing'", [ids.student])).rows[0].count,
@@ -289,6 +307,53 @@ await rejects(
   () => db.query('select record_bulk_attendance(current_date,$1::jsonb)', [JSON.stringify([{ student_id: ids.student, attendance_status: 'late' }])]),
   /outside an assigned class/,
 )
+await as('subject_teacher')
+assert.deepEqual(
+  (await db.query("select id from profiles where role='student'")).rows.map(row => row.id),
+  [ids.student],
+  'a subject allocation grants only its assigned stream learner scope',
+)
+assert.equal(
+  (await db.query('select teacher_has_class_assignment($1,$2,$3) as allowed', [campus, 'Form 1', 'A'])).rows[0].allowed,
+  false,
+  'a subject-only allocation does not grant class-register attendance scope',
+)
+await rejects(
+  () => db.query('select record_bulk_attendance(current_date,$1::jsonb)', [JSON.stringify([{ student_id: ids.student, attendance_status: 'late' }])]),
+  /outside an assigned class/,
+)
+await db.query("select record_bulk_marks('Essay','English',current_date,2026,'Term 1',100,$1::jsonb)", [JSON.stringify([{ student_id: ids.student, score: 80 }])])
+await rejects(
+  () => db.query("select record_bulk_marks('Essay','Science',current_date,2026,'Term 1',100,$1::jsonb)", [JSON.stringify([{ student_id: ids.student, score: 80 }])]),
+  /Subject is not allocated/,
+)
+await rejects(
+  () => db.query("select record_bulk_marks('Essay','English',current_date,2026,'Term 1',100,$1::jsonb)", [JSON.stringify([{ student_id: ids.stream_student, score: 80 }])]),
+  /Subject is not allocated/,
+)
+await as('admin')
+await db.query("select record_bulk_marks('Baseline mark','Science',current_date,2026,'Term 1',100,$1::jsonb)", [JSON.stringify([
+  { student_id: ids.other_student, score: 60 },
+  { student_id: ids.stranger, score: 55 },
+])])
+await db.query(
+  "insert into report_grade_bands(campus_id,minimum_percent,maximum_percent,grade,descriptor) values($1,0,100,'A','Excellent')",
+  [campus],
+)
+await db.query(
+  "insert into report_term_settings(campus_id,academic_year,academic_term,class_teacher_name,head_of_school_name,updated_by) values($1,2026,'Term 1','Class Teacher','Head of School',$2)",
+  [campus, ids.admin],
+)
+const publicationId = (await db.query(
+  "insert into report_publications(campus_id,academic_year,academic_term,published_at,published_by) values($1,2026,'Term 1',now(),$2) returning id",
+  [campus, ids.admin],
+)).rows[0].id
+const frozen = (await db.query(
+  'select assessments,subject_signatories from report_release_snapshots where publication_id=$1 and student_id=$2',
+  [publicationId, ids.stream_student],
+)).rows[0]
+assert.ok(frozen.assessments.some(item => item.title === 'Quiz 1' && item.subject === 'Science'), 'official snapshots preserve the allocated subject')
+assert.equal(frozen.subject_signatories.Science, 'T', 'whole-class subject allocations appear on stream-specific report snapshots')
 await as('')
 await rejects(() => pay(1), /Administrator/)
 await db.close()

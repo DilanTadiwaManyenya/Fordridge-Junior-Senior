@@ -5,6 +5,7 @@ import { workflowError } from './workflow'
 const blank = () => ({
   student_id: '',
   kind: 'attendance',
+  subject: '',
   event_date: new Date().toLocaleDateString('en-CA'),
   title: 'Daily attendance',
   notes: '',
@@ -20,6 +21,7 @@ export default function LearnerRecords({ profile, user }) {
   const canManage = admin || teacher
   const [items, setItems] = useState([]),
     [students, setStudents] = useState([]),
+    [subjectAssignments, setSubjectAssignments] = useState([]),
     [draft, setDraft] = useState(null),
     [kind, setKind] = useState('all')
   const [loading, setLoading] = useState(true),
@@ -39,9 +41,17 @@ export default function LearnerRecords({ profile, user }) {
       if (r.error) throw r.error
       setItems(r.data)
       if (canManage) {
+        let subjectRequest = supabase
+          .from('teacher_class_assignments')
+          .select('campus_id,class_level,class_stream,subject')
+          .not('subject', 'is', null)
+        if (teacher) subjectRequest = subjectRequest.eq('teacher_id', profile.id)
+        const allocations = await subjectRequest
+        if (allocations.error) throw allocations.error
+        setSubjectAssignments(allocations.data || [])
         let request = supabase
           .from('profiles')
-          .select('id,full_name,admission_number')
+          .select('id,full_name,admission_number,campus_id,class_level,class_stream')
           .eq('role', 'student')
           .order('full_name')
         if (teacher) request = request.eq('campus_id', profile.campus_id)
@@ -54,7 +64,7 @@ export default function LearnerRecords({ profile, user }) {
     } finally {
       setLoading(false)
     }
-  }, [canManage, profile.campus_id, teacher])
+  }, [canManage, profile.campus_id, profile.id, teacher])
   useEffect(() => {
     load()
   }, [load])
@@ -65,11 +75,14 @@ export default function LearnerRecords({ profile, user }) {
     setError('')
     setNotice('')
     try {
+      if (draft.kind === 'academic' && !draft.subject?.trim())
+        throw new Error('Choose the allocated subject for this academic record.')
       const payload = {
         student_id: draft.student_id,
         kind: draft.kind,
         event_date: draft.event_date,
         title: draft.title.trim(),
+        subject: draft.kind === 'academic' ? draft.subject.trim() : null,
         notes: draft.notes.trim(),
         attendance_status:
           draft.kind === 'attendance' ? draft.attendance_status : null,
@@ -109,6 +122,12 @@ export default function LearnerRecords({ profile, user }) {
     }
   }
   const shown = items.filter((item) => kind === 'all' || item.kind === kind)
+  const selectedLearner = students.find((student) => student.id === draft?.student_id)
+  const subjectOptions = subjectAssignments.filter((assignment) =>
+    assignment.campus_id === selectedLearner?.campus_id
+    && assignment.class_level?.trim().toLowerCase() === selectedLearner?.class_level?.trim().toLowerCase()
+    && (!assignment.class_stream || assignment.class_stream.trim().toLowerCase() === (selectedLearner.class_stream || '').trim().toLowerCase()),
+  )
   return (
     <section>
       <header className="workflow-heading">
@@ -141,7 +160,7 @@ export default function LearnerRecords({ profile, user }) {
                 required
                 value={draft.student_id}
                 onChange={(e) =>
-                  setDraft({ ...draft, student_id: e.target.value })
+                  setDraft({ ...draft, student_id: e.target.value, subject: '' })
                 }
               >
                 <option value="">Select learner</option>
@@ -186,13 +205,26 @@ export default function LearnerRecords({ profile, user }) {
               />
             </label>
             <label>
-              Title / subject
+              {draft.kind === 'academic' ? 'Assessment title' : 'Record title'}
               <input
                 required
                 value={draft.title}
                 onChange={(e) => setDraft({ ...draft, title: e.target.value })}
               />
             </label>
+            {draft.kind === 'academic' && (
+              <label>
+                Subject
+                {teacher ? (
+                  <select required value={draft.subject || ''} onChange={(e) => setDraft({ ...draft, subject: e.target.value })}>
+                    <option value="">Select allocated subject</option>
+                    {[...new Set(subjectOptions.map((item) => item.subject.trim()))].map((value) => <option key={value}>{value}</option>)}
+                  </select>
+                ) : (
+                  <input required maxLength={100} value={draft.subject || ''} onChange={(e) => setDraft({ ...draft, subject: e.target.value })} />
+                )}
+              </label>
+            )}
             {draft.kind === 'attendance' && (
               <label>
                 Status
@@ -304,7 +336,7 @@ export default function LearnerRecords({ profile, user }) {
                     <td>{item.student?.full_name || 'Learner'}</td>
                     <td>
                       {item.title}
-                      <small>{item.kind}</small>
+                      <small>{item.kind}{item.subject ? ' · ' + item.subject : ''}</small>
                     </td>
                     <td>
                       {item.attendance_status ||

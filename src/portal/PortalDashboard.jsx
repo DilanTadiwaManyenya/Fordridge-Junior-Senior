@@ -19,6 +19,7 @@ import PortalOverview from './PortalOverview'
 import ProgressReports from './ProgressReports'
 import BulkAttendance from './BulkAttendance'
 import ClassAssignments from './ClassAssignments'
+import SubjectAllocations from './SubjectAllocations'
 import ExpenseCashbook from './ExpenseCashbook'
 import ActivityLog from './ActivityLog'
 import NotificationCenter from './NotificationCenter'
@@ -135,6 +136,7 @@ export default function PortalDashboard() {
     (view === 'report-dashboard' && !admin) ||
     (view === 'report-verification' && !admin) ||
     (view === 'assignments' && !assignments) ||
+    (view === 'subject-allocations' && !assignments) ||
     (view === 'cashbook' && !admin) ||
     (view === 'activity' && !admin) ||
     ![
@@ -160,6 +162,7 @@ export default function PortalDashboard() {
       'report-dashboard',
       'report-verification',
       'assignments',
+      'subject-allocations',
       'cashbook',
       'activity',
       'notifications',
@@ -229,6 +232,7 @@ export default function PortalDashboard() {
           {analytics && nav('/portal/analytics', 'Academic analytics', '▤')}
           {attendance && nav('/portal/marks', 'Bulk mark entry', '✎')}
           {assignments && nav('/portal/assignments', 'Class assignments', '⌘')}
+          {assignments && nav('/portal/subject-allocations', 'Subject allocations', '▤')}
           {nav('/portal/announcements', 'Announcements', '✦')}
           {nav('/portal/notifications', 'Notifications', '●')}
           {nav('/portal/timetable', 'Timetable', '◷')}
@@ -307,6 +311,8 @@ export default function PortalDashboard() {
           <BulkMarks profile={profile} />
         ) : view === 'assignments' ? (
           <ClassAssignments profile={profile} />
+        ) : view === 'subject-allocations' ? (
+          <SubjectAllocations profile={profile} />
         ) : view === 'cashbook' ? (
           <ExpenseCashbook />
         ) : view === 'activity' ? (

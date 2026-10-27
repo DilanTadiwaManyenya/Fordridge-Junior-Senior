@@ -33,4 +33,4 @@ Approval basis: owner approval of the Reliance-inspired Stage 7 access matrix
 
 - The migration has not been applied to Supabase. No production database or frontend deployment was accessed. Production migration/deployment still requires separate owner approval.
 - Legacy assignments without an exact catalogue match remain text-only and keep their previous scope. Administrators can link them after the school confirms and enters the corresponding class/stream names.
-- Stage 11 remains next: subject allocations and subject-scoped Markbook/coursework writes.
+- Stage 11 completed in [the Stage 11 record](STAGE-11-SUBJECT-ALLOCATIONS.md); Stage 12 is next.
