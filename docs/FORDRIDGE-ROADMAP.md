@@ -138,4 +138,4 @@ Stages 7–20 establish access and class foundations. Do not roll out a new admi
 
 ## Current checkpoint
 
-Stage 24 is complete and pushed as `e376b04`, with the reviewed phone sidebar height fix in `5b291fe`. Stage 25 is next. The hosted frontend has not been deployed; deployment remains a separate pending checkpoint.
+Stage 25 is complete and pushed as `3e82ed0`; subpages share an Overview return link and consistent heading/action styling. Stage 26 is next. The hosted frontend has not been deployed; deployment remains a separate pending checkpoint.
