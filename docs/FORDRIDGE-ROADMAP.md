@@ -138,4 +138,4 @@ Stages 7–20 establish access and class foundations. Do not roll out a new admi
 
 ## Current checkpoint
 
-Stage 27 is complete and pushed as `dfee5a4`; learner CSV import supports quoted fields, local validation, E.164 phone normalization, and an explicit pre-import review. Stage 28 is next. The hosted frontend has not been deployed; deployment remains a separate pending checkpoint.
+Stage 28 is complete and pushed as `f3321b0`; the Learners directory exports the current filtered scope to spreadsheet-safe CSV with identifiers preserved as text. Stage 29 is next. The hosted frontend has not been deployed; deployment remains a separate pending checkpoint.
