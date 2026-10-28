@@ -1,6 +1,6 @@
 # Fordridge stage tracker
 
-Last updated: 27 October 2026
+Last updated: 28 October 2026
 Plan: [Fordridge portal roadmap](FORDRIDGE-ROADMAP.md)
 GitHub: https://github.com/DilanTadiwaManyenya/Fordridge-Junior-Senior
 
@@ -28,6 +28,7 @@ A stage is Complete only after its deliverable and relevant checks are recorded 
 | 18 | Complete | Teacher My class and active-campus subject workspace | [4cb42e4](https://github.com/DilanTadiwaManyenya/Fordridge-Junior-Senior/commit/4cb42e4); [Stage 18 record](STAGE-18-TEACHER-WORKSPACE.md); isolated assignment/RLS suite, build, lint and diff checks pass; no class/stream data seeded |
 | 19 | Complete | Junior ECD/Grade My class scope regression coverage | [4b562a1](https://github.com/DilanTadiwaManyenya/Fordridge-Junior-Senior/commit/4b562a1); [Stage 19 record](STAGE-19-JUNIOR-WORKSPACE-RULES.md); portal suite, build, lint and diff checks pass; synthetic fixtures only |
 | 20 | Complete | Senior Sixth Form stream-and-subject access regression coverage | [923baab](https://github.com/DilanTadiwaManyenya/Fordridge-Junior-Senior/commit/923baab); [Stage 20 record](STAGE-20-SENIOR-COURSEWORK-ACCESS.md); portal suite, build, lint and diff checks pass; synthetic fixtures only |
+| 21 | Complete | Verified Workspace and Academic services sidebar groups; confirmed internal destinations are implemented | [05b973d](https://github.com/DilanTadiwaManyenya/Fordridge-Junior-Senior/commit/05b973d); [Stage 21 record](STAGE-21-SIDEBAR-GROUPS.md); source route audit, production build and diff check pass; no code change required |
 
 ## Stage 5 follow-up status
 
