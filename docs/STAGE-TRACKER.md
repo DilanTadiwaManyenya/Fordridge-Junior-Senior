@@ -30,6 +30,7 @@ A stage is Complete only after its deliverable and relevant checks are recorded 
 | 20 | Complete | Senior Sixth Form stream-and-subject access regression coverage | [923baab](https://github.com/DilanTadiwaManyenya/Fordridge-Junior-Senior/commit/923baab); [Stage 20 record](STAGE-20-SENIOR-COURSEWORK-ACCESS.md); portal suite, build, lint and diff checks pass; synthetic fixtures only |
 | 21 | Complete | Verified Workspace and Academic services sidebar groups; confirmed internal destinations are implemented | [05b973d](https://github.com/DilanTadiwaManyenya/Fordridge-Junior-Senior/commit/05b973d); [Stage 21 record](STAGE-21-SIDEBAR-GROUPS.md); source route audit, production build and diff check pass; no code change required |
 | 22 | Complete | Finance and Administration sidebar groups; Account settings under Workspace | [08fa0c4](https://github.com/DilanTadiwaManyenya/Fordridge-Junior-Senior/commit/08fa0c4); [Stage 22 record](STAGE-22-FINANCE-ADMIN-NAVIGATION.md); build, lint, isolated portal suite and diff check pass; hosted frontend deployment pending |
+| 23 | Complete | Role-specific Accountant workspace limited to currently authorised Finance screens | [22848b4](https://github.com/DilanTadiwaManyenya/Fordridge-Junior-Senior/commit/22848b4); [Stage 23 record](STAGE-23-ACCOUNTANT-NAVIGATION.md); role navigation assertions, build, lint and isolated portal suite pass; hosted frontend deployment pending |
 
 ## Stage 5 follow-up status
 
