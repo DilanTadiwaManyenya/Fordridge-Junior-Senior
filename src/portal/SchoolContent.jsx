@@ -15,6 +15,12 @@ export default function SchoolContent({ view, profile, user }) {
   const timetable = view === 'timetable'
   const table = timetable ? 'timetable' : 'announcements'
   const canManage = ['admin', 'teacher'].includes(profile.role)
+  const canEdit = (item) =>
+    profile.role === 'admin' ||
+    (profile.role === 'teacher' &&
+      (timetable
+        ? !!item.class_level && item.teacher_id === user.id
+        : item.author_id === user.id))
   const [items, setItems] = useState([]),
     [campuses, setCampuses] = useState([]),
     [draft, setDraft] = useState(null)
@@ -310,7 +316,7 @@ export default function SchoolContent({ view, profile, user }) {
                   ? `${days[item.day_of_week - 1]} · ${item.subject}`
                   : item.title}
               </h2>
-              {canManage && <button onClick={() => open(item)}>Edit</button>}
+              {canEdit(item) && <button onClick={() => open(item)}>Edit</button>}
             </div>
             <p>
               {item.campus?.name}
