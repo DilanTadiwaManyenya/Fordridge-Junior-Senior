@@ -242,6 +242,27 @@ try {
     writes.find((w) => w.path.endsWith('/timetable')).body.subject,
     'Mathematics',
   )
+  await page.getByRole('link', { name: 'Bulk learner import', exact: true }).click()
+  const accountWritesBeforeImport = writes.filter((write) => write.path.endsWith('create-portal-account')).length
+  await page.getByLabel('CSV file').setInputFiles({
+    name: 'learners.csv',
+    mimeType: 'text/csv',
+    buffer: Buffer.from('full_name,phone,admission_number,class_level,class_stream\n"Smith, Jane",0787600111,F002,"Form 1","Blue, East"'),
+  })
+  await page.getByText('Smith, Jane', { exact: true }).waitFor()
+  await page.getByLabel('Shared initial password (minimum 12 characters)').fill('TestPassword123!')
+  assert.equal(
+    writes.filter((write) => write.path.endsWith('create-portal-account')).length,
+    accountWritesBeforeImport,
+    'the preview does not create accounts before explicit confirmation',
+  )
+  await page.getByRole('button', { name: 'Create 1 learner account' }).click()
+  await page.getByRole('status').filter({ hasText: 'Smith, Jane — Created' }).waitFor()
+  const importedAccount = writes.filter((write) => write.path.endsWith('create-portal-account')).at(-1)
+  assert.equal(importedAccount.body.full_name, 'Smith, Jane')
+  assert.equal(importedAccount.body.phone, '+263787600111')
+  assert.equal(importedAccount.body.class_stream, 'Blue, East')
+  assert.equal('line' in importedAccount.body, false)
   await page.getByRole('link', { name: 'Activity Log', exact: true }).click()
   await page.getByRole('alert').filter({ hasText: 'Temporary activity service failure.' }).waitFor()
   const attemptsBeforeRetry = await page.evaluate(() => window.getActivityAttempts())
