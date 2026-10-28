@@ -138,4 +138,4 @@ Stages 7–20 establish access and class foundations. Do not roll out a new admi
 
 ## Current checkpoint
 
-Stage 25 is complete and pushed as `3e82ed0`; subpages share an Overview return link and consistent heading/action styling. Stage 26 is next. The hosted frontend has not been deployed; deployment remains a separate pending checkpoint.
+Stage 26 is complete and pushed as `dac4917`; Activity Log and Announcements/Timetable share loading, empty, error, and retry states with stale-data clearing and duplicate-request guards. Stage 27 is next. The hosted frontend has not been deployed; deployment remains a separate pending checkpoint.
