@@ -22,6 +22,7 @@ export default function Directory({ view }) {
     [classes, setClasses] = useState([])
   const [query, setQuery] = useState(''),
     [draft, setDraft] = useState(null),
+    [correctionReason, setCorrectionReason] = useState(''),
     [classFilter, setClassFilter] = useState(''),
     [streamFilter, setStreamFilter] = useState(''),
     [statusFilter, setStatusFilter] = useState('all')
@@ -74,6 +75,7 @@ export default function Directory({ view }) {
     )
     setPhone('')
     setPassword('')
+    setCorrectionReason('')
     setError('')
     setNotice('')
   }
@@ -87,7 +89,13 @@ export default function Directory({ view }) {
     try {
       if (!draft.full_name.trim()) throw new Error('Enter a name.')
       if (draft.id) {
-        const { error: err } = await supabase.rpc('admin_update_profile', {
+        const learnerCorrection = learner && draft.role === 'student'
+        const correctionNote = correctionReason.trim()
+        if (learnerCorrection && correctionNote.length < 10)
+          throw new Error('Enter a correction reason of at least 10 characters.')
+        const { error: err } = await supabase.rpc(
+          learnerCorrection ? 'admin_correct_learner_profile' : 'admin_update_profile',
+          {
           p_id: draft.id,
           p_name: draft.full_name,
           p_campus: draft.campus_id || null,
@@ -95,7 +103,9 @@ export default function Directory({ view }) {
           p_class: draft.class_level,
           p_stream: draft.class_stream,
           p_status: draft.enrollment_status,
-        })
+          ...(learnerCorrection ? { p_reason: correctionNote } : {}),
+          },
+        )
         if (err) throw err
       } else {
         const number = toE164(phone, country)
@@ -274,6 +284,21 @@ export default function Directory({ view }) {
                   Phone: {draft.phone_number || 'Not recorded'} · Role:{' '}
                   {draft.role}
                 </p>
+              )}
+              {draft.id && learner && draft.role === 'student' && (
+                <label className="workflow-wide">
+                  Correction reason
+                  <textarea
+                    required
+                    minLength={10}
+                    maxLength={500}
+                    value={correctionReason}
+                    onChange={(event) => setCorrectionReason(event.target.value)}
+                    placeholder="Explain why this learner record needs correction"
+                    rows={3}
+                  />
+                  <small>Required for the audit history (10–500 characters).</small>
+                </label>
               )}
               {learner && (
                 <>

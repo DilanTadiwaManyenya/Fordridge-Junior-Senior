@@ -113,6 +113,7 @@ async function pageFor(
       ])
     }
     if (path.endsWith('/rpc/admin_update_profile')) return send(null)
+    if (path.endsWith('/rpc/admin_correct_learner_profile')) return send(null)
     if (path.endsWith('/rpc/record_fee_payment')) {
       if (failPayment) {
         failPayment = false
@@ -249,11 +250,17 @@ try {
   await page.getByLabel('Enrolment status').selectOption('all')
   await page.getByRole('button', { name: 'View or edit Test Learner' }).click()
   await page.getByLabel('Full name', { exact: true }).fill('Updated Learner')
+  await page.getByLabel('Correction reason').fill('Correcting the verified learner name')
   await page.getByRole('button', { name: 'Save profile', exact: true }).click()
   await page.getByRole('status').filter({ hasText: 'Profile saved' }).waitFor()
   assert.equal(
-    writes.find((w) => w.path.endsWith('admin_update_profile')).body.p_name,
+    writes.find((w) => w.path.endsWith('admin_correct_learner_profile')).body.p_name,
     'Updated Learner',
+  )
+  assert.equal(
+    writes.find((w) => w.path.endsWith('admin_correct_learner_profile')).body.p_reason,
+    'Correcting the verified learner name',
+    'learner profile corrections submit the required audit reason',
   )
   await page.getByRole('button', { name: '+ Add learner' }).click()
   await page.getByLabel('Full name', { exact: true }).fill('New Learner')

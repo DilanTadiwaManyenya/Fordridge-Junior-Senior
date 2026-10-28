@@ -252,15 +252,36 @@ await rejects(
   () => db.query('update fee_records set paid_amount=99 where id=$1', [fee]),
   /permission denied/,
 )
-await db.query('select admin_update_profile($1,$2,$3,$4,$5,$6,$7)', [
+await db.query('select admin_correct_learner_profile($1,$2,$3,$4,$5,$6,$7,$8)', [
   ids.student,
-  'Updated Student',
+  'Student baseline',
   campus,
   'F001',
   'Form 1',
   'A',
   'active',
+  'Correct imported learner details',
 ])
+await rejects(
+  () => db.query('select admin_correct_learner_profile($1,$2,$3,$4,$5,$6,$7,$8)', [
+    ids.student, 'Invalid Update', campus, 'F001', 'Form 1', 'A', 'active', 'wrong',
+  ]),
+  /Correction reason must be between 10 and 500 characters/,
+)
+await rejects(
+  () => db.query('select admin_update_profile($1,$2,$3,$4,$5,$6,$7)', [
+    ids.student, 'Bypass Attempt', campus, 'F001', 'Form 1', 'A', 'active',
+  ]),
+  /controlled learner correction workflow/,
+)
+const firstCorrection = (await db.query(
+  "select actor_id,action,detail from audit_trail where entity_type='learner_profile' and entity_id=$1 order by created_at desc limit 1",
+  [ids.student],
+)).rows[0]
+assert.equal(firstCorrection.actor_id, ids.admin, 'learner correction audit records the acting administrator')
+assert.equal(firstCorrection.action, 'corrected')
+assert.equal(firstCorrection.detail.reason, 'Correct imported learner details')
+assert.deepEqual(firstCorrection.detail.changes.admission_number, { from: null, to: 'F001' })
 await db.query(
   "insert into announcements(campus_id,title,body,published_at) values($1,'Draft','hidden',null),($1,'Published','visible',now())",
   [campus],
@@ -343,10 +364,15 @@ const streamB = (await db.query(
   "insert into school_class_streams(class_id,stream_name) values($1,'B') returning id",
   [formOne],
 )).rows[0].id
-await db.query('select admin_update_profile($1,$2,$3,$4,$5,$6,$7)', [ids.student, 'Updated Student', campus, 'F001', 'Form 1', 'A', 'active'])
-await db.query('select admin_update_profile($1,$2,$3,$4,$5,$6,$7)', [ids.stream_student, 'Stream B Learner', campus, 'B001', 'Form 1', 'B', 'active'])
-await db.query('select admin_update_profile($1,$2,$3,$4,$5,$6,$7)', [ids.other_student, 'Other Class Learner', campus, 'F201', 'Form 2', '', 'active'])
-await db.query('select admin_update_profile($1,$2,$3,$4,$5,$6,$7)', [ids.stranger, 'Unassigned Learner', campus, 'U001', 'Form 2', '', 'active'])
+const correctLearner = (id, name, admission, classLevel, stream, status = 'active') =>
+  db.query('select admin_correct_learner_profile($1,$2,$3,$4,$5,$6,$7,$8)', [
+    id, name, campus, admission, classLevel, stream, status,
+    'Set up the confirmed learner profile',
+  ])
+await correctLearner(ids.student, 'Updated Student', 'F001', 'Form 1', 'A')
+await correctLearner(ids.stream_student, 'Stream B Learner', 'B001', 'Form 1', 'B')
+await correctLearner(ids.other_student, 'Other Class Learner', 'F201', 'Form 2', '')
+await correctLearner(ids.stranger, 'Unassigned Learner', 'U001', 'Form 2', '')
 await db.query('select admin_update_profile($1,$2,$3,$4,$5,$6,$7)', [ids.stream_teacher, 'Stream Teacher', campus, null, null, null, null])
 await db.query('select admin_update_profile($1,$2,$3,$4,$5,$6,$7)', [ids.subject_teacher, 'Subject Teacher', campus, null, null, null, null])
 await db.query(
@@ -589,6 +615,20 @@ const frozen = (await db.query(
 )).rows[0]
 assert.ok(frozen.assessments.some(item => item.title === 'Quiz 1' && item.subject === 'Science'), 'official snapshots preserve the allocated subject')
 assert.equal(frozen.subject_signatories.Science, 'T', 'whole-class subject allocations appear on stream-specific report snapshots')
+await as('teacher')
+await rejects(
+  () => db.query('select admin_correct_learner_profile($1,$2,$3,$4,$5,$6,$7,$8)', [
+    ids.stream_student, 'Unauthorised Correction', campus, 'B001', 'Form 1', 'B', 'active', 'This must be denied',
+  ]),
+  /Administrator access required/,
+)
+await as('admin')
+await correctLearner(ids.stream_student, 'Corrected After Publication', 'B001', 'Form 1', 'B')
+const frozenAfterCorrection = (await db.query(
+  'select assessments,subject_signatories from report_release_snapshots where publication_id=$1 and student_id=$2',
+  [publicationId, ids.stream_student],
+)).rows[0]
+assert.deepEqual(frozenAfterCorrection, frozen, 'correcting the current learner profile leaves the issued report snapshot unchanged')
 await as('student')
 assert.equal(
   Number((await db.query('select count(*) from user_role_memberships')).rows[0].count),
