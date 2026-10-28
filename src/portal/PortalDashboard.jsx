@@ -23,6 +23,7 @@ import MyClass from './MyClass'
 import SubjectAllocations from './SubjectAllocations'
 import ExpenseCashbook from './ExpenseCashbook'
 import ActivityLog from './ActivityLog'
+import ParentAccounts from './ParentAccounts'
 import NotificationCenter from './NotificationCenter'
 import AttendanceHistory from './AttendanceHistory'
 import LearningAnalytics from './LearningAnalytics'
@@ -218,6 +219,7 @@ export default function PortalDashboard() {
   const financeNavigation = getFinanceNavigation(profile.role)
   if (
     (['learners', 'staff', 'classes'].includes(view) && !admin) ||
+    (view === 'parent-accounts' && !admin) ||
     (view === 'fees' && !fees) ||
     (view === 'records' && !records) ||
     (view === 'reports' && !reports) ||
@@ -244,6 +246,7 @@ export default function PortalDashboard() {
       'overview',
       'learners',
       'staff',
+      'parent-accounts',
       'classes',
       'fees',
       'records',
@@ -401,6 +404,7 @@ export default function PortalDashboard() {
           )}
           {admin && <span className="portal-nav-label portal-nav-label-secondary">Administration</span>}
           {admin && nav('/portal/activity', 'Activity Log', '◫')}
+          {admin && nav('/portal/parent-accounts', 'Parent accounts', '♧')}
           {admin && nav('/portal/staff', 'Staff', '♙')}
         </nav>
         <div className="portal-sidebar-footer">
@@ -501,6 +505,8 @@ export default function PortalDashboard() {
           <ExpenseCashbook />
         ) : view === 'activity' ? (
           <ActivityLog />
+        ) : view === 'parent-accounts' ? (
+          <ParentAccounts />
         ) : ['announcements', 'timetable'].includes(view) ? (
           <SchoolContent key={view} view={view} profile={profile} user={user} />
         ) : view === 'notifications' ? (

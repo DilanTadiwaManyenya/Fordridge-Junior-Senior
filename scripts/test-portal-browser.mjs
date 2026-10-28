@@ -128,15 +128,7 @@ async function pageFor(
       return send({ id: 'new-account' })
     const single = req.headers().accept?.includes('vnd.pgrst.object')
     if (path.endsWith('/profiles')) {
-      if (url.searchParams.get('id'))
-        return send({
-          ...user,
-          full_name: 'Test User',
-          role,
-          campus_id: null,
-          campus: { name: 'Junior School', code: 'junior' },
-        })
-      if (url.searchParams.get('role')?.includes('parent'))
+      if (url.searchParams.get('id')?.startsWith('in.')) {
         return send([
           {
             id: 'parent',
@@ -145,6 +137,30 @@ async function pageFor(
             role: 'parent',
           },
         ])
+      }
+      if (url.searchParams.get('id'))
+        return send({
+          ...user,
+          full_name: 'Test User',
+          role,
+          campus_id: null,
+          campus: { name: 'Junior School', code: 'junior' },
+        })
+      if (url.searchParams.get('role')?.includes('parent')) {
+        const linkedParent = {
+          id: 'parent',
+          full_name: 'Test Parent',
+          phone_number: '+263777111222',
+          role: 'parent',
+        }
+        const unlinkedParent = {
+          id: 'unlinked-parent',
+          full_name: 'Unlinked Parent',
+          phone_number: '+263777999000',
+          role: 'parent',
+        }
+        return send(url.searchParams.get('id')?.startsWith('in.') ? [linkedParent] : [linkedParent, unlinkedParent])
+      }
       if (url.searchParams.get('role')?.includes('student'))
         return send([student, formerStudent])
       return send([student])
@@ -195,7 +211,16 @@ async function pageFor(
         },
       ])
     if (path.endsWith('/fee_settings')) return send([])
-    if (path.endsWith('/student_guardians')) return send([])
+    if (path.endsWith('/student_guardians'))
+      return send(
+        url.searchParams.has('student_id')
+          ? []
+          : [{
+              parent_id: 'parent',
+              student_id: student.id,
+              learner: { ...student, campus: { name: 'Junior School' } },
+            }],
+      )
     if (
       ['announcements', 'timetable', 'learner_records', 'teacher_class_assignments'].some((table) =>
         path.endsWith('/' + table),
@@ -487,9 +512,22 @@ try {
     await parent.getByRole('link', { name: 'Staff', exact: true }).count(),
     0,
   )
+  await parent.goto('http://127.0.0.1:5179/portal/parent-accounts')
+  await parent.waitForURL('http://127.0.0.1:5179/portal')
+  await page.getByRole('button', { name: 'Open portal navigation' }).click()
+  await page.getByRole('link', { name: 'Parent accounts', exact: true }).click()
+  await page.getByRole('heading', { name: 'Parent accounts' }).waitFor()
+  await page.getByRole('cell', { name: /Test Parent/ }).waitFor()
+  assert.equal(await page.getByText('Test Learner', { exact: true }).count(), 1)
+  assert.equal(await page.getByText('Unlinked Parent', { exact: true }).count(), 0)
+  assert.equal(await page.getByText('Link verified guardian', { exact: true }).count(), 0)
+  await page.getByLabel('Search parent or learner').fill('F001')
+  assert.equal(await page.getByRole('row').filter({ hasText: 'Test Parent' }).count(), 1)
+  await page.getByLabel('Search parent or learner').fill('no matching account')
+  await page.getByText('No linked parent accounts match this search.').waitFor()
   assert.deepEqual(errors, [])
   console.log(
-    'PASS: profile editing, account creation, publishing, records, timetable, payment retry, teacher sign-in, parent route guard, mobile layout; no uncaught browser errors. All backend requests were mocked.',
+    'PASS: profile editing, account creation, publishing, records, timetable, payment retry, teacher sign-in, parent route guards and linked-account directory/search, mobile layout; no uncaught browser errors. All backend requests were mocked.',
   )
 } catch (error) {
   const p = browser.contexts()[0]?.pages()[0]
