@@ -138,4 +138,4 @@ Stages 7–20 establish access and class foundations. Do not roll out a new admi
 
 ## Current checkpoint
 
-Stage 28 is complete and pushed as `f3321b0`; the Learners directory exports the current filtered scope to spreadsheet-safe CSV with identifiers preserved as text. Stage 29 is next. The hosted frontend has not been deployed; deployment remains a separate pending checkpoint.
+Stage 29 is complete and pushed; the Learners directory filters by the configured class/form catalogue, its streams, and enrolment status, while CSV export follows the visible filtered roster. See [the Stage 29 record](STAGE-29-LEARNER-ROSTER-FILTERS.md) and [the stage tracker](STAGE-TRACKER.md). The hosted frontend has not been deployed; deployment remains a separate pending checkpoint.

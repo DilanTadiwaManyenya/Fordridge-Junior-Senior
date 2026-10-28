@@ -36,6 +36,7 @@ A stage is Complete only after its deliverable and relevant checks are recorded 
 | 26 | Complete | Shared loading, empty, error and retry states in Activity Log and school content | [dac4917](https://github.com/DilanTadiwaManyenya/Fordridge-Junior-Senior/commit/dac4917); [Stage 26 record](STAGE-26-ASYNC-STATES.md); build, lint, isolated portal suite, Chrome retry test and diff check pass; hosted frontend deployment pending |
 | 27 | Complete | Quoted CSV parsing, local row validation, normalized phones, and pre-import preview | [dfee5a4](https://github.com/DilanTadiwaManyenya/Fordridge-Junior-Senior/commit/dfee5a4); [Stage 27 record](STAGE-27-LEARNER-CSV-IMPORT.md); parser unit checks, targeted/full lint, build, Chrome preview/confirmation flow and diff check pass; hosted frontend deployment pending |
 | 28 | Complete | Filtered learner CSV export with spreadsheet-safe text and formula handling | [f3321b0](https://github.com/DilanTadiwaManyenya/Fordridge-Junior-Senior/commit/f3321b0); [Stage 28 record](STAGE-28-LEARNER-EXPORT.md); export unit checks, lint, build, Chrome download/filter test and diff check pass; hosted frontend deployment pending |
+| 29 | Complete | Learner roster filters for class/form, stream and enrolment status | Code: see [Stage 29 record](STAGE-29-LEARNER-ROSTER-FILTERS.md); build, lint, isolated portal/export checks, mocked Chrome filter/export flow and diff check pass; hosted frontend deployment pending |
 
 ## Stage 5 follow-up status
 
