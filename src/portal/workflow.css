@@ -99,6 +99,7 @@
   color: #8a1025;
   border-radius: 7px;
 }
+.workflow-async-state{margin:0;padding:14px 0;color:var(--muted);font-size:.86rem;line-height:1.5}.workflow-async-error{display:grid;justify-items:start;gap:10px}.workflow-async-error .workflow-error{margin:0;width:100%}.workflow-async-error .secondary-action{padding:9px 12px;border:1px solid var(--line);border-radius:8px;background:#fff;color:var(--navy);font:inherit;font-size:.78rem;font-weight:800;cursor:pointer}.workflow-async-error .secondary-action:hover{background:#f6f8fb}
 .workflow-notice {
   padding: 14px;
   background: #e9f7ef;

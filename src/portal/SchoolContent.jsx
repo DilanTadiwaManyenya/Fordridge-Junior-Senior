@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { workflowError } from './workflow'
+import AsyncState from './AsyncState'
 
 const days = [
   'Monday',
@@ -27,9 +28,16 @@ export default function SchoolContent({ view, profile, user }) {
   const [loading, setLoading] = useState(true),
     [saving, setSaving] = useState(false),
     [error, setError] = useState(''),
+    [loadError, setLoadError] = useState(''),
     [notice, setNotice] = useState('')
+  const requestLock = useRef(false)
   const load = useCallback(async () => {
+    if (requestLock.current) return
+    requestLock.current = true
     setLoading(true)
+    setLoadError('')
+    setItems([])
+    setCampuses([])
     try {
       const request = supabase.from(table).select('*,campus:campuses(name)')
       const result = timetable
@@ -47,8 +55,9 @@ export default function SchoolContent({ view, profile, user }) {
         )
       }
     } catch (err) {
-      setError(workflowError(err))
+      setLoadError(workflowError(err))
     } finally {
+      requestLock.current = false
       setLoading(false)
     }
   }, [table, timetable, canManage, profile.role, profile.campus_id])
@@ -305,9 +314,15 @@ export default function SchoolContent({ view, profile, user }) {
           </fieldset>
         </form>
       )}
-      {loading ? (
-        <p role="status">Loading…</p>
-      ) : items.length ? (
+      <AsyncState
+        loading={loading}
+        error={loadError}
+        empty={!items.length}
+        loadingMessage={`Loading ${timetable ? 'timetable' : 'announcements'}…`}
+        emptyMessage={timetable ? 'No lessons are available for your account yet.' : 'No announcements are available for your account yet.'}
+        onRetry={load}
+      />
+      {!loading && !loadError && items.length ? (
         items.map((item) => (
           <article className="workflow-panel" key={item.id}>
             <div className="workflow-heading">
@@ -333,15 +348,7 @@ export default function SchoolContent({ view, profile, user }) {
             )}
           </article>
         ))
-      ) : (
-        <section className="workflow-panel">
-          <p>
-            {timetable
-              ? 'No lessons are available for your account yet.'
-              : 'No announcements are available for your account yet.'}
-          </p>
-        </section>
-      )}
+      ) : null}
     </section>
   )
 }

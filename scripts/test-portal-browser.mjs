@@ -56,7 +56,13 @@ async function pageFor(
   const page = await context.newPage()
   page.on('pageerror', (error) => errors.push(error.message))
   let paid = 0,
-    failPayment = true
+    failPayment = true,
+    activityAttempts = 0,
+    activityCanSucceed = false
+  await page.exposeFunction('allowActivitySuccess', () => {
+    activityCanSucceed = true
+  })
+  await page.exposeFunction('getActivityAttempts', () => activityAttempts)
   await context.route('https://*.supabase.co/**', async (route) => {
     const req = route.request(),
       url = new URL(req.url()),
@@ -79,6 +85,22 @@ async function pageFor(
       return send({ active_role: role, active_campus_id: null })
     if (path.endsWith('/rpc/switch_active_portal_role'))
       return send({ active_role: body.p_role, active_campus_id: body.p_campus_id })
+    if (path.endsWith('/audit_trail')) {
+      activityAttempts += 1
+      if (!activityCanSucceed)
+        return send({ message: 'Temporary activity service failure.' }, 503)
+      return send([
+        {
+          id: 'activity-check',
+          entity_type: 'learner_profile',
+          action: 'Updated profile',
+          detail: null,
+          created_at: '2026-10-28T10:00:00Z',
+          actor: { full_name: 'Test User' },
+          campus: { name: 'Junior School' },
+        },
+      ])
+    }
     if (path.endsWith('/rpc/admin_update_profile')) return send(null)
     if (path.endsWith('/rpc/record_fee_payment')) {
       if (failPayment) {
@@ -220,6 +242,13 @@ try {
     writes.find((w) => w.path.endsWith('/timetable')).body.subject,
     'Mathematics',
   )
+  await page.getByRole('link', { name: 'Activity Log', exact: true }).click()
+  await page.getByRole('alert').filter({ hasText: 'Temporary activity service failure.' }).waitFor()
+  const attemptsBeforeRetry = await page.evaluate(() => window.getActivityAttempts())
+  await page.evaluate(() => window.allowActivitySuccess())
+  await page.getByRole('button', { name: 'Try again' }).click()
+  await page.getByText('Updated profile', { exact: true }).waitFor()
+  assert.equal(await page.evaluate(() => window.getActivityAttempts()), attemptsBeforeRetry + 1, 'a retry makes one new request and recovers from the failed request')
   await page.getByRole('link', { name: 'Finance', exact: true }).click()
   await page
     .getByRole('button', { name: 'Record payment', exact: true })
