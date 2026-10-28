@@ -28,8 +28,11 @@ API without contacting Supabase.
 ## GitHub and deployment
 
 - Code commit: `e376b0414693f9f7fccbf20bdfebc8f71bfb9551`
+- Mobile sidebar height follow-up: `5b291fe26dbc2007119acaee4594a0333016186c`
 - Author: `DilanTadiwaInnoJuniorManyenya <dilantadiwamanyenya@gmail.com>`
 - Pushed to the verified `origin/master` branch.
+- The final phone screenshot was reviewed and a desktop full-height sidebar rule
+  was overridden at the phone breakpoint to remove the empty full-screen panel.
 - Hosted frontend deployment remains pending; no production deployment was
   performed in this stage.
 
