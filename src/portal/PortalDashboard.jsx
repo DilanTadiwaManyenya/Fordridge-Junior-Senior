@@ -402,7 +402,20 @@ export default function PortalDashboard() {
         }
       >
         <div className="portal-topbar">
-          <div><span>Fordridge Schools</span><b>{profile.campus?.name || 'School portal'}</b></div>
+          <div className="portal-page-context">
+            <span>Fordridge Schools</span>
+            {view !== 'overview' && (
+              <Link
+                className="portal-return-link"
+                to="/portal"
+                aria-label="Back to overview"
+                onClick={closeMobileNav}
+              >
+                ← Overview
+              </Link>
+            )}
+            <b>{profile.campus?.name || 'School portal'}</b>
+          </div>
           <label className="portal-role-switcher">
             <span>Active role</span>
             {profile.role_memberships.length > 1 ? (

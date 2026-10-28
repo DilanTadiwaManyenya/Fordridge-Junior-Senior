@@ -154,6 +154,11 @@ async function pageFor(
 try {
   const page = await pageFor('admin')
   await page.goto('http://127.0.0.1:5179/portal/learners')
+  assert.equal(
+    await page.getByRole('link', { name: 'Back to overview' }).getAttribute('href'),
+    '/portal',
+    'portal subpages provide a shared return path to the overview',
+  )
   await page.getByRole('button', { name: 'View or edit Test Learner' }).click()
   await page.getByLabel('Full name', { exact: true }).fill('Updated Learner')
   await page.getByRole('button', { name: 'Save profile', exact: true }).click()
