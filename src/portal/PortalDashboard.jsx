@@ -44,6 +44,7 @@ import './workflow.css'
 
 export default function PortalDashboard() {
   const [mobileNavOpen, setMobileNavOpen] = useState(false)
+  const menuToggleRef = useRef(null)
   const [state, setState] = useState({
     loading: true,
     profile: null,
@@ -54,6 +55,23 @@ export default function PortalDashboard() {
   const navigate = useNavigate(),
     location = useLocation()
   const view = location.pathname.split('/')[2] || 'overview'
+  const closeMobileNav = useCallback(() => {
+    setMobileNavOpen(false)
+    if (window.matchMedia('(max-width: 700px)').matches) {
+      window.requestAnimationFrame(() => menuToggleRef.current?.focus())
+    }
+  }, [])
+  useEffect(() => {
+    if (!mobileNavOpen) return
+    const onKeyDown = (event) => {
+      if (event.key === 'Escape') {
+        event.preventDefault()
+        closeMobileNav()
+      }
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [mobileNavOpen, closeMobileNav])
   const load = useCallback(async () => {
     const requestId = ++loadRequest.current
     setState((s) => ({ ...s, loading: true, error: '' }))
@@ -246,7 +264,7 @@ export default function PortalDashboard() {
       end={path === '/portal'}
       to={path}
       className={({ isActive }) => (isActive ? 'active' : '')}
-      onClick={() => setMobileNavOpen(false)}
+      onClick={closeMobileNav}
     >
       <span className="portal-nav-icon" aria-hidden="true">{icon}</span>
       <span>{label}</span>
@@ -297,9 +315,11 @@ export default function PortalDashboard() {
           </span>
         </Link>
         <button
+          ref={menuToggleRef}
           type="button"
           className="portal-menu-toggle"
           onClick={() => setMobileNavOpen((open) => !open)}
+          aria-label={mobileNavOpen ? 'Close portal navigation' : 'Open portal navigation'}
           aria-expanded={mobileNavOpen}
           aria-controls="portal-navigation"
         >
@@ -347,7 +367,7 @@ export default function PortalDashboard() {
                 href={item.href}
                 target="_blank"
                 rel="noopener noreferrer"
-                onClick={() => setMobileNavOpen(false)}
+                onClick={closeMobileNav}
               >
                 <span className="portal-nav-icon" aria-hidden="true">{item.icon}</span>
                 <span>{item.label}</span><span aria-hidden="true">↗</span>
@@ -357,7 +377,7 @@ export default function PortalDashboard() {
                 key={item.to}
                 to={item.to}
                 className={({ isActive }) => (isActive ? 'active' : '')}
-                onClick={() => setMobileNavOpen(false)}
+                onClick={closeMobileNav}
               >
                 <span className="portal-nav-icon" aria-hidden="true">{item.icon}</span>
                 <span>{item.label}</span>

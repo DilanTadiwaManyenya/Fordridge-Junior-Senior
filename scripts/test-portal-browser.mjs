@@ -1,7 +1,10 @@
 import assert from 'node:assert/strict'
 import { chromium } from '../.portal-test-tools/node_modules/playwright/index.mjs'
 
-const browser = await chromium.launch({ headless: true })
+const launchOptions = { headless: true }
+if (process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH)
+  launchOptions.executablePath = process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH
+const browser = await chromium.launch(launchOptions)
 const errors = []
 const writes = []
 const user = {
@@ -32,9 +35,14 @@ const session = {
   expires_in: 3600,
   user,
 }
-async function pageFor(role, authenticated = true) {
+async function pageFor(
+  role,
+  authenticated = true,
+  { viewport = { width: 1365, height: 900 }, hasTouch = false } = {},
+) {
   const context = await browser.newContext({
-    viewport: { width: 1365, height: 900 },
+    viewport,
+    hasTouch,
   })
   if (authenticated)
     await context.addInitScript(
@@ -67,6 +75,10 @@ async function pageFor(role, authenticated = true) {
     if (path.endsWith('/auth/v1/token')) return send(session)
     if (path.endsWith('/auth/v1/verify')) return send(session)
     if (path.includes('/auth/v1/')) return send({})
+    if (path.endsWith('/rpc/resolve_active_portal_context'))
+      return send({ active_role: role, active_campus_id: null })
+    if (path.endsWith('/rpc/switch_active_portal_role'))
+      return send({ active_role: body.p_role, active_campus_id: body.p_campus_id })
     if (path.endsWith('/rpc/admin_update_profile')) return send(null)
     if (path.endsWith('/rpc/record_fee_payment')) {
       if (failPayment) {
@@ -85,7 +97,7 @@ async function pageFor(role, authenticated = true) {
           ...user,
           full_name: 'Test User',
           role,
-          campus_id: 'campus',
+          campus_id: null,
           campus: { name: 'Junior School', code: 'junior' },
         })
       if (url.searchParams.get('role')?.includes('parent'))
@@ -101,6 +113,15 @@ async function pageFor(role, authenticated = true) {
     }
     if (path.endsWith('/campuses'))
       return send([{ id: 'campus', name: 'Junior School', code: 'junior' }])
+    if (path.endsWith('/user_role_memberships'))
+      return send([
+        {
+          role,
+          campus_id: 'campus',
+          is_primary: true,
+          campus: { name: 'Junior School', code: 'junior' },
+        },
+      ])
     if (path.endsWith('/fee_records'))
       return send([
         {
@@ -119,7 +140,7 @@ async function pageFor(role, authenticated = true) {
     if (path.endsWith('/fee_settings')) return send([])
     if (path.endsWith('/student_guardians')) return send([])
     if (
-      ['announcements', 'timetable', 'learner_records'].some((table) =>
+      ['announcements', 'timetable', 'learner_records', 'teacher_class_assignments'].some((table) =>
         path.endsWith('/' + table),
       )
     )
@@ -156,6 +177,7 @@ try {
   )
   await page.getByRole('link', { name: 'Announcements', exact: true }).click()
   await page.getByRole('button', { name: '+ Write announcement' }).click()
+  await page.locator('form.workflow-form select').first().selectOption('campus')
   await page.getByLabel('Title', { exact: true }).fill('School notice')
   await page.getByLabel('Announcement', { exact: true }).fill('A test notice')
   await page.getByLabel('Publication').selectOption('published')
@@ -182,6 +204,7 @@ try {
   )
   await page.getByRole('link', { name: 'Timetable', exact: true }).click()
   await page.getByRole('button', { name: '+ Add lesson' }).click()
+  await page.locator('form.workflow-form select').first().selectOption('campus')
   await page.getByLabel('Subject', { exact: true }).fill('Mathematics')
   await page.getByRole('button', { name: 'Save', exact: true }).click()
   await page
@@ -231,6 +254,74 @@ try {
     ),
     true,
     'page must fit mobile viewport',
+  )
+  const menuButton = page.getByRole('button', {
+    name: 'Open portal navigation',
+  })
+  assert.equal(await menuButton.isVisible(), true, 'mobile navigation toggle is visible')
+  assert.equal(await menuButton.getAttribute('aria-expanded'), 'false')
+  await menuButton.focus()
+  await page.keyboard.press('Enter')
+  assert.equal(
+    await page.getByRole('button', { name: 'Close portal navigation' }).getAttribute('aria-expanded'),
+    'true',
+    'keyboard activation opens the mobile navigation',
+  )
+  const learnersLink = page.getByRole('link', { name: 'Learners', exact: true })
+  assert.match(await learnersLink.getAttribute('class'), /active/)
+  await page.keyboard.press('Escape')
+  const closedMenuButton = page.getByRole('button', {
+    name: 'Open portal navigation',
+  })
+  assert.equal(await closedMenuButton.getAttribute('aria-expanded'), 'false')
+  assert.equal(
+    await closedMenuButton.evaluate((element) => document.activeElement === element),
+    true,
+    'Escape closes the drawer and returns focus to its toggle',
+  )
+
+  const touchPage = await pageFor('admin', true, {
+    viewport: { width: 390, height: 844 },
+    hasTouch: true,
+  })
+  await touchPage.goto('http://127.0.0.1:5179/portal/learners')
+  await touchPage.getByRole('button', { name: 'Open portal navigation' }).tap()
+  assert.equal(
+    await touchPage.getByRole('button', { name: 'Close portal navigation' }).getAttribute('aria-expanded'),
+    'true',
+    'touch activation opens the mobile navigation',
+  )
+  await touchPage.getByRole('link', { name: 'Overview', exact: true }).tap()
+  await touchPage.waitForURL('http://127.0.0.1:5179/portal')
+  assert.equal(
+    await touchPage.getByRole('button', { name: 'Open portal navigation' }).getAttribute('aria-expanded'),
+    'false',
+    'touch navigation closes the drawer after route selection',
+  )
+  assert.equal(
+    await touchPage.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),
+    true,
+    'touch navigation remains within a narrow phone viewport',
+  )
+
+  const tablet = await pageFor('admin', true, {
+    viewport: { width: 768, height: 1024 },
+    hasTouch: true,
+  })
+  await tablet.goto('http://127.0.0.1:5179/portal/learners')
+  assert.equal(
+    await tablet.getByRole('button', { name: 'Open portal navigation' }).isVisible(),
+    false,
+    'tablet viewport uses the persistent sidebar rather than the phone drawer',
+  )
+  assert.equal(
+    await tablet.getByRole('link', { name: 'Learners', exact: true }).isVisible(),
+    true,
+  )
+  assert.equal(
+    await tablet.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),
+    true,
+    'tablet layout does not overflow horizontally',
   )
   const teacher = await pageFor('teacher', false)
   await teacher.goto('http://127.0.0.1:5179/portal/staff/login')
