@@ -167,6 +167,12 @@ const fee = (
     [campus, ids.student],
   )
 ).rows[0].id
+const unrelatedFee = (
+  await db.query(
+    'insert into fee_records(campus_id,student_id,amount) values($1,$2,35) returning id',
+    [campus, ids.stranger],
+  )
+).rows[0].id
 async function as(name) {
   await db.exec('reset role')
   const userId = ids[name] || ''
@@ -222,6 +228,10 @@ assert.equal(
 assert.equal(
   (await db.query('select count(*) from audit_trail')).rows[0].count,
   1,
+)
+await db.query(
+  "select * from record_fee_payment($1,10,'cash','Unlinked learner test payment',$2)",
+  [unrelatedFee, '40000000-0000-4000-8000-000000000001'],
 )
 await rejects(() => pay(41), /already used/)
 await rejects(
@@ -298,6 +308,10 @@ await db.query(
   "insert into learner_records(student_id,kind,event_date,title,attendance_status) values($1,'attendance',current_date,'Register','present')",
   [ids.student],
 )
+await db.query(
+  "insert into learner_records(student_id,kind,event_date,title,score,max_score,academic_year,academic_term) values($1,'academic',current_date,'Unlinked learner result',50,100,2026,'Term 1')",
+  [ids.stranger],
+)
 await rejects(
   () =>
     db.query(
@@ -344,9 +358,62 @@ assert.equal(
     .length,
   1,
 )
+assert.equal((await db.query('select * from profiles where id=$1', [ids.stranger])).rows.length, 0,
+  'parent profile reads are limited to the explicitly linked learner')
+assert.equal((await db.query('select * from learner_records where student_id=$1', [ids.stranger])).rows.length, 0,
+  'a parent cannot read another learner record in the same school')
+assert.equal((await db.query("select * from announcements where title='Published'")).rows.length, 1,
+  'a Parent role can see a published announcement for its linked learner campus')
+assert.equal((await db.query("select * from timetable where subject='Maths'")).rows.length, 1,
+  'a Parent role can see the linked learner class timetable')
+assert.equal((await db.query('select * from fee_records where student_id=$1', [ids.stranger])).rows.length, 0,
+  'a parent cannot read another learner fee record')
+assert.equal((await db.query('select * from fee_transactions where fee_record_id=$1', [unrelatedFee])).rows.length, 0,
+  'a parent cannot read another learner payment transaction')
+await db.query('select * from report_class_ranking($1,2026,$2)', [ids.student, 'Term 1'])
+await db.query('select * from report_subject_signatories($1)', [ids.student])
+await rejects(
+  () => db.query('select * from report_class_ranking($1,2026,$2)', [ids.stranger, 'Term 1']),
+  /Not allowed/,
+)
+await rejects(
+  () => db.query('select * from report_subject_signatories($1)', [ids.stranger]),
+  /Not allowed/,
+)
+const seniorCampusForParentRoleTest = (await db.query("select id from campuses where code='senior'")).rows[0].id
+await as('admin')
+await db.query(
+  "select grant_portal_role($1,'teacher',$2,'Parent boundary role test')",
+  [ids.parent, seniorCampusForParentRoleTest],
+)
+await as('parent')
+await db.query("select switch_active_portal_role('teacher',$1)", [seniorCampusForParentRoleTest])
+assert.equal((await db.query('select * from student_guardians where parent_id=$1', [ids.parent])).rows.length, 0,
+  'guardian links disappear outside the active Parent role')
+assert.equal((await db.query('select * from profiles where id=$1', [ids.student])).rows.length, 0,
+  'linked learner profiles are not exposed through the Parent grant while another role is active')
+assert.equal((await db.query('select * from learner_records where student_id=$1', [ids.student])).rows.length, 0,
+  'linked learner records are unavailable when the active role is not Parent')
+assert.equal((await db.query('select * from fee_records where student_id=$1', [ids.student])).rows.length, 0,
+  'linked learner fees are unavailable when the active role is not Parent')
+assert.equal((await db.query('select * from fee_transactions')).rows.length, 0,
+  'linked learner payment history is unavailable when the active role is not Parent')
+assert.equal((await db.query("select * from announcements where title='Published'")).rows.length, 0,
+  'parent-linked announcements are unavailable when the active role is not Parent')
+assert.equal((await db.query("select * from timetable where subject='Maths'")).rows.length, 0,
+  'parent-linked timetable is unavailable when the active role is not Parent')
+await rejects(
+  () => db.query('select * from report_subject_signatories($1)', [ids.student]),
+  /Not allowed/,
+)
+await db.query("select switch_active_portal_role('parent',$1)", [campus])
+assert.equal((await db.query('select * from learner_records')).rows.length, 2,
+  'switching back to Parent restores only the verified linked learner records')
 await as('stranger')
-assert.equal((await db.query('select * from learner_records')).rows.length, 0)
-assert.equal((await db.query('select * from fee_records')).rows.length, 0)
+assert.equal((await db.query('select * from learner_records where student_id=$1', [ids.stranger])).rows.length, 1,
+  'an unlinked learner can still read their own record')
+assert.equal((await db.query('select * from fee_records where student_id=$1', [ids.stranger])).rows.length, 1,
+  'an unlinked learner can still read their own fee record')
 await as('admin')
 const formOne = (await db.query(
   "insert into school_classes(campus_id,class_level) values($1,'Form 1') returning id",
@@ -655,6 +722,16 @@ assert.equal((await db.query('select * from learner_records')).rows.length, 3, '
 assert.equal((await db.query('select * from fee_records')).rows.length, 2, 'parents retain linked learner financial history after deactivation')
 assert.equal((await db.query('select * from fee_transactions')).rows.length, 1, 'parents retain linked learner payment history after deactivation')
 assert.ok((await db.query('select * from report_release_snapshots where student_id=$1', [ids.student])).rows.length > 0, 'parents retain access to issued reports after deactivation')
+assert.equal((await db.query('select * from report_release_snapshots where student_id=$1', [ids.stranger])).rows.length, 0,
+  'parents cannot read a different learner’s released report snapshot')
+assert.equal((await db.query('select * from report_publications where campus_id=$1', [campus])).rows.length, 1,
+  'a linked Parent can read its campus report publication')
+await db.query("select switch_active_portal_role('teacher',$1)", [seniorCampusForParentRoleTest])
+assert.equal((await db.query('select * from report_release_snapshots where student_id=$1', [ids.student])).rows.length, 0,
+  'parent report snapshots are not exposed under another active role')
+assert.equal((await db.query('select * from report_publications where campus_id=$1', [campus])).rows.length, 0,
+  'parent-linked campus publications are not exposed under another active role')
+await db.query("select switch_active_portal_role('parent',$1)", [campus])
 await as('admin')
 await correctLearner(ids.student, 'Updated Student', 'F001', 'Form 1', 'A', 'active')
 await as('student')
@@ -1066,5 +1143,5 @@ await as('')
 await rejects(() => pay(1), /Administrator/)
 await db.close()
 console.log(
-  'PASS: migrations, atomic payments/retries/rollback, class and subject scope, role membership isolation/grants/revocation/provisioning, teacher profile/record/RPC scope, guardian access, private records and teacher login.',
+  'PASS: migrations, atomic payments/retries/rollback, class and subject scope, role membership isolation/grants/revocation/provisioning, active-role parent/child boundaries, teacher profile/record/RPC scope, guardian access, private records and teacher login.',
 )
