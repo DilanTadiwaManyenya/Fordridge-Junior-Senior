@@ -137,6 +137,7 @@
   align-items: flex-start;
   margin-bottom: 18px;
 }
+.directory-header-actions{display:flex;align-items:center;justify-content:flex-end;gap:10px;flex-wrap:wrap}.directory-header-actions button{white-space:nowrap}
 .workflow-heading h1 {
   margin: 0;
   color: var(--navy);
@@ -185,6 +186,7 @@
     align-items: flex-start;
     flex-direction: column;
   }
+  .directory-header-actions{width:100%;justify-content:flex-start}
   .workflow-panel {
     padding: 16px;
   }

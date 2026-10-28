@@ -181,6 +181,25 @@ try {
     '/portal',
     'portal subpages provide a shared return path to the overview',
   )
+  const exportButton = page.getByRole('button', { name: 'Export 1 learner as CSV' })
+  await exportButton.waitFor()
+  const downloadPromise = page.waitForEvent('download')
+  await exportButton.click()
+  const learnerDownload = await downloadPromise
+  assert.equal(learnerDownload.suggestedFilename(), 'fordridge-learners.csv')
+  const learnerStream = await learnerDownload.createReadStream()
+  const learnerChunks = []
+  for await (const chunk of learnerStream) learnerChunks.push(chunk)
+  const learnerCsv = Buffer.concat(learnerChunks).toString('utf8')
+  assert.match(learnerCsv, /"'00000000-0000-4000-8000-000000000002"/)
+  assert.match(learnerCsv, /"'F001"/)
+  await page.getByLabel('Search directory').fill('no matching learner')
+  assert.equal(
+    await page.getByRole('button', { name: 'Export 0 learners as CSV' }).isDisabled(),
+    true,
+    'export is disabled when the current directory filter has no rows',
+  )
+  await page.getByLabel('Search directory').fill('')
   await page.getByRole('button', { name: 'View or edit Test Learner' }).click()
   await page.getByLabel('Full name', { exact: true }).fill('Updated Learner')
   await page.getByRole('button', { name: 'Save profile', exact: true }).click()

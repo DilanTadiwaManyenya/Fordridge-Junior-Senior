@@ -4,6 +4,7 @@ import { workflowError } from './workflow'
 import PhoneNumberField, { toE164 } from './PhoneNumberField'
 import PasswordInput from './PasswordInput'
 import GuardianLinks from './GuardianLinks'
+import { buildLearnerExportCsv } from './learnerExportCsv'
 
 const empty = (role) => ({
   full_name: '',
@@ -117,6 +118,19 @@ export default function Directory({ view }) {
       .toLowerCase()
       .includes(query.toLowerCase()),
   )
+  function exportLearners() {
+    if (!learner || loading || error || !filtered.length) return
+    const csv = buildLearnerExportCsv(filtered)
+    const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }))
+    const link = document.createElement('a')
+    link.href = url
+    link.download = 'fordridge-learners.csv'
+    document.body.appendChild(link)
+    link.click()
+    link.remove()
+    window.setTimeout(() => URL.revokeObjectURL(url), 0)
+    setNotice(`Exported ${filtered.length} learner record${filtered.length === 1 ? '' : 's'} as CSV.`)
+  }
   return (
     <section>
       <header className="workflow-heading">
@@ -124,9 +138,22 @@ export default function Directory({ view }) {
           <p className="eyebrow">Fordridge administration</p>
           <h1>{learner ? 'Learners' : 'Staff'}</h1>
         </div>
-        <button className="primary-action" onClick={() => open(null)}>
-          + Add {learner ? 'learner' : 'staff member'}
-        </button>
+        <div className="directory-header-actions">
+          {learner && (
+            <button
+              className="secondary-action"
+              type="button"
+              onClick={exportLearners}
+              disabled={loading || Boolean(error) || !filtered.length}
+              aria-label={`Export ${filtered.length} learner${filtered.length === 1 ? '' : 's'} as CSV`}
+            >
+              Export {filtered.length} learner{filtered.length === 1 ? '' : 's'}
+            </button>
+          )}
+          <button className="primary-action" onClick={() => open(null)}>
+            + Add {learner ? 'learner' : 'staff member'}
+          </button>
+        </div>
       </header>
       {error && (
         <p role="alert" className="workflow-error">
