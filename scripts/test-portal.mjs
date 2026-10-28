@@ -666,6 +666,21 @@ assert.deepEqual(
 assert.ok((await db.query('select * from learner_records')).rows.length > 0, 'reactivated learners can read their retained academic history')
 assert.ok((await db.query('select * from announcements')).rows.length > 0, 'reactivated learners regain their student announcements')
 assert.ok((await db.query('select * from timetable')).rows.length > 0, 'reactivated learners regain their timetable')
+await as('admin')
+await rejects(
+  () => db.query('delete from profiles where id=$1', [ids.student]),
+  /permission denied/,
+)
+await db.exec('reset role')
+await rejects(
+  () => db.query('delete from auth.users where id=$1', [ids.student]),
+  /Learner profiles cannot be deleted/,
+)
+assert.equal((await db.query('select count(*) from profiles where id=$1', [ids.student])).rows[0].count, 1, 'a cascading auth-user delete cannot remove the learner profile')
+assert.ok((await db.query('select count(*) from fee_records where student_id=$1', [ids.student])).rows[0].count > 0, 'learner fees remain after a rejected delete')
+assert.ok((await db.query('select count(*) from learner_records where student_id=$1', [ids.student])).rows[0].count > 0, 'learner academic history remains after a rejected delete')
+assert.ok((await db.query('select count(*) from report_release_snapshots where student_id=$1', [ids.student])).rows[0].count > 0, 'issued report snapshots remain after a rejected delete')
+await as('student')
 assert.equal(
   Number((await db.query('select count(*) from user_role_memberships')).rows[0].count),
   1,
