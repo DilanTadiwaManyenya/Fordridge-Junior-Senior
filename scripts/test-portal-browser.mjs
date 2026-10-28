@@ -49,7 +49,7 @@ const session = {
 async function pageFor(
   role,
   authenticated = true,
-  { viewport = { width: 1365, height: 900 }, hasTouch = false } = {},
+  { viewport = { width: 1365, height: 900 }, hasTouch = false, learnerAccess = true } = {},
 ) {
   const context = await browser.newContext({
     viewport,
@@ -96,6 +96,8 @@ async function pageFor(
       return send({ active_role: role, active_campus_id: null })
     if (path.endsWith('/rpc/switch_active_portal_role'))
       return send({ active_role: body.p_role, active_campus_id: body.p_campus_id })
+    if (path.endsWith('/rpc/learner_portal_access_status'))
+      return send({ allowed: learnerAccess, status: learnerAccess ? 'active' : 'inactive' })
     if (path.endsWith('/audit_trail')) {
       activityAttempts += 1
       if (!activityCanSucceed)
@@ -468,6 +470,16 @@ try {
   await recovery.getByLabel('Password', { exact: true }).fill('Replacement123!')
   await recovery.getByRole('button', { name: 'Save new password' }).click()
   await recovery.getByRole('status').filter({ hasText: 'Password changed' }).waitFor()
+  const inactiveLogin = await pageFor('student', false, { learnerAccess: false })
+  await inactiveLogin.goto('http://127.0.0.1:5179/portal/student/login')
+  await inactiveLogin.getByLabel('Phone number', { exact: true }).fill('0777123456')
+  await inactiveLogin.getByLabel('Password', { exact: true }).fill('test123')
+  await inactiveLogin.getByRole('button', { name: 'Sign in to portal' }).click()
+  await inactiveLogin.getByRole('alert').filter({ hasText: 'account is inactive' }).waitFor()
+  const inactiveSession = await pageFor('student', true, { learnerAccess: false })
+  await inactiveSession.goto('http://127.0.0.1:5179/portal')
+  await inactiveSession.getByRole('heading', { name: 'Unable to load your portal' }).waitFor()
+  await inactiveSession.getByRole('alert').filter({ hasText: 'account is inactive' }).waitFor()
   const parent = await pageFor('parent')
   await parent.goto('http://127.0.0.1:5179/portal/learners')
   await parent.waitForURL('**/portal')

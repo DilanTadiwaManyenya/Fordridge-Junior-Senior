@@ -26,6 +26,16 @@ export default function PortalLogin({
   const roleTitle = portalRole[0].toUpperCase() + portalRole.slice(1)
   async function enter(user) {
     await withPortalTimeout(async () => {
+      if (portalRole === 'student') {
+        const access = await supabase.rpc('learner_portal_access_status')
+        if (access.error) throw access.error
+        if (!access.data?.allowed) {
+          await supabase.auth.signOut()
+          throw new Error(
+            'This learner account is inactive or no longer enrolled. Contact the school office for help.',
+          )
+        }
+      }
       const permittedRoles =
         portalRole === 'staff' ? ['staff', 'teacher', 'admin'] : [portalRole]
       const result = await supabase

@@ -629,7 +629,43 @@ const frozenAfterCorrection = (await db.query(
   [publicationId, ids.stream_student],
 )).rows[0]
 assert.deepEqual(frozenAfterCorrection, frozen, 'correcting the current learner profile leaves the issued report snapshot unchanged')
+await correctLearner(ids.student, 'Updated Student', 'F001', 'Form 1', 'A', 'inactive')
 await as('student')
+assert.deepEqual(
+  (await db.query('select learner_portal_access_status() as status')).rows[0].status,
+  { allowed: false, status: 'inactive' },
+  'an inactive learner is denied the learner portal',
+)
+assert.equal((await db.query('select * from learner_records')).rows.length, 0, 'inactive learners cannot read their academic or attendance records')
+assert.equal((await db.query('select * from fee_records')).rows.length, 0, 'inactive learners cannot read their fee records')
+assert.equal((await db.query('select * from fee_transactions')).rows.length, 0, 'inactive learners cannot read payment transactions')
+assert.equal((await db.query('select * from report_release_snapshots')).rows.length, 0, 'inactive learners cannot read issued reports')
+assert.equal((await db.query('select * from announcements')).rows.length, 0, 'inactive learners cannot read student announcements')
+assert.equal((await db.query('select * from timetable')).rows.length, 0, 'inactive learners cannot read their timetable')
+await rejects(
+  () => db.query('select * from report_class_ranking($1,2026,$2)', [ids.student, 'Term 1']),
+  /Not allowed/,
+)
+await rejects(
+  () => db.query('select * from report_subject_signatories($1)', [ids.student]),
+  /Not allowed/,
+)
+await as('parent')
+assert.equal((await db.query('select * from learner_records')).rows.length, 3, 'parents retain linked learner academic history after deactivation')
+assert.equal((await db.query('select * from fee_records')).rows.length, 2, 'parents retain linked learner financial history after deactivation')
+assert.equal((await db.query('select * from fee_transactions')).rows.length, 1, 'parents retain linked learner payment history after deactivation')
+assert.ok((await db.query('select * from report_release_snapshots where student_id=$1', [ids.student])).rows.length > 0, 'parents retain access to issued reports after deactivation')
+await as('admin')
+await correctLearner(ids.student, 'Updated Student', 'F001', 'Form 1', 'A', 'active')
+await as('student')
+assert.deepEqual(
+  (await db.query('select learner_portal_access_status() as status')).rows[0].status,
+  { allowed: true, status: 'active' },
+  'reactivating a learner restores learner portal access',
+)
+assert.ok((await db.query('select * from learner_records')).rows.length > 0, 'reactivated learners can read their retained academic history')
+assert.ok((await db.query('select * from announcements')).rows.length > 0, 'reactivated learners regain their student announcements')
+assert.ok((await db.query('select * from timetable')).rows.length > 0, 'reactivated learners regain their timetable')
 assert.equal(
   Number((await db.query('select count(*) from user_role_memberships')).rows[0].count),
   1,

@@ -109,6 +109,20 @@ export default function PortalDashboard() {
           : contextResult.data
         if (!context?.active_role)
           throw new Error('Your active role could not be loaded. Contact the school office.')
+        if (context.active_role === 'student') {
+          const learnerAccess = await supabase.rpc('learner_portal_access_status')
+          if (learnerAccess.error) throw learnerAccess.error
+          if (!learnerAccess.data?.allowed) {
+            await supabase.auth.signOut()
+            setState({
+              loading: false,
+              profile: null,
+              user: null,
+              error: 'This learner account is inactive or no longer enrolled. Contact the school office for help.',
+            })
+            return null
+          }
+        }
         const memberships = membershipResult.data || []
         const activeMembership = memberships.find(
           (item) =>
@@ -148,6 +162,7 @@ export default function PortalDashboard() {
         }
       })
       if (requestId !== loadRequest.current) return
+      if (nextState === null) return
       setState(nextState)
     } catch (err) {
       if (requestId !== loadRequest.current) return
