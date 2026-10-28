@@ -3,6 +3,31 @@ import { readFile, readdir } from 'node:fs/promises'
 import { PGlite } from '../.portal-test-tools/node_modules/@electric-sql/pglite/dist/index.js'
 import { canEnterPortal, withPortalTimeout } from '../src/portal/workflow.js'
 import { buildTeacherClassScopes, canOpenTeacherMyClass } from '../src/portal/teacher-workspace.js'
+import { getFinanceNavigation } from '../src/portal/navigation.js'
+
+assert.deepEqual(
+  getFinanceNavigation('accountant'),
+  {
+    heading: 'Accountant workspace',
+    items: [{ to: '/portal/fees', label: 'Finance', icon: '$' }],
+  },
+  'Accountant navigation exposes the authorized Finance screen only',
+)
+assert.deepEqual(
+  getFinanceNavigation('admin').items.map((item) => item.label),
+  ['Finance', 'Expenses & Cashbook', 'Inventory & POS'],
+  'Main Admin retains its Finance, cashbook and POS links',
+)
+assert.deepEqual(
+  getFinanceNavigation('staff').items.map((item) => item.label),
+  ['Inventory & POS'],
+  'ordinary Staff do not see finance ledgers or cashbook',
+)
+assert.deepEqual(
+  getFinanceNavigation('teacher').items,
+  [],
+  'teachers do not see finance navigation they are not authorized to use',
+)
 
 assert.equal(canOpenTeacherMyClass('teacher', true), true)
 assert.equal(canOpenTeacherMyClass('teacher', false), false)

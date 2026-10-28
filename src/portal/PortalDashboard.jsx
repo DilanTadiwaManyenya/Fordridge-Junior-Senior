@@ -39,6 +39,7 @@ import ReportReleaseMetrics from './ReportReleaseMetrics'
 import ReportVerification from './ReportVerification'
 import { withPortalTimeout, workflowError } from './workflow'
 import { canOpenTeacherMyClass } from './teacher-workspace'
+import { getFinanceNavigation } from './navigation'
 import './workflow.css'
 
 export default function PortalDashboard() {
@@ -181,6 +182,7 @@ export default function PortalDashboard() {
     profile.has_class_assignment,
   )
   const analytics = ['teacher', 'admin'].includes(profile.role)
+  const financeNavigation = getFinanceNavigation(profile.role)
   if (
     (['learners', 'staff', 'classes'].includes(view) && !admin) ||
     (view === 'fees' && !fees) ||
@@ -333,21 +335,34 @@ export default function PortalDashboard() {
           {nav('/portal/notifications', 'Notifications', '●')}
           {nav('/portal/timetable', 'Timetable', '◷')}
           {nav('/portal/account', 'Account settings', '⚙')}
-          {(fees || admin || profile.role === 'staff') && (
-            <span className="portal-nav-label portal-nav-label-secondary">Finance</span>
+          {financeNavigation.items.length > 0 && (
+            <span className="portal-nav-label portal-nav-label-secondary">
+              {financeNavigation.heading}
+            </span>
           )}
-          {fees && nav('/portal/fees', 'Finance', '$')}
-          {admin && nav('/portal/cashbook', 'Expenses & Cashbook', '¤')}
-          {['staff', 'admin'].includes(profile.role) && (
-            <a
-              href="https://inventory-management-system-3xi2f.sevalla.page/"
-              target="_blank"
-              rel="noopener noreferrer"
-              onClick={() => setMobileNavOpen(false)}
-            >
-              <span className="portal-nav-icon" aria-hidden="true">▣</span>
-              <span>Inventory & POS</span><span aria-hidden="true">↗</span>
-            </a>
+          {financeNavigation.items.map((item) =>
+            item.href ? (
+              <a
+                key={item.label}
+                href={item.href}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={() => setMobileNavOpen(false)}
+              >
+                <span className="portal-nav-icon" aria-hidden="true">{item.icon}</span>
+                <span>{item.label}</span><span aria-hidden="true">↗</span>
+              </a>
+            ) : (
+              <NavLink
+                key={item.to}
+                to={item.to}
+                className={({ isActive }) => (isActive ? 'active' : '')}
+                onClick={() => setMobileNavOpen(false)}
+              >
+                <span className="portal-nav-icon" aria-hidden="true">{item.icon}</span>
+                <span>{item.label}</span>
+              </NavLink>
+            ),
           )}
           {admin && <span className="portal-nav-label portal-nav-label-secondary">Administration</span>}
           {admin && nav('/portal/activity', 'Activity Log', '◫')}

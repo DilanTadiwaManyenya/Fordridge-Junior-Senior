@@ -1,0 +1,29 @@
+const financeItems = [
+  {
+    roles: ['student', 'parent', 'principal', 'accountant', 'admin'],
+    to: '/portal/fees',
+    label: 'Finance',
+    icon: '$',
+  },
+  {
+    roles: ['admin'],
+    to: '/portal/cashbook',
+    label: 'Expenses & Cashbook',
+    icon: '¤',
+  },
+  {
+    roles: ['staff', 'admin'],
+    href: 'https://inventory-management-system-3xi2f.sevalla.page/',
+    label: 'Inventory & POS',
+    icon: '▣',
+  },
+]
+
+export function getFinanceNavigation(role) {
+  return {
+    heading: role === 'accountant' ? 'Accountant workspace' : 'Finance',
+    items: financeItems
+      .filter((item) => item.roles.includes(role))
+      .map(({ roles: _roles, ...item }) => item),
+  }
+}
