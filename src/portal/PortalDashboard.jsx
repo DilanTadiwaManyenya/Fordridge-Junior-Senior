@@ -332,11 +332,12 @@ export default function PortalDashboard() {
           {nav('/portal/announcements', 'Announcements', '✦')}
           {nav('/portal/notifications', 'Notifications', '●')}
           {nav('/portal/timetable', 'Timetable', '◷')}
-          <span className="portal-nav-label portal-nav-label-secondary">Management</span>
+          {nav('/portal/account', 'Account settings', '⚙')}
+          {(fees || admin || profile.role === 'staff') && (
+            <span className="portal-nav-label portal-nav-label-secondary">Finance</span>
+          )}
           {fees && nav('/portal/fees', 'Finance', '$')}
-          {admin && nav('/portal/cashbook', 'Expense cashbook', '¤')}
-          {admin && nav('/portal/activity', 'Activity log', '◫')}
-          {admin && nav('/portal/staff', 'Staff', '♙')}
+          {admin && nav('/portal/cashbook', 'Expenses & Cashbook', '¤')}
           {['staff', 'admin'].includes(profile.role) && (
             <a
               href="https://inventory-management-system-3xi2f.sevalla.page/"
@@ -348,7 +349,9 @@ export default function PortalDashboard() {
               <span>Inventory & POS</span><span aria-hidden="true">↗</span>
             </a>
           )}
-          {nav('/portal/account', 'Account settings', '⚙')}
+          {admin && <span className="portal-nav-label portal-nav-label-secondary">Administration</span>}
+          {admin && nav('/portal/activity', 'Activity Log', '◫')}
+          {admin && nav('/portal/staff', 'Staff', '♙')}
         </nav>
         <div className="portal-sidebar-footer">
           <div className="portal-account-summary">
