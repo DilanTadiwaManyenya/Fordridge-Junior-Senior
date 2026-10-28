@@ -603,6 +603,33 @@ await rejects(
   /Choose an allocated subject/,
 )
 await db.query("select record_bulk_marks('Quiz 1','Science',current_date,2026,'Term 1',100,$1::jsonb)", [JSON.stringify([{ student_id: ids.stream_student, score: 75 }])])
+await rejects(
+  () => db.query("select record_bulk_marks('Quiz 1','Science',current_date,2026,'Term 1',100,$1::jsonb)", [JSON.stringify([{ student_id: ids.stream_student, score: 75 }])]),
+  /already exist for this assessment/,
+)
+await rejects(
+  () => db.query("select record_bulk_marks('Duplicate batch','Science',current_date,2026,'Term 1',100,$1::jsonb)", [JSON.stringify([
+    { student_id: ids.stream_student, score: 75 },
+    { student_id: ids.stream_student, score: 80 },
+  ])]),
+  /appears more than once/,
+)
+await rejects(
+  () => db.query("select record_bulk_marks('Missing score','Science',current_date,2026,'Term 1',100,$1::jsonb)", [JSON.stringify([{ student_id: ids.stream_student }])]),
+  /valid learner ID and a numeric mark/,
+)
+await rejects(
+  () => db.query("select record_bulk_marks('Future assessment','Science',current_date + 1,2026,'Term 1',100,$1::jsonb)", [JSON.stringify([{ student_id: ids.stream_student, score: 75 }])]),
+  /must be today or earlier and match the academic year/,
+)
+await rejects(
+  () => db.query("select record_bulk_marks('Wrong year','Science',date '2025-12-31',2026,'Term 1',100,$1::jsonb)", [JSON.stringify([{ student_id: ids.stream_student, score: 75 }])]),
+  /must be today or earlier and match the academic year/,
+)
+await rejects(
+  () => db.query("select record_bulk_marks('Invalid term','Science',current_date,2026,'Term 4',100,$1::jsonb)", [JSON.stringify([{ student_id: ids.stream_student, score: 75 }])]),
+  /valid academic term/,
+)
 assert.equal(
   (await db.query("select subject from learner_records where student_id=$1 and title='Quiz 1'", [ids.stream_student])).rows[0].subject,
   'Science',
