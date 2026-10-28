@@ -138,4 +138,4 @@ Stages 7–20 establish access and class foundations. Do not roll out a new admi
 
 ## Current checkpoint
 
-Stage 30 is implemented and validated locally: learner profile corrections require a reason, record actor and field-level changes, reject the legacy bypass, and leave published report snapshots untouched. Its versioned migration and frontend have not been deployed; production migration approval is required first. See [the Stage 30 record](STAGE-30-CONTROLLED-LEARNER-CORRECTIONS.md) and [the stage tracker](STAGE-TRACKER.md). Stage 29 is complete and pushed as recorded in the tracker; the hosted frontend remains pending deployment.
+Stage 31 is implemented, validated, and pushed as `4c87178`: inactive, graduated and transferred learners cannot use their own portal data, while linked parents retain academic, finance and issued-report history. Reactivation restores learner access without recreating data. Its versioned migration and frontend have not been deployed; production migration approval is required first. See [the Stage 31 record](STAGE-31-LEARNER-DEACTIVATION.md) and [the stage tracker](STAGE-TRACKER.md). The hosted frontend remains pending deployment.
