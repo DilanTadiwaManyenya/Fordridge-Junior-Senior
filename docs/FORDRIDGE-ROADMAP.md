@@ -138,4 +138,4 @@ Stages 7–20 establish access and class foundations. Do not roll out a new admi
 
 ## Current checkpoint
 
-Stage 29 is complete and pushed; the Learners directory filters by the configured class/form catalogue, its streams, and enrolment status, while CSV export follows the visible filtered roster. See [the Stage 29 record](STAGE-29-LEARNER-ROSTER-FILTERS.md) and [the stage tracker](STAGE-TRACKER.md). The hosted frontend has not been deployed; deployment remains a separate pending checkpoint.
+Stage 30 is implemented and validated locally: learner profile corrections require a reason, record actor and field-level changes, reject the legacy bypass, and leave published report snapshots untouched. Its versioned migration and frontend have not been deployed; production migration approval is required first. See [the Stage 30 record](STAGE-30-CONTROLLED-LEARNER-CORRECTIONS.md) and [the stage tracker](STAGE-TRACKER.md). Stage 29 is complete and pushed as recorded in the tracker; the hosted frontend remains pending deployment.
