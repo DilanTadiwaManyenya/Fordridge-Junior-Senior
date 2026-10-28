@@ -31,12 +31,13 @@ A stage is Complete only after its deliverable and relevant checks are recorded 
 | 21 | Complete | Verified Workspace and Academic services sidebar groups; confirmed internal destinations are implemented | [05b973d](https://github.com/DilanTadiwaManyenya/Fordridge-Junior-Senior/commit/05b973d); [Stage 21 record](STAGE-21-SIDEBAR-GROUPS.md); source route audit, production build and diff check pass; no code change required |
 | 22 | Complete | Finance and Administration sidebar groups; Account settings under Workspace | [08fa0c4](https://github.com/DilanTadiwaManyenya/Fordridge-Junior-Senior/commit/08fa0c4); [Stage 22 record](STAGE-22-FINANCE-ADMIN-NAVIGATION.md); build, lint, isolated portal suite and diff check pass; hosted frontend deployment pending |
 | 23 | Complete | Role-specific Accountant workspace limited to currently authorised Finance screens | [22848b4](https://github.com/DilanTadiwaManyenya/Fordridge-Junior-Senior/commit/22848b4); [Stage 23 record](STAGE-23-ACCOUNTANT-NAVIGATION.md); role navigation assertions, build, lint and isolated portal suite pass; hosted frontend deployment pending |
+| 24 | Complete | Accessible phone drawer and responsive portal navigation | [e376b04](https://github.com/DilanTadiwaManyenya/Fordridge-Junior-Senior/commit/e376b04); [Stage 24 record](STAGE-24-MOBILE-NAVIGATION.md); build, lint, isolated portal suite, Chrome browser suite and diff check pass; hosted frontend deployment pending |
 
 ## Stage 5 follow-up status
 
 Both report-signatory migrations now parse, and `node scripts/test-portal.mjs` passes in isolated PGlite: migration application, atomic payments/retries/rollback, profile permissions, published notices, class scoping, guardian access, private records and teacher login. Production was not accessed.
 
-The browser suite remains unrun because Playwright Chromium is missing. The isolated portal suite now covers whole-class and stream assignments, overlap rejection, assigned learner reads, direct attendance/mark RPC scope and wellbeing privacy.
+The isolated portal suite covers whole-class and stream assignments, overlap rejection, assigned learner reads, direct attendance/mark RPC scope and wellbeing privacy. The mocked browser suite passes with the installed Chrome executable; Stage 24 adds keyboard, touch, phone, and tablet navigation checks.
 
 ## Current owner decision
 

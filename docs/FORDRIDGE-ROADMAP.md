@@ -132,6 +132,10 @@ Stages 1–17 are completed foundation, catalogue, teacher-scope, role-membershi
 - The build passes, with a 735.40 kB minified JavaScript chunk warning.
 - Lint exits successfully with React effect update warnings and a missing `selected` dependency warning in BulkMarks.jsx.
 - Stage 5 follow-up corrected malformed initials expressions in the live and snapshot signatory migrations. The isolated database suite now passes in PGlite, including policy and payment assertions.
-- The mocked browser suite still has no installed Playwright Chromium executable. Run it after the browser dependency is available.
+- The mocked browser suite passes with the installed Chrome executable. Stage 24 adds keyboard, touch, phone, and tablet navigation checks.
 
 Stages 7–20 establish access and class foundations. Do not roll out a new administrator/accountant capability until both page gates and database rules agree. No production deployment is certified by a local build or mock test.
+
+## Current checkpoint
+
+Stage 24 is complete and pushed as `e376b04`. Stage 25 is next. The hosted frontend has not been deployed; deployment remains a separate pending checkpoint.
