@@ -24,6 +24,17 @@ const student = {
   enrollment_status: 'active',
   campus: { name: 'Junior School' },
 }
+const formerStudent = {
+  id: '00000000-0000-4000-8000-000000000003',
+  full_name: 'Former Learner',
+  role: 'student',
+  campus_id: 'campus',
+  admission_number: 'F002',
+  class_level: 'Form 2',
+  class_stream: '',
+  enrollment_status: 'graduated',
+  campus: { name: 'Junior School' },
+}
 const payload = Buffer.from(
   JSON.stringify({ sub: user.id, exp: Math.floor(Date.now() / 1000) + 3600 }),
 ).toString('base64url')
@@ -131,10 +142,31 @@ async function pageFor(
             role: 'parent',
           },
         ])
+      if (url.searchParams.get('role')?.includes('student'))
+        return send([student, formerStudent])
       return send([student])
     }
     if (path.endsWith('/campuses'))
       return send([{ id: 'campus', name: 'Junior School', code: 'junior' }])
+    if (path.endsWith('/school_classes'))
+      return send([
+        {
+          id: 'class-form-1',
+          campus_id: 'campus',
+          class_level: 'Form 1',
+          is_active: true,
+          campus: { name: 'Junior School' },
+          streams: [{ id: 'stream-a', stream_name: 'A', is_active: true }],
+        },
+        {
+          id: 'class-form-2',
+          campus_id: 'campus',
+          class_level: 'Form 2',
+          is_active: true,
+          campus: { name: 'Junior School' },
+          streams: [],
+        },
+      ])
     if (path.endsWith('/user_role_memberships'))
       return send([
         {
@@ -181,6 +213,7 @@ try {
     '/portal',
     'portal subpages provide a shared return path to the overview',
   )
+  await page.getByLabel('Search directory').fill('Test Learner')
   const exportButton = page.getByRole('button', { name: 'Export 1 learner as CSV' })
   await exportButton.waitFor()
   const downloadPromise = page.waitForEvent('download')
@@ -200,6 +233,20 @@ try {
     'export is disabled when the current directory filter has no rows',
   )
   await page.getByLabel('Search directory').fill('')
+  await page.getByLabel('Class / form').selectOption('class-form-1')
+  assert.equal(await page.getByRole('button', { name: /View or edit Test Learner/ }).count(), 1)
+  assert.equal(await page.getByRole('button', { name: /View or edit Former Learner/ }).count(), 0)
+  await page.getByLabel('Stream').selectOption('stream-a')
+  assert.equal(await page.getByRole('button', { name: /View or edit Test Learner/ }).count(), 1)
+  await page.getByLabel('Enrolment status').selectOption('inactive')
+  assert.equal(await page.getByRole('button', { name: /View or edit Former Learner/ }).count(), 0)
+  await page.getByLabel('Class / form').selectOption('class-form-2')
+  assert.equal(await page.getByRole('button', { name: /View or edit Former Learner/ }).count(), 1)
+  await page.getByLabel('Enrolment status').selectOption('active')
+  assert.equal(await page.getByRole('button', { name: /View or edit Former Learner/ }).count(), 0)
+  assert.equal(await page.getByRole('button', { name: /View or edit Test Learner/ }).count(), 0)
+  await page.getByLabel('Class / form').selectOption('')
+  await page.getByLabel('Enrolment status').selectOption('all')
   await page.getByRole('button', { name: 'View or edit Test Learner' }).click()
   await page.getByLabel('Full name', { exact: true }).fill('Updated Learner')
   await page.getByRole('button', { name: 'Save profile', exact: true }).click()

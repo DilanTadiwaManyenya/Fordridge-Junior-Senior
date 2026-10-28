@@ -18,9 +18,13 @@ const empty = (role) => ({
 export default function Directory({ view }) {
   const learner = view === 'learners'
   const [items, setItems] = useState([]),
-    [campuses, setCampuses] = useState([])
+    [campuses, setCampuses] = useState([]),
+    [classes, setClasses] = useState([])
   const [query, setQuery] = useState(''),
-    [draft, setDraft] = useState(null)
+    [draft, setDraft] = useState(null),
+    [classFilter, setClassFilter] = useState(''),
+    [streamFilter, setStreamFilter] = useState(''),
+    [statusFilter, setStatusFilter] = useState('all')
   const [phone, setPhone] = useState(''),
     [country, setCountry] = useState('ZW'),
     [password, setPassword] = useState('')
@@ -32,7 +36,7 @@ export default function Directory({ view }) {
   const load = useCallback(async () => {
     setLoading(true)
     try {
-      const [profiles, locations] = await Promise.all([
+      const [profiles, locations, catalogue] = await Promise.all([
         supabase
           .from('profiles')
           .select(
@@ -41,11 +45,18 @@ export default function Directory({ view }) {
           .in('role', learner ? ['student'] : ['staff', 'teacher', 'admin'])
           .order('full_name'),
         supabase.from('campuses').select('id,name').order('name'),
+        learner
+          ? supabase
+              .from('school_classes')
+              .select('id,campus_id,class_level,is_active,campus:campuses(name),streams:school_class_streams(id,stream_name,is_active)')
+              .order('class_level')
+          : Promise.resolve({ data: [], error: null }),
       ])
-      if (profiles.error || locations.error)
-        throw profiles.error || locations.error
+      if (profiles.error || locations.error || catalogue.error)
+        throw profiles.error || locations.error || catalogue.error
       setItems(profiles.data)
       setCampuses(locations.data)
+      setClasses(catalogue.data || [])
     } catch (err) {
       setError(workflowError(err))
     } finally {
@@ -113,11 +124,32 @@ export default function Directory({ view }) {
       lock.current = false
     }
   }
-  const filtered = items.filter((item) =>
-    `${item.full_name} ${item.admission_number || ''} ${item.class_level || ''} ${item.campus?.name || ''}`
+  const selectedClass = classes.find((item) => item.id === classFilter)
+  const filtered = items.filter((item) => {
+    const searchMatches = `${item.full_name} ${item.admission_number || ''} ${item.class_level || ''} ${item.class_stream || ''} ${item.campus?.name || ''}`
       .toLowerCase()
-      .includes(query.toLowerCase()),
-  )
+      .includes(query.toLowerCase())
+    const catalogueClass = classes.some((classItem) =>
+      classItem.campus_id === item.campus_id &&
+      classItem.class_level.trim().toLowerCase() === (item.class_level || '').trim().toLowerCase(),
+    )
+    const classMatches = !classFilter || (
+      classFilter === 'unlisted'
+        ? !catalogueClass
+        : Boolean(selectedClass && selectedClass.campus_id === item.campus_id &&
+            selectedClass.class_level.trim().toLowerCase() === (item.class_level || '').trim().toLowerCase())
+    )
+    const selectedStream = selectedClass?.streams?.find((stream) => stream.id === streamFilter)
+    const streamMatches = !streamFilter || Boolean(
+      selectedStream && selectedStream.stream_name.trim().toLowerCase() === (item.class_stream || '').trim().toLowerCase(),
+    )
+    const status = (item.enrollment_status || '').toLowerCase()
+    const statusMatches = statusFilter === 'all' ||
+      (statusFilter === 'active' && status === 'active') ||
+      (statusFilter === 'inactive' && ['inactive', 'graduated', 'transferred'].includes(status)) ||
+      (statusFilter === 'unassigned' && !status)
+    return searchMatches && classMatches && streamMatches && statusMatches
+  })
   function exportLearners() {
     if (!learner || loading || error || !filtered.length) return
     const csv = buildLearnerExportCsv(filtered)
@@ -306,6 +338,53 @@ export default function Directory({ view }) {
             placeholder="Name, admission number, class or campus"
           />
         </label>
+        {learner && (
+          <div className="learner-roster-filters" aria-label="Learner roster filters">
+            <label>
+              Class / form
+              <select
+                value={classFilter}
+                onChange={(event) => {
+                  setClassFilter(event.target.value)
+                  setStreamFilter('')
+                }}
+                disabled={loading}
+              >
+                <option value="">All classes</option>
+                {classes.map((item) => (
+                  <option key={item.id} value={item.id}>
+                    {item.campus?.name || 'Campus'} · {item.class_level}{item.is_active ? '' : ' · Inactive class'}
+                  </option>
+                ))}
+                <option value="unlisted">Unlisted or unassigned</option>
+              </select>
+            </label>
+            <label>
+              Stream
+              <select
+                value={streamFilter}
+                onChange={(event) => setStreamFilter(event.target.value)}
+                disabled={loading || !selectedClass || !selectedClass.streams?.length}
+              >
+                <option value="">All streams</option>
+                {selectedClass?.streams?.map((stream) => (
+                  <option key={stream.id} value={stream.id}>
+                    {stream.stream_name}{stream.is_active ? '' : ' · Inactive stream'}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label>
+              Enrolment status
+              <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)} disabled={loading}>
+                <option value="all">All statuses</option>
+                <option value="active">Active</option>
+                <option value="inactive">Inactive / former</option>
+                <option value="unassigned">Not assigned</option>
+              </select>
+            </label>
+          </div>
+        )}
         {loading ? (
           <p role="status">Loading directory…</p>
         ) : (
