@@ -1007,6 +1007,49 @@ assert.equal(
   1,
   'additional role grants remain stored separately from the primary role',
 )
+await as('admin')
+await db.query("select switch_active_portal_role('admin',null)")
+await db.query(
+  'select admin_record_parent_recovery_support($1,true)',
+  [ids.parent],
+)
+const recoveryAudit = (await db.query(
+  "select actor_id,entity_type,entity_id,action,detail from audit_trail where entity_type='parent_access' and entity_id=$1",
+  [ids.parent],
+)).rows[0]
+assert.equal(recoveryAudit.actor_id, ids.admin)
+assert.equal(recoveryAudit.action, 'recovery_guidance_provided')
+assert.deepEqual(recoveryAudit.detail, {
+  method: 'parent_self_service_sms_reset',
+  identity_verified: true,
+  reusable_credentials_shared: false,
+})
+const unlinkedParentId = '00000000-0000-4000-8000-999999999999'
+await db.exec('reset role')
+await db.query(
+  'insert into auth.users(id,raw_user_meta_data) values($1,$2)',
+  [unlinkedParentId, JSON.stringify({ full_name: 'Unlinked parent', portal_role: 'parent' })],
+)
+await as('admin')
+await rejects(
+  () => db.query('select admin_record_parent_recovery_support($1,true)', [unlinkedParentId]),
+  /no verified learner link/,
+)
+await rejects(
+  () => db.query('select admin_record_parent_recovery_support($1,false)', [ids.parent]),
+  /Verify the requester/,
+)
+await as('parent')
+await rejects(
+  () => db.query('select admin_record_parent_recovery_support($1,true)', [ids.parent]),
+  /Main administrator access required/,
+)
+await as('admin')
+assert.equal(
+  (await db.query("select has_function_privilege('anon','public.admin_record_parent_recovery_support(uuid,boolean)','EXECUTE') as allowed")).rows[0].allowed,
+  false,
+  'anonymous callers cannot execute the parent recovery support RPC',
+)
 await db.exec('reset role')
 await db.query("select set_config('request.jwt.claim.sub',$1,false)", ['00000000-0000-4000-8000-000000000010'])
 await db.exec('set role authenticated')

@@ -116,6 +116,7 @@ async function pageFor(
     }
     if (path.endsWith('/rpc/admin_update_profile')) return send(null)
     if (path.endsWith('/rpc/admin_correct_learner_profile')) return send(null)
+    if (path.endsWith('/rpc/admin_record_parent_recovery_support')) return send(null)
     if (path.endsWith('/rpc/record_fee_payment')) {
       if (failPayment) {
         failPayment = false
@@ -525,9 +526,22 @@ try {
   assert.equal(await page.getByRole('row').filter({ hasText: 'Test Parent' }).count(), 1)
   await page.getByLabel('Search parent or learner').fill('no matching account')
   await page.getByText('No linked parent accounts match this search.').waitFor()
+  await page.getByLabel('Search parent or learner').fill('')
+  const parentRow = page.getByRole('row').filter({ hasText: 'Test Parent' })
+  await parentRow.getByRole('button', { name: 'Support access' }).click()
+  const recoveryDialog = page.getByRole('dialog', { name: 'Support access' })
+  await recoveryDialog.getByText('verify the one-time SMS code', { exact: false }).waitFor()
+  assert.equal(await recoveryDialog.locator('input[type="password"]').count(), 0)
+  const recordGuidance = recoveryDialog.getByRole('button', { name: 'Record guidance provided' })
+  assert.equal(await recordGuidance.isDisabled(), true)
+  await recoveryDialog.getByLabel(/I verified the requester/).check()
+  await recordGuidance.click()
+  await recoveryDialog.getByRole('status').filter({ hasText: 'recorded in the activity log' }).waitFor()
+  const recoveryWrite = writes.filter((write) => write.path.endsWith('admin_record_parent_recovery_support')).at(-1)
+  assert.deepEqual(recoveryWrite.body, { p_parent_id: 'parent', p_identity_verified: true })
   assert.deepEqual(errors, [])
   console.log(
-    'PASS: profile editing, account creation, publishing, records, timetable, payment retry, teacher sign-in, parent route guards and linked-account directory/search, mobile layout; no uncaught browser errors. All backend requests were mocked.',
+    'PASS: profile editing, account creation, publishing, records, timetable, payment retry, teacher sign-in, parent route guards, linked-account directory/search, credential-free audited recovery guidance, mobile layout; no uncaught browser errors. All backend requests were mocked.',
   )
 } catch (error) {
   const p = browser.contexts()[0]?.pages()[0]
