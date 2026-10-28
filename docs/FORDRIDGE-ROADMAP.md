@@ -138,4 +138,4 @@ Stages 7–20 establish access and class foundations. Do not roll out a new admi
 
 ## Current checkpoint
 
-Stage 26 is complete and pushed as `dac4917`; Activity Log and Announcements/Timetable share loading, empty, error, and retry states with stale-data clearing and duplicate-request guards. Stage 27 is next. The hosted frontend has not been deployed; deployment remains a separate pending checkpoint.
+Stage 27 is complete and pushed as `dfee5a4`; learner CSV import supports quoted fields, local validation, E.164 phone normalization, and an explicit pre-import review. Stage 28 is next. The hosted frontend has not been deployed; deployment remains a separate pending checkpoint.
