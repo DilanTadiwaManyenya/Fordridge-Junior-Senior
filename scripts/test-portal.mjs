@@ -608,6 +608,26 @@ assert.equal(
   'Science',
   'Markbook persists subject separately from the assessment title',
 )
+await db.query(
+  "insert into learner_records(student_id,kind,event_date,title,subject,score,max_score,academic_year,academic_term) values($1,'academic',current_date,'Direct scoped mark','Science',70,100,2026,'Term 1')",
+  [ids.stream_student],
+)
+await rejects(
+  () => db.query(
+    "insert into learner_records(student_id,kind,event_date,title,subject,score,max_score,academic_year,academic_term) values($1,'academic',current_date,'Direct out-of-class mark','Science',70,100,2026,'Term 1')",
+    [ids.other_student],
+  ),
+  /row-level security/,
+)
+await rejects(
+  () => db.query("select record_bulk_marks('Cross-class batch','Science',current_date,2026,'Term 1',100,$1::jsonb)", [JSON.stringify([
+    { student_id: ids.student, score: 70 },
+    { student_id: ids.other_student, score: 70 },
+  ])]),
+  /Subject is not allocated/,
+)
+assert.equal((await db.query("select count(*) from learner_records where title='Cross-class batch'")).rows[0].count, 0,
+  'a mixed-scope bulk call rolls back every mark when one learner is outside the assignment')
 await rejects(
   () => db.query('select record_bulk_attendance(current_date,$1::jsonb)', [JSON.stringify([{ student_id: ids.other_student, attendance_status: 'present' }])]),
   /outside an assigned class/,
@@ -651,6 +671,20 @@ await rejects(
   /outside an assigned class/,
 )
 await db.query("select record_bulk_marks('Essay','English',current_date,2026,'Term 1',100,$1::jsonb)", [JSON.stringify([{ student_id: ids.student, score: 80 }])])
+await rejects(
+  () => db.query(
+    "insert into learner_records(student_id,kind,event_date,title,subject,score,max_score,academic_year,academic_term) values($1,'academic',current_date,'Direct wrong subject','Science',70,100,2026,'Term 1')",
+    [ids.student],
+  ),
+  /row-level security/,
+)
+await rejects(
+  () => db.query(
+    "insert into learner_records(student_id,kind,event_date,title,subject,score,max_score,academic_year,academic_term) values($1,'academic',current_date,'Direct wrong campus','English',70,100,2026,'Term 1')",
+    [seniorLearnerId],
+  ),
+  /row-level security/,
+)
 await rejects(
   () => db.query("select record_bulk_marks('Essay','Science',current_date,2026,'Term 1',100,$1::jsonb)", [JSON.stringify([{ student_id: ids.student, score: 80 }])]),
   /Subject is not allocated/,
