@@ -1,7 +1,7 @@
 # Fordridge portal roadmap inspired by Reliance
 
 Updated: 29 October 2026
-Current checkpoint: Stages 1–41 complete locally; Stage 42 is next. Database/frontend deployment is pending approval and release.
+Current checkpoint: Stages 1–42 implemented and validated locally; Stage 42 GitHub checkpoint is in progress; Stage 43 is next. Database/frontend deployment is pending approval and release.
 
 ## Purpose
 
@@ -138,4 +138,4 @@ Stages 7–20 establish access and class foundations. Do not roll out a new admi
 
 ## Current checkpoint
 
-Stage 41 adds administrator-reviewed period closing with a required reason and expected revision, append-only period event and Activity Log audit entries, teacher read-only visibility of campus period state, and both UI and database write locks for closed periods. Stage 40's registry keeps dates and current-period selection unset; report publication remains a separate status. Isolated PGlite, lint, build, and mocked Chrome browser checks pass. Migrations `20261029110000_reporting_period_registry.sql` and `20261029120000_close_reporting_period.sql` and the frontend are pushed but not deployed. See [the Stage 40 record](STAGE-40-REPORT-PERIOD-REGISTRY.md), [the Stage 41 record](STAGE-41-REVIEWED-PERIOD-CLOSE.md), and [the stage tracker](STAGE-TRACKER.md). Earlier migrations/frontend releases remain pending production deployment/approval.
+Stage 42 adds reasoned administrator reopening and current-period selection. Current-period handoff locks the campus row, checks both the requested revision and the displayed current-period revision, and records an event and Activity Log audit entry for each affected period. No dates or calendar rules are assumed. Isolated PGlite, lint, build, and mocked Chrome browser checks pass. See [the Stage 42 record](STAGE-42-REVIEWED-REOPEN-CURRENT.md) and [the stage tracker](STAGE-TRACKER.md). Migrations `20261029110000_reporting_period_registry.sql`, `20261029120000_close_reporting_period.sql`, and `20261029130000_review_reporting_period_state.sql` and their frontend changes are not deployed. Earlier migrations/frontend releases remain pending production deployment/approval.
