@@ -672,6 +672,123 @@ assert.deepEqual((await db.query(
   'select destination_class_id, destination_stream_id from year_rollover_decisions where learner_id=$1', [ids.student],
 )).rows[0], { destination_class_id: null, destination_stream_id: null },
 'changing to Transfer clears an obsolete internal destination proposal')
+await db.exec('begin')
+async function rolloverRejectsInSavepoint(fn, pattern) {
+  await db.exec('savepoint rollover_rejection_check')
+  await rejects(fn, pattern)
+  await db.exec('rollback to savepoint rollover_rejection_check')
+  await db.exec('release savepoint rollover_rejection_check')
+}
+const rolloverProfileSnapshots = {}
+for (const learnerId of [ids.student, ids.stream_student, ids.other_student, ids.stranger]) {
+  rolloverProfileSnapshots[learnerId] = (await db.query(
+    'select id, full_name, admission_number, campus_id, class_level, class_stream, enrollment_status from profiles where id=$1', [learnerId],
+  )).rows[0]
+}
+await db.query('select save_year_rollover_decision($1,$2,$3,$4,$5,$6,$7,$8,$9)', [
+  ids.other_student, 2026, 2027, 'complete', 'Learner completed the final approved school level',
+  rolloverProfileSnapshots[ids.other_student].campus_id, rolloverProfileSnapshots[ids.other_student].class_level,
+  rolloverProfileSnapshots[ids.other_student].class_stream, rolloverProfileSnapshots[ids.other_student].enrollment_status,
+])
+await db.query('select save_year_rollover_decision($1,$2,$3,$4,$5,$6,$7,$8,$9)', [
+  ids.stranger, 2026, 2027, 'retain', 'Retention approved after the academic review panel',
+  rolloverProfileSnapshots[ids.stranger].campus_id, rolloverProfileSnapshots[ids.stranger].class_level,
+  rolloverProfileSnapshots[ids.stranger].class_stream, rolloverProfileSnapshots[ids.stranger].enrollment_status,
+])
+await db.query('select save_year_rollover_placement($1,$2,$3,$4,null)', [ids.stream_student, 2026, 2027, formTwo])
+await db.query('select save_year_rollover_placement($1,$2,$3,$4,null)', [ids.stranger, 2026, 2027, formTwo])
+const readyRolloverBatch = (await db.query(
+  'select preview_year_rollover_batch($1,$2,$3,1,25) as result', [2026, 2027, campus],
+)).rows[0].result
+assert.equal(readyRolloverBatch.summary.ready_for_review, 4, 'application preflight sees a complete reviewed batch for every active learner')
+assert.equal(readyRolloverBatch.summary.capacity_exceeded, 0, 'application preflight blocks no destinations over configured capacity')
+assert.ok(readyRolloverBatch.summary.capacity_unknown > 0, 'application preflight records destinations with unknown capacity')
+const protectedRolloverHistory = {}
+for (const learnerId of Object.keys(rolloverProfileSnapshots)) {
+  protectedRolloverHistory[learnerId] = (await db.query(
+    `select
+      (select count(*)::integer from learner_records where student_id=$1) as records,
+      (select count(*)::integer from fee_records where student_id=$1) as fees,
+      (select count(*)::integer from student_guardians where student_id=$1) as guardians`, [learnerId],
+  )).rows[0]
+}
+const preflightProfileSnapshot = (await db.query(
+  'select id, full_name, admission_number, campus_id, class_level, class_stream, enrollment_status from profiles where id=$1', [ids.student],
+)).rows[0]
+await rolloverRejectsInSavepoint(
+  () => db.query('select apply_year_rollover_batch($1,$2,$3,$4,$5,$6)', [2026, 2027, campus, 3, 'APPLY YEAR ROLLOVER 2026 TO 2027', true]),
+  /Active roster changed since preview/,
+)
+await rolloverRejectsInSavepoint(
+  () => db.query('select apply_year_rollover_batch($1,$2,$3,$4,$5,$6)', [2026, 2027, campus, 4, 'wrong confirmation', true]),
+  /exact rollover confirmation/,
+)
+await rolloverRejectsInSavepoint(
+  () => db.query('select apply_year_rollover_batch($1,$2,$3,$4,$5,$6)', [2026, 2027, campus, 4, 'APPLY YEAR ROLLOVER 2026 TO 2027', false]),
+  /capacity is unset/,
+)
+assert.deepEqual((await db.query(
+  'select id, full_name, admission_number, campus_id, class_level, class_stream, enrollment_status from profiles where id=$1', [ids.student],
+)).rows[0], preflightProfileSnapshot, 'failed rollover preflight leaves learner placement and enrolment unchanged')
+await as('teacher')
+await rolloverRejectsInSavepoint(
+  () => db.query('select apply_year_rollover_batch($1,$2,$3,$4,$5,$6)', [2026, 2027, campus, 4, 'APPLY YEAR ROLLOVER 2026 TO 2027', true]),
+  /Main administrator access required/,
+)
+await as('admin')
+const appliedRollover = (await db.query(
+  'select apply_year_rollover_batch($1,$2,$3,$4,$5,$6) as result',
+  [2026, 2027, campus, 4, 'APPLY YEAR ROLLOVER 2026 TO 2027', true],
+)).rows[0].result
+assert.equal(appliedRollover.already_applied, false, 'the first successful execution creates the batch')
+assert.equal(appliedRollover.learner_count, 4, 'one transaction applies every active learner in the campus roster')
+assert.deepEqual(appliedRollover.decision_counts, { promote: 1, retain: 1, transfer: 1, complete: 1 }, 'the batch reports each applied decision type')
+assert.ok(appliedRollover.capacity_unknown_count > 0, 'the run records explicitly acknowledged unknown capacity')
+const afterRolloverProfiles = (await db.query(
+  'select id, full_name, admission_number, campus_id, class_level, class_stream, enrollment_status from profiles where id=any($1::uuid[]) order by id',
+  [Object.keys(rolloverProfileSnapshots)],
+)).rows
+assert.equal(afterRolloverProfiles.find(row => row.id === ids.student).enrollment_status, 'transferred', 'Transfer changes only enrolment status')
+assert.equal(afterRolloverProfiles.find(row => row.id === ids.other_student).enrollment_status, 'graduated', 'Complete records the terminal learner status')
+assert.equal(afterRolloverProfiles.find(row => row.id === ids.stream_student).class_level, 'Form 2', 'Promote applies only the configured destination class')
+assert.equal(afterRolloverProfiles.find(row => row.id === ids.stranger).class_level, 'Form 2', 'Retain applies its explicitly reviewed placement')
+for (const learnerId of Object.keys(rolloverProfileSnapshots)) {
+  const after = afterRolloverProfiles.find(row => row.id === learnerId)
+  assert.equal(after.id, rolloverProfileSnapshots[learnerId].id, 'rollover preserves learner identity')
+  assert.equal(after.full_name, rolloverProfileSnapshots[learnerId].full_name, 'rollover preserves the learner name')
+  assert.equal(after.admission_number, rolloverProfileSnapshots[learnerId].admission_number, 'rollover preserves admission number')
+  assert.deepEqual((await db.query(
+    `select
+      (select count(*)::integer from learner_records where student_id=$1) as records,
+      (select count(*)::integer from fee_records where student_id=$1) as fees,
+      (select count(*)::integer from student_guardians where student_id=$1) as guardians`, [learnerId],
+  )).rows[0], protectedRolloverHistory[learnerId], 'rollover preserves linked marks/records, fee history and guardian links')
+}
+assert.equal((await db.query(
+  "select count(*)::integer as count from audit_trail where entity_type='year_rollover' and action='applied'",
+)).rows[0].count, 4, 'each changed learner has an audit event')
+assert.equal((await db.query(
+  "select count(*)::integer as count from audit_trail where entity_type='year_rollover_batch' and action='applied'",
+)).rows[0].count, 1, 'the batch has a single summary audit event')
+await db.exec('reset role')
+await rolloverRejectsInSavepoint(
+  () => db.query('update year_rollover_decisions set reason=reason || $2 where learner_id=$1', [ids.student, ' amended']),
+  /decision was applied and is locked/,
+)
+await db.exec('set role authenticated')
+const statusAfterRollover = (await db.query(
+  'select year_rollover_batch_run_status($1,$2,$3) as result', [2026, 2027, campus],
+)).rows[0].result
+assert.equal(statusAfterRollover.status, 'applied', 'the applied batch can be verified by cycle and campus')
+const repeatedRollover = (await db.query(
+  'select apply_year_rollover_batch($1,$2,$3,$4,$5,$6) as result',
+  [2026, 2027, campus, 4, 'APPLY YEAR ROLLOVER 2026 TO 2027', true],
+)).rows[0].result
+assert.equal(repeatedRollover.already_applied, true, 'repeating the same cycle returns the existing run without reprocessing learners')
+assert.equal((await db.query(
+  "select count(*)::integer as count from audit_trail where entity_type='year_rollover_batch' and action='applied'",
+)).rows[0].count, 1, 'an idempotent retry does not add duplicate batch audit events')
+await db.exec('rollback')
 await db.query('select admin_update_profile($1,$2,$3,$4,$5,$6,$7)', [ids.stream_teacher, 'Stream Teacher', campus, null, null, null, null])
 await db.query('select admin_update_profile($1,$2,$3,$4,$5,$6,$7)', [ids.subject_teacher, 'Subject Teacher', campus, null, null, null, null])
 await db.query(

@@ -96,6 +96,7 @@ async function pageFor(
     campus: null,
   })))
   let rolloverDecisions = []
+  let rolloverAppliedRun = null
   const reportRecords = [
     { id: 'senior-mark', student_id: student.id, title: 'Term assessment', subject: 'Mathematics', assessment_type: 'markbook', score: 74, max_score: 100, event_date: '2026-01-15', academic_year: 2026, academic_term: 'Term 1', student },
     { id: 'senior-coursework', student_id: student.id, title: 'Course Work', subject: 'Mathematics', assessment_type: 'coursework', score: 100, max_score: 100, event_date: '2026-01-14', academic_year: 2026, academic_term: 'Term 1', student },
@@ -212,6 +213,14 @@ async function pageFor(
         total_count: 1, page: body.p_page, page_size: 25, total_pages: 1,
         summary: { active_learners: 1, decisions_recorded: saved ? 1 : 0, needs_decision: saved ? 0 : 1, placements_missing: saved && !hasPlacement ? 1 : 0, stale_roster: 0, destinations_unavailable: 0, ready_for_review: saved && (hasPlacement || ['transfer', 'complete'].includes(saved.decision)) ? 1 : 0, capacity_exceeded: 0, capacity_unknown: 0 },
       })
+    }
+    if (path.endsWith('/rpc/year_rollover_batch_run_status')) return send(rolloverAppliedRun)
+    if (path.endsWith('/rpc/apply_year_rollover_batch')) {
+      rolloverAppliedRun = {
+        id: 'rollover-run-1', status: 'applied', learner_count: body.p_expected_learner_count,
+        applied_by_name: 'Main Admin', applied_at: '2026-10-29T12:30:00.000Z',
+      }
+      return send({ already_applied: false, batch_run_id: 'rollover-run-1', learner_count: 1, applied_at: rolloverAppliedRun.applied_at })
     }
     if (path.endsWith('/rpc/save_year_rollover_decision')) {
       rolloverDecisions = rolloverDecisions.filter(item => item.learner_id !== body.p_learner_id)
@@ -846,6 +855,26 @@ try {
     p_expected_class_level: 'Form 1',
     p_expected_class_stream: null,
     p_expected_enrollment_status: 'active',
+  })
+  await page.getByLabel('Campus').selectOption('campus')
+  await page.getByRole('button', { name: 'Preview roster' }).click()
+  const applyButton = page.getByRole('button', { name: 'Apply reviewed rollover' })
+  await applyButton.waitFor()
+  assert.equal(await applyButton.isDisabled(), true, 'rollover application remains disabled until the exact confirmation is entered')
+  await page.getByLabel(/Type APPLY YEAR ROLLOVER 2026 TO 2027 to confirm/).fill('APPLY YEAR ROLLOVER 2026 TO 2027')
+  assert.equal(await applyButton.isDisabled(), false, 'a fully reviewed campus batch can be applied after explicit confirmation')
+  await applyButton.click()
+  await page.getByRole('status').filter({ hasText: 'Year rollover applied' }).waitFor()
+  assert.equal(await page.getByRole('button', { name: 'Apply reviewed rollover' }).count(), 0,
+    'the completed batch no longer offers a second apply action')
+  const appliedRolloverWrite = writes.find(write => write.path.endsWith('/rpc/apply_year_rollover_batch'))
+  assert.deepEqual(appliedRolloverWrite.body, {
+    p_source_academic_year: 2026,
+    p_destination_academic_year: 2027,
+    p_campus_id: 'campus',
+    p_expected_learner_count: 1,
+    p_confirmation: 'APPLY YEAR ROLLOVER 2026 TO 2027',
+    p_accept_unknown_capacity: false,
   })
   await page.getByRole('heading', { name: 'Destination capacity preview' }).waitFor()
   await page.getByLabel('Destination class', { exact: true }).selectOption('class-form-1')
