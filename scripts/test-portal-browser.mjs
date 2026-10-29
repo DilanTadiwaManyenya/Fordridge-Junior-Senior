@@ -95,6 +95,7 @@ async function pageFor(
     updated_at: '2026-10-29T10:00:00.000Z',
     campus: null,
   })))
+  let rolloverDecisions = []
   const reportRecords = [
     { id: 'senior-mark', student_id: student.id, title: 'Term assessment', subject: 'Mathematics', assessment_type: 'markbook', score: 74, max_score: 100, event_date: '2026-01-15', academic_year: 2026, academic_term: 'Term 1', student },
     { id: 'senior-coursework', student_id: student.id, title: 'Course Work', subject: 'Mathematics', assessment_type: 'coursework', score: 100, max_score: 100, event_date: '2026-01-14', academic_year: 2026, academic_term: 'Term 1', student },
@@ -190,6 +191,23 @@ async function pageFor(
           { id: 'stream-b', stream_name: 'B', capacity: null, current_count: 1 },
         ],
       }])
+    if (path.endsWith('/rpc/preview_year_rollover_decisions'))
+      return send(rolloverDecisions.filter(item => body.p_learner_ids.includes(item.learner_id)))
+    if (path.endsWith('/rpc/save_year_rollover_decision')) {
+      rolloverDecisions = rolloverDecisions.filter(item => item.learner_id !== body.p_learner_id)
+      rolloverDecisions.push({
+        learner_id: body.p_learner_id,
+        decision: body.p_decision,
+        reason: body.p_reason,
+        reviewer_name: 'Main Admin',
+        reviewed_at: '2026-10-29T12:00:00.000Z',
+        current_campus_id: body.p_expected_campus_id,
+        current_class_level: body.p_expected_class_level,
+        current_class_stream: body.p_expected_class_stream,
+        current_enrollment_status: body.p_expected_enrollment_status,
+      })
+      return send({ learner_id: body.p_learner_id, decision: body.p_decision, reviewed_at: '2026-10-29T12:00:00.000Z' })
+    }
     if (path.endsWith('/audit_trail')) {
       activityAttempts += 1
       if (!activityCanSucceed)
@@ -765,6 +783,25 @@ try {
   await page.getByText('Learner Needs Review', { exact: true }).waitFor()
   await page.getByText('Campus is not recorded.', { exact: false }).waitFor()
   await page.getByText('This preview does not change learner profiles, promote learners, or assign streams.', { exact: false }).waitFor()
+  await page.getByLabel('Decision source academic year').fill('2026')
+  await page.getByLabel('Decision destination academic year').fill('2027')
+  await page.getByLabel('Decision for Ready Learner').selectOption('promote')
+  await page.getByLabel('Decision reason for Ready Learner').fill('Progression confirmed by school review')
+  await page.getByRole('row', { name: /Ready Learner R001/ }).getByRole('button', { name: 'Save decision' }).click()
+  await page.getByRole('status').filter({ hasText: 'Decision recorded for Ready Learner' }).waitFor()
+  await page.getByText('Saved promote · Main Admin', { exact: false }).waitFor()
+  const savedRolloverDecision = writes.filter(write => write.path.endsWith('/rpc/save_year_rollover_decision')).at(-1)
+  assert.deepEqual(savedRolloverDecision.body, {
+    p_learner_id: 'rollover-active',
+    p_source_academic_year: 2026,
+    p_destination_academic_year: 2027,
+    p_decision: 'promote',
+    p_reason: 'Progression confirmed by school review',
+    p_expected_campus_id: 'campus',
+    p_expected_class_level: 'Form 1',
+    p_expected_class_stream: null,
+    p_expected_enrollment_status: 'active',
+  })
   await page.getByRole('heading', { name: 'Destination capacity preview' }).waitFor()
   await page.getByLabel('Destination class').selectOption('class-form-1')
   await page.getByLabel('Destination stream').selectOption('stream-a')
@@ -916,7 +953,7 @@ try {
   await parent.waitForURL('http://127.0.0.1:5179/portal')
   assert.deepEqual(errors, [])
   console.log(
-    'PASS: profile editing, account creation, Reliance grade-band boundary preview and audited scale save, read-only rollover readiness and review reasons, destination capacity what-if/unknown-capacity/unmatched-stream preview, report readiness and release attribution, report integrity verified/mismatch/not-found flows, historical release-time learner/class/stream/campus identity and legacy-context disclosure, Junior/Senior/Sixth Form report variants, A4 print context/title/width and hidden portal controls, coursework exclusion from averages, reporting-period registration and reviewed close, publishing, records, timetable, payment retry, teacher sign-in and Coursework access, parent route guards, linked-account directory/search, credential-free audited recovery guidance, mobile layout; no uncaught browser errors. All backend requests were mocked.',
+    'PASS: profile editing, account creation, Reliance grade-band boundary preview and audited scale save, read-only rollover readiness and review reasons, reviewed per-learner promote/retain/transfer/complete decision save, destination capacity what-if/unknown-capacity/unmatched-stream preview, report readiness and release attribution, report integrity verified/mismatch/not-found flows, historical release-time learner/class/stream/campus identity and legacy-context disclosure, Junior/Senior/Sixth Form report variants, A4 print context/title/width and hidden portal controls, coursework exclusion from averages, reporting-period registration and reviewed close, publishing, records, timetable, payment retry, teacher sign-in and Coursework access, parent route guards, linked-account directory/search, credential-free audited recovery guidance, mobile layout; no uncaught browser errors. All backend requests were mocked.',
   )
 } catch (error) {
   const p = browser.contexts()[0]?.pages()[0]

@@ -570,6 +570,52 @@ await rejects(
 await as('admin')
 assert.equal((await db.query("select has_function_privilege('anon','public.preview_year_rollover_destinations(uuid)','EXECUTE') as allowed")).rows[0].allowed,
   false, 'anonymous callers cannot access rollover destination counts')
+const decisionProfileBefore = (await db.query(
+  'select id, campus_id, class_level, class_stream, enrollment_status from profiles where id=$1', [ids.student],
+)).rows[0]
+await db.query('select save_year_rollover_decision($1,$2,$3,$4,$5,$6,$7,$8,$9)', [
+  ids.student, 2026, 2027, 'promote', 'Progression approved after staff review',
+  decisionProfileBefore.campus_id, decisionProfileBefore.class_level, decisionProfileBefore.class_stream, decisionProfileBefore.enrollment_status,
+])
+const savedDecisions = (await db.query(
+  'select preview_year_rollover_decisions($1,$2,$3) as result', [[ids.student], 2026, 2027],
+)).rows[0].result
+assert.equal(savedDecisions.length, 1, 'reviewed rollover decision is listed for its explicit academic-year cycle')
+assert.equal(savedDecisions[0].decision, 'promote', 'decision preview returns the recorded per-learner outcome')
+assert.equal(savedDecisions[0].current_class_stream, decisionProfileBefore.class_stream,
+  'reviewed decision preserves the current unallocated stream snapshot')
+assert.deepEqual((await db.query(
+  'select id, campus_id, class_level, class_stream, enrollment_status from profiles where id=$1', [ids.student],
+)).rows[0], decisionProfileBefore, 'recording a rollover decision does not change learner placement or enrolment')
+await db.query('select save_year_rollover_decision($1,$2,$3,$4,$5,$6,$7,$8,$9)', [
+  ids.student, 2026, 2027, 'retain', 'Decision amended after moderation review',
+  decisionProfileBefore.campus_id, decisionProfileBefore.class_level, decisionProfileBefore.class_stream, decisionProfileBefore.enrollment_status,
+])
+assert.equal((await db.query(
+  'select preview_year_rollover_decisions($1,$2,$3) as result', [[ids.student], 2026, 2027],
+)).rows[0].result[0].decision, 'retain', 'reviewed decision may be amended in place for the same cycle')
+assert.equal((await db.query("select count(*)::integer as count from audit_trail where entity_type='year_rollover_decision' and entity_id=$1", [ids.student])).rows[0].count,
+  2, 'recording and amending a decision produce separate audit entries')
+await rejects(
+  () => db.query('select save_year_rollover_decision($1,$2,$3,$4,$5,$6,$7,$8,$9)', [
+    ids.student, 2026, 2027, 'promote', 'Stale profile should be rejected', campus, 'Old Class', null, 'active',
+  ]),
+  /Learner roster changed since review/,
+)
+await as('teacher')
+assert.equal((await db.query('select count(*)::integer as count from year_rollover_decisions')).rows[0].count,
+  0, 'teachers cannot read reviewed rollover decisions through direct table access')
+await rejects(
+  () => db.query('select preview_year_rollover_decisions($1,$2,$3)', [[ids.student], 2026, 2027]),
+  /Main administrator access required/,
+)
+await as('admin')
+await rejects(
+  () => db.query('select preview_year_rollover_decisions($1,$2,$3)', [[ids.student], 2027, 2027]),
+  /valid source and later destination academic year/,
+)
+assert.equal((await db.query("select has_function_privilege('anon','public.save_year_rollover_decision(uuid,integer,integer,text,text,uuid,text,text,text)','EXECUTE') as allowed")).rows[0].allowed,
+  false, 'anonymous callers cannot record rollover decisions')
 await db.query('select admin_update_profile($1,$2,$3,$4,$5,$6,$7)', [ids.stream_teacher, 'Stream Teacher', campus, null, null, null, null])
 await db.query('select admin_update_profile($1,$2,$3,$4,$5,$6,$7)', [ids.subject_teacher, 'Subject Teacher', campus, null, null, null, null])
 await db.query(

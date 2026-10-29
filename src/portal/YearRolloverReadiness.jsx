@@ -27,6 +27,12 @@ export default function YearRolloverReadiness() {
   const [destinationClassId, setDestinationClassId] = useState('')
   const [destinationStreamId, setDestinationStreamId] = useState('')
   const [proposedCount, setProposedCount] = useState('0')
+  const [decisionYears, setDecisionYears] = useState({ source: '', destination: '' })
+  const [decisions, setDecisions] = useState({})
+  const [decisionDrafts, setDecisionDrafts] = useState({})
+  const [savingDecision, setSavingDecision] = useState('')
+  const [decisionError, setDecisionError] = useState('')
+  const [decisionNotice, setDecisionNotice] = useState('')
   const [page, setPage] = useState(1)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -71,11 +77,69 @@ export default function YearRolloverReadiness() {
 
   useEffect(() => { loadPreview() }, [loadPreview])
   useEffect(() => { loadDestinations() }, [loadDestinations])
+  useEffect(() => {
+    const sourceYear = Number(decisionYears.source)
+    const destinationYear = Number(decisionYears.destination)
+    const learnerIds = (preview?.rows || []).map(row => row.id)
+    if (!Number.isInteger(sourceYear) || sourceYear < 2000 || !Number.isInteger(destinationYear) || destinationYear <= sourceYear || !learnerIds.length) {
+      setDecisions({})
+      return
+    }
+    let mounted = true
+    supabase.rpc('preview_year_rollover_decisions', {
+      p_learner_ids: learnerIds,
+      p_source_academic_year: sourceYear,
+      p_destination_academic_year: destinationYear,
+    }).then(({ data, error: queryError }) => {
+      if (!mounted) return
+      if (queryError) setDecisionError(workflowError(queryError))
+      else {
+        setDecisionError('')
+        setDecisions(Object.fromEntries((Array.isArray(data) ? data : []).map(item => [item.learner_id, item])))
+      }
+    })
+    return () => { mounted = false }
+  }, [preview?.rows, decisionYears])
 
   function applyFilters(event) {
     event.preventDefault()
     setPage(1)
     setFilters({ ...draft, search: draft.search.trim() })
+  }
+
+  async function saveDecision(row) {
+    const draft = decisionDrafts[row.id] || {}
+    const sourceYear = Number(decisionYears.source)
+    const destinationYear = Number(decisionYears.destination)
+    if (!Number.isInteger(sourceYear) || sourceYear < 2000 || !Number.isInteger(destinationYear) || destinationYear <= sourceYear) {
+      setDecisionError('Enter a valid source year and a later destination year first.')
+      return
+    }
+    setSavingDecision(row.id)
+    setDecisionError('')
+    setDecisionNotice('')
+    const { error: saveError } = await supabase.rpc('save_year_rollover_decision', {
+      p_learner_id: row.id,
+      p_source_academic_year: sourceYear,
+      p_destination_academic_year: destinationYear,
+      p_decision: draft.decision || decisions[row.id]?.decision || '',
+      p_reason: draft.reason ?? decisions[row.id]?.reason ?? '',
+      p_expected_campus_id: row.campus_id,
+      p_expected_class_level: row.class_level,
+      p_expected_class_stream: row.class_stream,
+      p_expected_enrollment_status: row.enrollment_status,
+    })
+    setSavingDecision('')
+    if (saveError) {
+      setDecisionError(workflowError(saveError))
+      return
+    }
+    setDecisionNotice(`Decision recorded for ${row.full_name || 'learner'}. No learner profile or placement was changed.`)
+    const { data } = await supabase.rpc('preview_year_rollover_decisions', {
+      p_learner_ids: [row.id], p_source_academic_year: sourceYear, p_destination_academic_year: destinationYear,
+    })
+    if (Array.isArray(data) && data[0]) setDecisions(value => ({ ...value, [row.id]: data[0] }))
+    setDecisionDrafts(value => ({ ...value, [row.id]: undefined }))
   }
 
   const summary = preview?.summary || { ready_for_decision: 0, needs_review: 0, not_currently_active: 0 }
@@ -126,6 +190,19 @@ export default function YearRolloverReadiness() {
         </label>
         <button className="primary-action" disabled={loading}>Preview roster</button>
       </form>
+      <section className="workflow-panel rollover-cycle-panel">
+        <div className="workflow-form rollover-cycle-form">
+          <label>Decision source academic year
+            <input type="number" min="2000" step="1" value={decisionYears.source} onChange={event => { setDecisionYears(value => ({ ...value, source: event.target.value })); setDecisionDrafts({}); setDecisionNotice('') }} placeholder="Enter confirmed year" />
+          </label>
+          <label>Decision destination academic year
+            <input type="number" min="2000" step="1" value={decisionYears.destination} onChange={event => { setDecisionYears(value => ({ ...value, destination: event.target.value })); setDecisionDrafts({}); setDecisionNotice('') }} placeholder="Enter confirmed year" />
+          </label>
+          <p className="progress-report-note">Enter the school-confirmed years. Decisions are review records only; they do not promote learners, change enrolment, or assign classes or streams.</p>
+        </div>
+        {decisionError && <p className="workflow-error" role="alert">{decisionError}</p>}
+        {decisionNotice && <p className="workflow-success" role="status">{decisionNotice}</p>}
+      </section>
       <div className="rollover-readiness-summary" aria-label="Roster review summary">
         <article><span>Learners ready for review</span><strong>{summary.ready_for_decision}</strong></article>
         <article><span>Needs review</span><strong>{summary.needs_review}</strong></article>
@@ -138,7 +215,7 @@ export default function YearRolloverReadiness() {
         </header>
         {rows.length ? <div className="workflow-table-wrap">
           <table className="workflow-table">
-            <thead><tr><th>Learner</th><th>Current campus</th><th>Current class</th><th>Stream</th><th>Enrolment</th><th>Review status and reason</th></tr></thead>
+            <thead><tr><th>Learner</th><th>Current campus</th><th>Current class</th><th>Stream</th><th>Enrolment</th><th>Review status and reason</th><th>Reviewed decision</th></tr></thead>
             <tbody>{rows.map(row => <tr key={row.id}>
               <td><strong>{row.full_name || 'Name not recorded'}</strong><small>{row.admission_number || 'Admission number not recorded'}</small></td>
               <td>{row.campus_name || 'Campus not recorded'}</td>
@@ -146,6 +223,35 @@ export default function YearRolloverReadiness() {
               <td>{row.class_stream || 'Not set'}</td>
               <td>{row.enrollment_status || 'Not recorded'}</td>
               <td><span className={`rollover-status is-${row.readiness}`}>{readinessLabel(row.readiness)}</span><small>{row.review_reasons?.length ? row.review_reasons.join(' ') : 'Current roster details are present. Destination and promotion decisions are not part of this preview.'}</small></td>
+              <td><div className="rollover-decision-form">
+                <label>Decision for {row.full_name || 'learner'}
+                  <select
+                    aria-label={`Decision for ${row.full_name || 'learner'}`}
+                    value={decisionDrafts[row.id]?.decision ?? decisions[row.id]?.decision ?? ''}
+                    disabled={!decisionYears.source || !decisionYears.destination || row.readiness !== 'ready_for_decision' || row.enrollment_status !== 'active'}
+                    onChange={event => setDecisionDrafts(value => ({ ...value, [row.id]: { ...value[row.id], decision: event.target.value } }))}
+                  >
+                    <option value="">Choose decision</option>
+                    <option value="promote">Promote</option>
+                    <option value="retain">Retain</option>
+                    <option value="transfer">Transfer</option>
+                    <option value="complete">Complete</option>
+                  </select>
+                </label>
+                <label>Reason
+                  <textarea
+                    aria-label={`Decision reason for ${row.full_name || 'learner'}`}
+                    minLength={10}
+                    maxLength={500}
+                    value={decisionDrafts[row.id]?.reason ?? decisions[row.id]?.reason ?? ''}
+                    disabled={!decisionYears.source || !decisionYears.destination || row.readiness !== 'ready_for_decision' || row.enrollment_status !== 'active'}
+                    onChange={event => setDecisionDrafts(value => ({ ...value, [row.id]: { ...value[row.id], reason: event.target.value } }))}
+                    placeholder="At least 10 characters"
+                  />
+                </label>
+                {decisions[row.id] && <small>Saved {decisions[row.id].decision} · {decisions[row.id].reviewer_name} · {new Date(decisions[row.id].reviewed_at).toLocaleDateString()}</small>}
+                <button type="button" className="secondary-action" disabled={savingDecision === row.id || !decisionYears.source || !decisionYears.destination || row.readiness !== 'ready_for_decision' || row.enrollment_status !== 'active' || !(decisionDrafts[row.id]?.decision ?? decisions[row.id]?.decision) || (decisionDrafts[row.id]?.reason ?? decisions[row.id]?.reason ?? '').trim().length < 10} onClick={() => saveDecision(row)}>{savingDecision === row.id ? 'Saving…' : decisions[row.id] ? 'Update decision' : 'Save decision'}</button>
+              </div></td>
             </tr>)}</tbody>
           </table>
         </div> : !loading && <p className="portal-empty-copy">No learners match these filters.</p>}
