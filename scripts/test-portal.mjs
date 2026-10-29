@@ -5,6 +5,7 @@ import { canEnterPortal, withPortalTimeout } from '../src/portal/workflow.js'
 import { buildTeacherClassScopes, canOpenTeacherMyClass } from '../src/portal/teacher-workspace.js'
 import { canReviewIncomeExpenses, getFinanceNavigation } from '../src/portal/navigation.js'
 import { referenceBandsFor } from '../src/portal/grade-band-rules.js'
+import { learningFileDetails, matchesLearningFileReservation, needsAbandonedUploadReview } from '../src/portal/learning-library-file-workflow.js'
 import {
   buildIncomeExpenseCsv,
   buildIncomeExpenseEntries,
@@ -81,6 +82,26 @@ assert.match(buildIncomeExpenseCsv(financeEntries), /"'=1\+1"/, 'CSV protects le
 assert.equal(canOpenTeacherMyClass('teacher', true), true)
 assert.equal(canOpenTeacherMyClass('teacher', false), false)
 assert.equal(canOpenTeacherMyClass('admin', true), false)
+
+assert.deepEqual(learningFileDetails({ name: 'lesson.pdf', size: 1024, type: 'application/pdf' }), {
+  extension: 'pdf', mimeType: 'application/pdf',
+}, 'learning-library upload validation accepts the approved PDF type')
+assert.throws(() => learningFileDetails({ name: 'lesson.svg', size: 1024, type: 'image/svg+xml' }), /up to 10 MiB/,
+  'unsupported file formats are rejected before a reservation is created')
+assert.throws(() => learningFileDetails({ name: 'lesson.pdf', size: 1024, type: 'image/png' }), /do not match/,
+  'a filename and browser MIME mismatch cannot resume a saved reservation')
+const learningReservation = {
+  original_name: 'lesson.pdf', size_bytes: 1024, extension: 'pdf', mime_type: 'application/pdf',
+}
+assert.equal(matchesLearningFileReservation({ name: 'lesson.pdf', size: 1024, type: 'application/pdf' }, learningReservation), true)
+assert.equal(matchesLearningFileReservation({ name: 'other.pdf', size: 1024, type: 'application/pdf' }, learningReservation), false,
+  'resume requires the saved filename, size, and type')
+const reviewClock = Date.parse('2026-10-29T00:00:00Z')
+assert.equal(needsAbandonedUploadReview({ ready: false, created_at: '2026-10-22T00:00:00Z' }, reviewClock), true,
+  'an incomplete reservation enters the review queue at seven days without automatic deletion')
+assert.equal(needsAbandonedUploadReview({ ready: false, created_at: '2026-10-28T00:00:00Z' }, reviewClock), false)
+assert.equal(needsAbandonedUploadReview({ ready: true, created_at: '2026-10-01T00:00:00Z' }, reviewClock), false,
+  'finalized files are never treated as abandoned upload reservations')
 
 const teacherLearners = [
   { id: 'one', campus_id: 'junior', class_level: 'Form 1', class_stream: 'A', full_name: 'A Learner' },

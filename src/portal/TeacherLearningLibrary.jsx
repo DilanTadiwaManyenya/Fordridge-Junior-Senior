@@ -1,32 +1,9 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { workflowError } from './workflow'
+import { learningFileDetails, matchesLearningFileReservation, needsAbandonedUploadReview } from './learning-library-file-workflow'
 import './workflow.css'
 import './teacher-learning-library.css'
-
-const FILE_TYPES = {
-  pdf: 'application/pdf',
-  doc: 'application/msword',
-  docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-  ppt: 'application/vnd.ms-powerpoint',
-  pptx: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
-  jpg: 'image/jpeg',
-  jpeg: 'image/jpeg',
-  png: 'image/png',
-  webp: 'image/webp',
-}
-const MAX_FILE_SIZE = 10 * 1024 * 1024
-
-function fileDetails(file) {
-  const extension = file.name.split('.').pop()?.toLowerCase() || ''
-  const mimeType = FILE_TYPES[extension]
-  if (!mimeType || file.size < 1 || file.size > MAX_FILE_SIZE)
-    throw new Error('Choose a PDF, Word, PowerPoint, JPEG, PNG, or WebP file up to 10 MiB.')
-  if (file.type && file.type !== mimeType)
-    throw new Error('The file name and file format do not match an allowed type.')
-  if (file.name.length > 240) throw new Error('File names must be 240 characters or fewer.')
-  return { extension, mimeType }
-}
 
 function scopeLabel(row) {
   return `${row.class_level}${row.class_stream ? ` · ${row.class_stream}` : ' · all streams'} · ${row.subject}`
@@ -62,21 +39,17 @@ export default function TeacherLearningLibrary({ profile }) {
       setDraft((value) => valid.some((row) => row.id === value.allocationId)
         ? value
         : { ...value, allocationId: valid[0]?.id || '' })
-      if (!valid.length) {
-        setPeriod(null)
-        setResources([])
-        setFiles([])
-        return
-      }
-      const [{ data: currentPeriod, error: periodError }, { data: ownResources, error: resourceError }] = await Promise.all([
-        supabase.rpc('teacher_learning_current_period', { p_campus_id: profile.campus_id }),
+      const [periodResult, resourceResult] = await Promise.all([
+        valid.length
+          ? supabase.rpc('teacher_learning_current_period', { p_campus_id: profile.campus_id })
+          : Promise.resolve({ data: null, error: null }),
         supabase.from('learning_resources').select('*').eq('teacher_id', profile.id).eq('campus_id', profile.campus_id).order('created_at', { ascending: false }),
       ])
-      if (periodError) throw periodError
-      if (resourceError) throw resourceError
-      setPeriod(currentPeriod)
-      setResources(ownResources || [])
-      const resourceIds = (ownResources || []).map((row) => row.id)
+      if (periodResult.error) throw periodResult.error
+      if (resourceResult.error) throw resourceResult.error
+      setPeriod(periodResult.data)
+      setResources(resourceResult.data || [])
+      const resourceIds = (resourceResult.data || []).map((row) => row.id)
       if (resourceIds.length) {
         const { data: fileRows, error: fileError } = await supabase
           .from('learning_resource_files').select('*').in('resource_id', resourceIds).order('created_at', { ascending: false })
@@ -96,6 +69,11 @@ export default function TeacherLearningLibrary({ profile }) {
   const fileByResource = useMemo(() => {
     const map = new Map()
     for (const file of files) if (file.active && file.ready) map.set(file.resource_id, file)
+    return map
+  }, [files])
+  const filesByResource = useMemo(() => {
+    const map = new Map()
+    for (const file of files) map.set(file.resource_id, [...(map.get(file.resource_id) || []), file])
     return map
   }, [files])
 
@@ -129,10 +107,21 @@ export default function TeacherLearningLibrary({ profile }) {
   async function startUpload(resource, file) {
     setError(''); setNotice('')
     try {
-      const { extension, mimeType } = fileDetails(file)
+      const { extension, mimeType } = learningFileDetails(file)
       setPending({ resourceId: resource.id, file, extension, mimeType, requestId: crypto.randomUUID() })
-      setNotice('File selected. Upload it to this draft when ready.')
+      setNotice('File selected. Upload it to this draft; a finalized replacement becomes active only after verification.')
     } catch (cause) { setError(cause.message) }
+  }
+
+  function resumeUpload(resource, reservation, file) {
+    setError(''); setNotice('')
+    if (!matchesLearningFileReservation(file, reservation)) {
+      setError('Choose the same file name, size, and format as the saved reservation. The existing file was left unchanged.')
+      return
+    }
+    const { extension, mimeType } = learningFileDetails(file)
+    setPending({ resourceId: resource.id, file, extension, mimeType, requestId: reservation.request_id })
+    setNotice('Saved reservation selected. Resume it to verify the uploaded file or safely retry the upload.')
   }
 
   async function uploadPending() {
@@ -237,19 +226,30 @@ export default function TeacherLearningLibrary({ profile }) {
         <div className="workflow-scroll teacher-learning-list">
           {resources.length ? resources.map((resource) => {
             const activeFile = fileByResource.get(resource.id)
+            const resourceFiles = filesByResource.get(resource.id) || []
+            const incompleteFiles = resourceFiles.filter((file) => !file.ready)
+            const replacedFiles = resourceFiles.filter((file) => file.ready && !file.active)
             const allocation = allocationMap.get(resource.allocation_id)
             return <article className="teacher-learning-card" key={resource.id}>
               <div className="teacher-learning-card-heading"><div><span className={`teacher-learning-state state-${resource.state}`}>{resource.state}</span>
                 <h2>{resource.title}</h2><p>{resource.class_level}{resource.class_stream ? ` · ${resource.class_stream}` : ' · all streams'} · {resource.subject} · {resource.academic_year} · {resource.academic_term}</p></div></div>
               {resource.description && <p className="teacher-learning-description">{resource.description}</p>}
               {activeFile ? <div className="teacher-learning-file"><span>Attached: {activeFile.original_name} · {(activeFile.size_bytes / 1024 / 1024).toFixed(2)} MiB</span><button type="button" onClick={() => openFile(activeFile)}>Open private file</button></div> : <p className="teacher-learning-file">No finalized file attached yet.</p>}
+              {replacedFiles.length > 0 && <details className="teacher-learning-history"><summary>Previous finalized files ({replacedFiles.length})</summary>{replacedFiles.map((file) => <p key={file.id}>{file.original_name} · replaced {new Date(file.created_at).toLocaleDateString()}</p>)}</details>}
               {resource.state === 'draft' && <div className="workflow-actions teacher-learning-card-actions">
                 <button type="button" onClick={() => editResource(resource)} disabled={saving || !allocation || !period}>Edit draft</button>
-                {!activeFile && <label className="teacher-learning-file-picker" id={`learning-file-${resource.id}`}>Choose file
+                <label className="teacher-learning-file-picker" id={`learning-file-${resource.id}`}>{activeFile ? 'Choose replacement file' : 'Choose file'}
                   <input type="file" accept=".pdf,.doc,.docx,.ppt,.pptx,.jpg,.jpeg,.png,.webp" onChange={(event) => event.target.files?.[0] && startUpload(resource, event.target.files[0])} disabled={saving || !allocation || !period} />
-                </label>}
-                {pending?.resourceId === resource.id && <button type="button" onClick={uploadPending} disabled={saving}>{saving ? 'Uploading…' : `Upload ${pending.file.name}`}</button>}
-                <button type="button" onClick={() => changeState(resource, 'published')} disabled={saving || !allocation || !period || !activeFile}>Publish</button>
+                </label>
+                {incompleteFiles.map((file) => <div className="teacher-learning-reservation" key={file.id}>
+                  <p>Incomplete upload: <strong>{file.original_name}</strong> · reserved {new Date(file.created_at).toLocaleDateString()}</p>
+                  {needsAbandonedUploadReview(file) && <small>This reservation is over 7 days old and needs review. It is retained; the system will not delete it automatically.</small>}
+                  <label className="teacher-learning-file-picker">Choose same file to resume
+                    <input type="file" accept=".pdf,.doc,.docx,.ppt,.pptx,.jpg,.jpeg,.png,.webp" onChange={(event) => event.target.files?.[0] && resumeUpload(resource, file, event.target.files[0])} disabled={saving || !allocation || !period} />
+                  </label>
+                </div>)}
+                {pending?.resourceId === resource.id && <button type="button" onClick={uploadPending} disabled={saving || !allocation || !period}>{saving ? 'Uploading…' : `Upload ${pending.file.name}`}</button>}
+                <button type="button" onClick={() => changeState(resource, 'published')} disabled={saving || !allocation || !period || !activeFile || pending?.resourceId === resource.id}>Publish</button>
                 <button type="button" onClick={() => changeState(resource, 'archived')} disabled={saving}>Archive</button>
               </div>}
               {resource.state === 'published' && <div className="workflow-actions teacher-learning-card-actions"><button type="button" onClick={() => changeState(resource, 'archived')} disabled={saving}>Archive</button></div>}
