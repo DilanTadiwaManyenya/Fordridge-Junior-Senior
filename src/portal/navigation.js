@@ -7,6 +7,12 @@ const financeItems = [
   },
   {
     roles: ['admin'],
+    to: '/portal/income-expenses',
+    label: 'Income & expenses',
+    icon: '↕',
+  },
+  {
+    roles: ['admin'],
     to: '/portal/cashbook',
     label: 'Expenses & Cashbook',
     icon: '¤',
@@ -26,4 +32,8 @@ export function getFinanceNavigation(role) {
       .filter((item) => item.roles.includes(role))
       .map(({ roles: _roles, ...item }) => item),
   }
+}
+
+export function canReviewIncomeExpenses(role) {
+  return role === 'admin'
 }

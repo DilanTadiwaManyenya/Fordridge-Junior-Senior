@@ -9,6 +9,7 @@ import {
 import crest from '../assets/fordridge-crest.jpeg'
 import { isSupabaseConfigured, supabase } from '../lib/supabase'
 import FeesDashboard from './FeesDashboard'
+import IncomeExpenses from './IncomeExpenses'
 import AdminOverview from './AdminOverview'
 import Directory from './Directory'
 import ClassCatalogue from './ClassCatalogue'
@@ -43,7 +44,7 @@ import ReportingPeriods from './ReportingPeriods'
 import YearRolloverReadiness from './YearRolloverReadiness'
 import { withPortalTimeout, workflowError } from './workflow'
 import { canOpenTeacherMyClass } from './teacher-workspace'
-import { getFinanceNavigation } from './navigation'
+import { canReviewIncomeExpenses, getFinanceNavigation } from './navigation'
 import './workflow.css'
 
 export default function PortalDashboard() {
@@ -223,6 +224,7 @@ export default function PortalDashboard() {
   if (
     (['learners', 'staff', 'classes'].includes(view) && !admin) ||
     (view === 'parent-accounts' && !admin) ||
+    (view === 'income-expenses' && !canReviewIncomeExpenses(profile.role)) ||
     (view === 'fees' && !fees) ||
     (view === 'records' && !records) ||
     (view === 'reports' && !reports) ||
@@ -255,6 +257,7 @@ export default function PortalDashboard() {
       'parent-accounts',
       'classes',
       'fees',
+      'income-expenses',
       'records',
       'reports',
       'attendance',
@@ -471,6 +474,8 @@ export default function PortalDashboard() {
         </div>
         {view === 'fees' ? (
           <FeesDashboard profile={profile} user={user} />
+        ) : view === 'income-expenses' ? (
+          <IncomeExpenses profile={profile} />
         ) : view === 'classes' ? (
           <ClassCatalogue />
         ) : ['learners', 'staff'].includes(view) ? (

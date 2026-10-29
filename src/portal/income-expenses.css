@@ -1,0 +1,33 @@
+.income-expenses{min-width:0;color:var(--ink,#10264a)}
+.income-expenses-header{display:flex;align-items:flex-start;justify-content:space-between;gap:20px;margin-bottom:18px}
+.income-expenses-header h1{margin:0;color:var(--navy,#10264a);font:700 clamp(1.8rem,3vw,2.6rem)/1.1 'Playfair Display',serif}
+.income-expenses-header p:not(.eyebrow){margin:8px 0 0;color:var(--muted,#65738a)}
+.income-expenses-header button,.income-expenses-filter-actions button,.income-expenses-error button{border:0;border-radius:6px;padding:10px 14px;background:var(--navy,#10264a);color:#fff;font:inherit;font-size:.82rem;font-weight:700;cursor:pointer}
+.income-expenses-header button:disabled,.income-expenses-filter-actions button:disabled{opacity:.55;cursor:not-allowed}
+.income-expenses-notice{margin-bottom:18px;padding:13px 16px;border-left:4px solid #bd922f;background:#fff8e6;color:#665626;font-size:.84rem;line-height:1.55}
+.income-expenses-scope-note{margin:-8px 0 15px;color:#6b5d36;font-size:.8rem;line-height:1.5}
+.income-expenses-filters{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:13px;padding:17px;margin-bottom:18px;border:1px solid var(--line,#e1e8f0);border-radius:10px;background:#fff}
+.income-expenses-filters label{display:grid;gap:6px;color:#52637a;font-size:.77rem;font-weight:800}
+.income-expenses-filters input,.income-expenses-filters select{width:100%;min-width:0;padding:9px 10px;border:1px solid #cbd3df;border-radius:6px;background:#fff;color:#10264a;font:inherit;font-weight:500}
+.income-expenses-filter-actions{display:flex;align-items:flex-end;gap:8px;flex-wrap:wrap}
+.income-expenses-filter-actions .secondary{border:1px solid #cbd3df;background:#fff;color:#263c5d}
+.income-expenses-totals{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,280px),1fr));gap:14px;margin-bottom:18px}
+.income-expenses-totals article,.income-expenses-table-card{min-width:0;border:1px solid var(--line,#e1e8f0);border-radius:10px;background:#fff;box-shadow:0 5px 14px rgba(9,45,89,.035)}
+.income-expenses-totals article{padding:17px;border-top:3px solid var(--navy,#10264a)}
+.income-expenses-totals h2{margin:0 0 12px;color:var(--navy,#10264a);font-size:.95rem}
+.income-expenses-totals dl{display:grid;gap:8px;margin:0}
+.income-expenses-totals dl>div{display:flex;justify-content:space-between;gap:12px;padding-top:8px;border-top:1px solid #edf0f4}
+.income-expenses-totals dt{color:#65738a;font-size:.78rem}
+.income-expenses-totals dd{margin:0;text-align:right;font-weight:800;font-size:.85rem}
+.income-expenses-count{margin:0;padding:14px 16px;border-bottom:1px solid #e5eaf0;color:#65738a;font-size:.8rem}
+.income-expenses-table-scroll{overflow-x:auto}
+.income-expenses-table-scroll table{width:100%;min-width:1080px;border-collapse:collapse;font-size:.8rem}
+.income-expenses-table-scroll th,.income-expenses-table-scroll td{padding:12px;text-align:left;vertical-align:top;border-bottom:1px solid #edf0f4}
+.income-expenses-table-scroll th{background:#f7f9fb;color:#53647a;font-size:.68rem;text-transform:uppercase;letter-spacing:.05em;white-space:nowrap}
+.income-expenses-table-scroll td small{display:block;margin-top:4px;color:#65738a;max-width:280px;overflow-wrap:anywhere}
+.income-expenses-review-tag{color:#8a5a00!important;font-weight:700}
+.income-expenses-state,.income-expenses-error{padding:16px;color:#65738a}
+.income-expenses-error{display:flex;align-items:center;justify-content:space-between;gap:14px;margin-bottom:16px;border-left:4px solid #9a2333;background:#fbe8ea;color:#8b1830}
+.income-expenses-error p{margin:0}
+@media(max-width:900px){.income-expenses-filters{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:600px){.income-expenses-header{flex-direction:column}.income-expenses-header button{width:100%}.income-expenses-filters{grid-template-columns:1fr}.income-expenses-filter-actions{display:grid;grid-template-columns:1fr 1fr}.income-expenses-error{align-items:flex-start;flex-direction:column}}

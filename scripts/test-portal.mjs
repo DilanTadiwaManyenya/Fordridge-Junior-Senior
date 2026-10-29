@@ -3,8 +3,14 @@ import { readFile, readdir } from 'node:fs/promises'
 import { PGlite } from '../.portal-test-tools/node_modules/@electric-sql/pglite/dist/index.js'
 import { canEnterPortal, withPortalTimeout } from '../src/portal/workflow.js'
 import { buildTeacherClassScopes, canOpenTeacherMyClass } from '../src/portal/teacher-workspace.js'
-import { getFinanceNavigation } from '../src/portal/navigation.js'
+import { canReviewIncomeExpenses, getFinanceNavigation } from '../src/portal/navigation.js'
 import { referenceBandsFor } from '../src/portal/grade-band-rules.js'
+import {
+  buildIncomeExpenseCsv,
+  buildIncomeExpenseEntries,
+  filterIncomeExpenseEntries,
+  summarizeIncomeExpenseEntries,
+} from '../src/portal/income-expense-review.js'
 
 assert.deepEqual(
   getFinanceNavigation('accountant'),
@@ -16,8 +22,8 @@ assert.deepEqual(
 )
 assert.deepEqual(
   getFinanceNavigation('admin').items.map((item) => item.label),
-  ['Finance', 'Expenses & Cashbook', 'Inventory & POS'],
-  'Main Admin retains its Finance, cashbook and POS links',
+  ['Finance', 'Income & expenses', 'Expenses & Cashbook', 'Inventory & POS'],
+  'Main Admin receives the new Income & expenses review alongside existing finance links',
 )
 assert.deepEqual(
   getFinanceNavigation('staff').items.map((item) => item.label),
@@ -29,6 +35,45 @@ assert.deepEqual(
   [],
   'teachers do not see finance navigation they are not authorized to use',
 )
+assert.equal(canReviewIncomeExpenses('admin'), true)
+assert.equal(canReviewIncomeExpenses('principal'), false)
+assert.equal(canReviewIncomeExpenses('accountant'), false)
+
+const financeEntries = buildIncomeExpenseEntries({
+  payments: [
+    { id: 'payment-usd', fee_record_id: 'fee-usd', campus_id: 'junior', amount: 80, reference: 'R-1', created_at: '2026-10-28T22:30:00Z' },
+    { id: 'payment-zig', fee_record_id: 'fee-zig', campus_id: 'senior', amount: 100, created_at: '2026-10-29T09:00:00Z' },
+  ],
+  feeRecords: [
+    { id: 'fee-usd', campus_id: 'junior', currency: 'USD', academic_year: 2026, academic_term: 'Term 3' },
+    { id: 'fee-zig', campus_id: 'senior', currency: 'ZiG', academic_year: 2026, academic_term: 'Term 3' },
+  ],
+  expenses: [
+    { id: 'expense-fuel', expense_date: '2026-10-29', category: 'Fuel', description: 'Bus fuel', amount: 20, currency: 'USD', reference: 'INV-1' },
+    { id: 'expense-legacy', expense_date: '2026-10-27', category: '=1+1', description: 'Historic row', amount: 5, currency: 'USD' },
+  ],
+  campuses: [
+    { id: 'junior', name: 'Junior School', code: 'JNR' },
+    { id: 'senior', name: 'Senior School', code: 'SNR' },
+  ],
+})
+assert.equal(financeEntries.length, 4)
+assert.equal(financeEntries.find((entry) => entry.sourceId === 'payment-usd').date, '2026-10-29', 'transaction timestamps use the school-local date')
+assert.equal(financeEntries.find((entry) => entry.sourceId === 'expense-fuel').campusId, null, 'legacy expenses are not attributed to a campus')
+assert.equal(financeEntries.find((entry) => entry.sourceId === 'expense-legacy').categoryNeedsReview, true, 'unmapped legacy category text remains visible and is flagged')
+assert.deepEqual(
+  summarizeIncomeExpenseEntries(financeEntries),
+  {
+    USD: { currency: 'USD', income: 80, expenses: 25, net: 55 },
+    ZiG: { currency: 'ZiG', income: 100, expenses: 0, net: 100 },
+  },
+  'income and expense totals remain separate by source currency',
+)
+const filteredFinanceRows = filterIncomeExpenseEntries(financeEntries, { currency: 'USD', direction: 'expense', category: 'Fuel', campusId: 'unassigned' })
+assert.deepEqual(filteredFinanceRows.map((entry) => entry.sourceId), ['expense-fuel'], 'filters include unassigned expenses and preserve the active currency/type/category')
+const filteredFinanceCsv = buildIncomeExpenseCsv(filteredFinanceRows)
+assert.match(filteredFinanceCsv, /"USD","0","20","-20"/, 'CSV totals match the filtered rows')
+assert.match(buildIncomeExpenseCsv(financeEntries), /"'=1\+1"/, 'CSV protects legacy text from spreadsheet formulas')
 
 assert.equal(canOpenTeacherMyClass('teacher', true), true)
 assert.equal(canOpenTeacherMyClass('teacher', false), false)
