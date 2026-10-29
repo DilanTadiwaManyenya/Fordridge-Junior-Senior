@@ -580,12 +580,14 @@ try {
     writes.find((w) => w.path.endsWith('create-portal-account')).body.role,
     'student',
   )
-  await page.getByRole('link', { name: 'Announcements', exact: true }).click()
-  await page.getByRole('button', { name: '+ Write announcement' }).click()
+  await page.getByRole('link', { name: 'Newsletters', exact: true }).click()
+  await page.getByRole('button', { name: '+ Write newsletter' }).click()
   await page.locator('form.workflow-form select').first().selectOption('campus')
   await page.getByLabel('Title', { exact: true }).fill('School notice')
-  await page.getByLabel('Announcement', { exact: true }).fill('A test notice')
+  await page.getByLabel('Announcement', { exact: true }).fill('A test newsletter')
   await page.getByLabel('Publication').selectOption('published')
+  await page.getByLabel('Expires at (optional)').fill('2027-01-01T00:00')
+  await page.getByLabel('Audience').selectOption('student')
   await page.getByRole('button', { name: 'Save', exact: true }).click()
   await page
     .getByRole('status')
@@ -594,6 +596,8 @@ try {
   assert.ok(
     writes.find((w) => w.path.endsWith('/announcements')).body.published_at,
   )
+  assert.ok(writes.find((w) => w.path.endsWith('/announcements')).body.expires_at)
+  assert.deepEqual(writes.find((w) => w.path.endsWith('/announcements')).body.audience_roles, ['student'])
   await page.getByRole('link', { name: 'Records', exact: true }).click()
   await page.getByRole('button', { name: '+ Add record' }).click()
   await page.getByLabel(/^Learner/).selectOption(student.id)

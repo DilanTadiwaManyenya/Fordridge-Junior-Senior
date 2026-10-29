@@ -392,7 +392,7 @@ export default function PortalDashboard() {
           {teacherMyClass && nav('/portal/my-class', 'My class', '▦')}
           {['teacher', 'parent'].includes(profile.role) && nav('/portal/learning-library', 'Learning library', '▤')}
           {assignments && nav('/portal/subject-allocations', 'Subject allocations', '▤')}
-          {nav('/portal/announcements', 'Announcements', '✦')}
+          {nav('/portal/announcements', 'Newsletters', '✦')}
           {nav('/portal/notifications', 'Notifications', '●')}
           {nav('/portal/timetable', 'Timetable', '◷')}
           {nav('/portal/account', 'Account settings', '⚙')}

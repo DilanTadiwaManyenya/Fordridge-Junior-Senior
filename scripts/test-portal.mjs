@@ -797,8 +797,12 @@ assert.equal(firstCorrection.action, 'corrected')
 assert.equal(firstCorrection.detail.reason, 'Correct imported learner details')
 assert.deepEqual(firstCorrection.detail.changes.admission_number, { from: null, to: 'F001' })
 await db.query(
-  "insert into announcements(campus_id,title,body,published_at) values($1,'Draft','hidden',null),($1,'Published','visible',now())",
+  "insert into announcements(campus_id,title,body,published_at,expires_at) values($1,'Draft','hidden',null,null),($1,'Published','visible',now(),null),($1,'Scheduled','future',now()+interval '1 day',null),($1,'Expired','old',now()-interval '2 days',now()-interval '1 day')",
   [campus],
+)
+await rejects(
+  () => db.query("insert into announcements(campus_id,title,body,published_at,expires_at) values($1,'Invalid expiry','hidden',now(),now()-interval '1 second')", [campus]),
+  /announcements_expiry_after_publication/,
 )
 await db.query(
   "insert into timetable(campus_id,subject,day_of_week,starts_at,ends_at,class_level,audience_role) values($1,'Maths',1,'08:00','09:00','Form 1','student'),($1,'Other class',1,'09:00','10:00','Form 2','student')",
@@ -842,7 +846,7 @@ await rejects(
 assert.equal(
   (await db.query('select title from announcements')).rows.length,
   1,
-  'student cannot see drafts',
+  'student cannot see drafts, scheduled newsletters, or expired newsletters',
 )
 assert.equal(
   (await db.query('select subject from timetable')).rows.length,
@@ -868,6 +872,8 @@ assert.equal((await db.query('select * from learner_records where student_id=$1'
   'a parent cannot read another learner record in the same school')
 assert.equal((await db.query("select * from announcements where title='Published'")).rows.length, 1,
   'a Parent role can see a published announcement for its linked learner campus')
+assert.equal((await db.query("select * from announcements where title='Expired'")).rows.length, 0,
+  'parents cannot see an expired newsletter')
 assert.equal((await db.query("select * from timetable where subject='Maths'")).rows.length, 1,
   'a Parent role can see the linked learner class timetable')
 assert.equal((await db.query('select * from fee_records where student_id=$1', [ids.stranger])).rows.length, 0,
@@ -2676,5 +2682,5 @@ assert.ok((await db.query('select preview_fee_reconciliation(null,2026,$1) as re
 await db.exec('rollback')
 await db.close()
 console.log(
-  'PASS: migrations, Stages 70–71 teacher/parent learning-library allocation, enrollment, campus, stream, Storage and file lifecycle boundaries, report readiness/release attribution/announcement/audit, atomic payments/retries/rollback, class and subject scope, role membership isolation/grants/revocation/provisioning, active-role parent/child boundaries, teacher profile/record/RPC scope, guardian access, private records and teacher login.',
+  'PASS: migrations, Stages 70–73 teacher/parent learning-library allocation, enrollment, campus, stream, Storage and file lifecycle boundaries, newsletter publication/audience/expiry, report readiness/release attribution/announcement/audit, atomic payments/retries/rollback, class and subject scope, role membership isolation/grants/revocation/provisioning, active-role parent/child boundaries, teacher profile/record/RPC scope, guardian access, private records and teacher login.',
 )

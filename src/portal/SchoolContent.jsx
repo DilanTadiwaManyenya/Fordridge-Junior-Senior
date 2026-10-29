@@ -12,6 +12,21 @@ const days = [
   'Saturday',
   'Sunday',
 ]
+function toDateTimeInput(value) {
+  if (!value) return ''
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return ''
+  const local = new Date(date.getTime() - date.getTimezoneOffset() * 60_000)
+  return local.toISOString().slice(0, 16)
+}
+
+function newsletterStatus(item, now = Date.now()) {
+  if (!item.published_at) return 'Draft'
+  if (Date.parse(item.published_at) > now) return 'Scheduled'
+  if (item.expires_at && Date.parse(item.expires_at) <= now) return 'Expired'
+  return 'Published'
+}
+
 export default function SchoolContent({ view, profile, user }) {
   const timetable = view === 'timetable'
   const table = timetable ? 'timetable' : 'announcements'
@@ -75,6 +90,9 @@ export default function SchoolContent({ view, profile, user }) {
             title: '',
             body: '',
             publish: false,
+            publishMode: 'draft',
+            publishAt: '',
+            expiresAt: '',
             subject: '',
             day_of_week: 1,
             starts_at: '08:00',
@@ -86,6 +104,17 @@ export default function SchoolContent({ view, profile, user }) {
             audience_roles: [],
           },
     )
+    if (!timetable && item) {
+      const publishTime = Date.parse(item.published_at)
+      setDraft({
+        ...item,
+        publishMode: Number.isFinite(publishTime)
+          ? (publishTime > Date.now() ? 'scheduled' : 'published')
+          : 'draft',
+        publishAt: Number.isFinite(publishTime) ? toDateTimeInput(item.published_at) : '',
+        expiresAt: toDateTimeInput(item.expires_at),
+      })
+    }
   }
   async function save(e) {
     e.preventDefault()
@@ -96,6 +125,15 @@ export default function SchoolContent({ view, profile, user }) {
     try {
       if (timetable && draft.ends_at <= draft.starts_at)
         throw new Error('End time must be after start time.')
+      if (!timetable && draft.publishMode === 'scheduled' && (!draft.publishAt || Date.parse(draft.publishAt) <= Date.now()))
+        throw new Error('Choose a future publication date and time.')
+      const publicationTime = timetable ? null : draft.publishMode === 'draft'
+        ? null
+        : draft.publishMode === 'scheduled'
+          ? Date.parse(draft.publishAt)
+          : Date.parse(draft.published_at) || Date.now()
+      if (!timetable && draft.expiresAt && Date.parse(draft.expiresAt) <= (publicationTime || Date.now()))
+        throw new Error('The expiry date and time must be after publication.')
       const payload = timetable
         ? {
             campus_id: draft.campus_id,
@@ -116,9 +154,12 @@ export default function SchoolContent({ view, profile, user }) {
           body: draft.body.trim(),
           author_id: draft.author_id || user.id,
           audience_roles: draft.audience_roles || [],
-            published_at: draft.publish
-              ? draft.published_at || new Date().toISOString()
-              : null,
+          published_at: draft.publishMode === 'draft'
+            ? null
+            : draft.publishMode === 'scheduled'
+              ? new Date(draft.publishAt).toISOString()
+              : draft.published_at || new Date().toISOString(),
+          expires_at: draft.expiresAt ? new Date(draft.expiresAt).toISOString() : null,
           }
       if (!(timetable ? payload.subject : payload.title && payload.body))
         throw new Error('Complete all required text fields.')
@@ -145,11 +186,11 @@ export default function SchoolContent({ view, profile, user }) {
       <header className="workflow-heading">
         <div>
           <p className="eyebrow">Fordridge Schools</p>
-          <h1>{timetable ? 'Timetable' : 'Announcements'}</h1>
+          <h1>{timetable ? 'Timetable' : 'Newsletters'}</h1>
         </div>
         {canManage && (
           <button className="primary-action" onClick={() => open(null)}>
-            + {timetable ? 'Add lesson' : 'Write announcement'}
+            + {timetable ? 'Add lesson' : 'Write newsletter'}
           </button>
         )}
       </header>
@@ -268,19 +309,18 @@ export default function SchoolContent({ view, profile, user }) {
                 </label>
                 <label>
                   Publication
-                  <select
-                    value={draft.publish ? 'published' : 'draft'}
-                    onChange={(e) =>
-                      setDraft({
-                        ...draft,
-                        publish: e.target.value === 'published',
-                      })
-                    }
-                  >
-                    <option value="draft">Draft — staff only</option>
-                    <option value="published">Publish to campus</option>
+                  <select value={draft.publishMode} onChange={(e) => setDraft({
+                    ...draft,
+                    publishMode: e.target.value,
+                    published_at: e.target.value === 'published' && draft.publishMode === 'scheduled' ? null : draft.published_at,
+                  })}>
+                    <option value="draft">Save as draft — staff only</option>
+                    <option value="scheduled">Schedule publication</option>
+                    <option value="published">Publish now</option>
                   </select>
                 </label>
+                {draft.publishMode === 'scheduled' && <label>Publish at<input type="datetime-local" required value={draft.publishAt} onChange={(e) => setDraft({ ...draft, publishAt: e.target.value })} /></label>}
+                <label>Expires at (optional)<input type="datetime-local" value={draft.expiresAt} onChange={(e) => setDraft({ ...draft, expiresAt: e.target.value })} /></label>
                 <label>
                   Audience
                   <select
@@ -295,12 +335,13 @@ export default function SchoolContent({ view, profile, user }) {
                     }
                   >
                     <option value="">Everyone at this campus</option>
-                    <option value="student">Students and their parents</option>
+                    <option value="student">Students and linked parents</option>
                     <option value="parent">Parents only</option>
                     <option value="teacher,staff">Teachers and staff</option>
-                    <option value="admin">Administrators only</option>
+                    <option value="principal,accountant,admin">School leadership and administrators</option>
                   </select>
                 </label>
+                <p className="workflow-wide">Scheduled newsletters remain hidden until publication. Expired newsletters stop appearing to their audience. File attachments are not enabled in this workflow.</p>
               </>
             )}
             <div className="workflow-actions workflow-wide">
@@ -335,7 +376,7 @@ export default function SchoolContent({ view, profile, user }) {
             </div>
             <p>
               {item.campus?.name}
-              {!timetable && canManage && !item.published_at ? ' · Draft' : ''}
+              {!timetable && canManage ? ` · ${newsletterStatus(item)}` : ''}
             </p>
             {timetable ? (
               <p>
@@ -344,7 +385,11 @@ export default function SchoolContent({ view, profile, user }) {
                 {item.room ? ` · ${item.room}` : ''}
               </p>
             ) : (
-              <p>{item.body}</p>
+              <>
+                <p>{item.body}</p>
+                {item.expires_at && <small>Expires {new Date(item.expires_at).toLocaleString()}</small>}
+                {canManage && <small>Audience: {item.audience_roles?.length ? item.audience_roles.join(', ') : 'Everyone at this campus'}</small>}
+              </>
             )}
           </article>
         ))
