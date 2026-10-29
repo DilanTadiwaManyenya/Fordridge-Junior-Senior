@@ -36,6 +36,16 @@ const formerStudent = {
   enrollment_status: 'graduated',
   campus: { name: 'Junior School' },
 }
+const juniorStudent = {
+  id: '00000000-0000-4000-8000-000000000004', full_name: 'Junior Learner', role: 'student',
+  campus_id: 'campus', admission_number: 'J001', class_level: 'Grade 3', class_stream: '',
+  enrollment_status: 'active', campus: { name: 'Junior School' },
+}
+const sixthFormStudent = {
+  id: '00000000-0000-4000-8000-000000000005', full_name: 'Sixth Form Learner', role: 'student',
+  campus_id: 'campus', admission_number: 'S001', class_level: 'Lower Six', class_stream: 'Arts',
+  enrollment_status: 'active', campus: { name: 'Senior School' },
+}
 const payload = Buffer.from(
   JSON.stringify({ sub: user.id, exp: Math.floor(Date.now() / 1000) + 3600 }),
 ).toString('base64url')
@@ -85,6 +95,12 @@ async function pageFor(
     updated_at: '2026-10-29T10:00:00.000Z',
     campus: null,
   })))
+  const reportRecords = [
+    { id: 'senior-mark', student_id: student.id, title: 'Term assessment', subject: 'Mathematics', assessment_type: 'markbook', score: 74, max_score: 100, event_date: '2026-01-15', academic_year: 2026, academic_term: 'Term 1', student },
+    { id: 'senior-coursework', student_id: student.id, title: 'Course Work', subject: 'Mathematics', assessment_type: 'coursework', score: 100, max_score: 100, event_date: '2026-01-14', academic_year: 2026, academic_term: 'Term 1', student },
+    { id: 'junior-mark', student_id: juniorStudent.id, title: 'Term assessment', subject: 'English', assessment_type: 'markbook', score: 85, max_score: 100, event_date: '2026-01-13', academic_year: 2026, academic_term: 'Term 1', student: juniorStudent },
+    { id: 'sixth-mark', student_id: sixthFormStudent.id, title: 'Term assessment', subject: 'Biology', assessment_type: 'markbook', score: 70, max_score: 100, event_date: '2026-01-12', academic_year: 2026, academic_term: 'Term 1', student: sixthFormStudent },
+  ]
   await page.exposeFunction('allowActivitySuccess', () => {
     activityCanSucceed = true
   })
@@ -164,6 +180,8 @@ async function pageFor(
       }
       return send(period?.revision ?? null)
     }
+    if (path.endsWith('/rpc/report_class_ranking')) return send([{ class_rank: 1, class_size: 12 }])
+    if (path.endsWith('/rpc/report_subject_signatories')) return send([{ subject: 'Mathematics', teacher_initials: 'TM' }])
     if (path.endsWith('/rpc/save_report_grade_scale')) {
       gradeBands = gradeBands.filter(item => !(item.campus_id === body.p_campus_id && item.band_group === body.p_band_group))
         .concat(body.p_bands.map((band, index) => ({
@@ -281,6 +299,9 @@ async function pageFor(
               learner: { ...student, campus: { name: 'Junior School' } },
             }],
       )
+    if (path.endsWith('/learner_records') && method === 'GET' && url.searchParams.get('kind') === 'eq.academic')
+      return send(reportRecords)
+    if (path.endsWith('/report_term_settings')) return send([])
     if (
       ['announcements', 'timetable', 'learner_records', 'teacher_class_assignments'].some((table) =>
         path.endsWith('/' + table),
@@ -626,6 +647,17 @@ try {
     p_reason: 'Owner approved provisional Reliance scale',
     p_expected_updated_at: '2026-10-29T10:00:00.000Z',
   })
+  await page.goto('http://127.0.0.1:5179/portal/reports')
+  await page.getByRole('heading', { name: 'Senior progress report' }).waitFor()
+  await page.locator('.report-summary article').first().locator('strong').filter({ hasText: '74.0%' }).waitFor()
+  await page.getByText('Course Work is listed separately and excluded.', { exact: false }).waitFor()
+  await page.getByLabel('Learner').selectOption(juniorStudent.id)
+  await page.getByRole('heading', { name: 'Junior progress report' }).waitFor()
+  await page.getByText('Unit 1', { exact: true }).waitFor()
+  await page.getByLabel('Learner').selectOption(sixthFormStudent.id)
+  await page.getByRole('heading', { name: 'Sixth Form progress report' }).waitFor()
+  await page.getByText('B', { exact: true }).waitFor()
+  await page.getByText('no subject weighting or aggregate points are assumed.', { exact: false }).waitFor()
   await page.goto('http://127.0.0.1:5179/portal/report-periods')
   await page.getByRole('heading', { name: 'Reporting periods' }).waitFor()
   await page.getByLabel('Campus').selectOption('campus')
@@ -685,7 +717,7 @@ try {
   await parent.waitForURL('http://127.0.0.1:5179/portal')
   assert.deepEqual(errors, [])
   console.log(
-    'PASS: profile editing, account creation, Reliance grade-band boundary preview and audited scale save, reporting-period registration and reviewed close, publishing, records, timetable, payment retry, teacher sign-in and Coursework access, parent route guards, linked-account directory/search, credential-free audited recovery guidance, mobile layout; no uncaught browser errors. All backend requests were mocked.',
+    'PASS: profile editing, account creation, Reliance grade-band boundary preview and audited scale save, Junior/Senior/Sixth Form progress report variants, coursework exclusion from averages, reporting-period registration and reviewed close, publishing, records, timetable, payment retry, teacher sign-in and Coursework access, parent route guards, linked-account directory/search, credential-free audited recovery guidance, mobile layout; no uncaught browser errors. All backend requests were mocked.',
   )
 } catch (error) {
   const p = browser.contexts()[0]?.pages()[0]
