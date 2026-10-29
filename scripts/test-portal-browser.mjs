@@ -73,6 +73,9 @@ async function pageFor(
   const reportingPeriods = [{
     id: 'period-open', campus_id: 'campus', academic_year: 2026, academic_term: 'Term 1',
     period_status: 'open', is_current: false, revision: 4, campus: { name: 'Junior School' },
+  }, {
+    id: 'period-current', campus_id: 'campus', academic_year: 2026, academic_term: 'Term 3',
+    period_status: 'open', is_current: true, revision: 2, campus: { name: 'Junior School' },
   }]
   await page.exposeFunction('allowActivitySuccess', () => {
     activityCanSucceed = true
@@ -133,6 +136,22 @@ async function pageFor(
       const period = reportingPeriods.find(item => item.id === body.p_period_id)
       if (period && period.revision === body.p_expected_revision) {
         period.period_status = 'closed'
+        period.revision += 1
+      }
+      return send(period?.revision ?? null)
+    }
+    if (path.endsWith('/rpc/review_reporting_period')) {
+      const period = reportingPeriods.find(item => item.id === body.p_period_id)
+      if (period && period.revision === body.p_expected_revision) {
+        if (body.p_action === 'reopen') period.period_status = 'open'
+        if (body.p_action === 'make_current') {
+          const current = reportingPeriods.find(item => item.campus_id === period.campus_id && item.is_current)
+          if (current) {
+            current.is_current = false
+            current.revision += 1
+          }
+          period.is_current = true
+        }
         period.revision += 1
       }
       return send(period?.revision ?? null)
@@ -590,6 +609,36 @@ try {
     p_reason: 'Reviewed marks and verified term results',
   })
   assert.equal(await page.getByRole('row').filter({ hasText: 'Term 1' }).getByText('Closed').count(), 1)
+  const closedPeriodRow = page.getByRole('row').filter({ hasText: 'Term 1' })
+  await closedPeriodRow.getByRole('button', { name: 'Reopen' }).click()
+  await page.getByLabel('Reason for reopening this period').fill('Verified corrections are required')
+  await page.getByRole('button', { name: 'Confirm reopen' }).click()
+  await page.getByRole('status').filter({ hasText: 'reopened at revision 6' }).waitFor()
+  const reopenWrite = writes.filter(write => write.path.endsWith('review_reporting_period')).at(-1)
+  assert.deepEqual(reopenWrite.body, {
+    p_period_id: 'period-open',
+    p_action: 'reopen',
+    p_expected_revision: 5,
+    p_expected_current_period_id: null,
+    p_expected_current_revision: null,
+    p_reason: 'Verified corrections are required',
+  })
+  const reopenedPeriodRow = page.getByRole('row').filter({ hasText: 'Term 1' })
+  await reopenedPeriodRow.getByRole('button', { name: 'Make current' }).click()
+  await page.getByLabel('Reason for making this period current').fill('School leadership approved term transition')
+  await page.getByRole('button', { name: 'Confirm current period' }).click()
+  await page.getByRole('status').filter({ hasText: 'made current at revision 7' }).waitFor()
+  const currentWrite = writes.filter(write => write.path.endsWith('review_reporting_period')).at(-1)
+  assert.deepEqual(currentWrite.body, {
+    p_period_id: 'period-open',
+    p_action: 'make_current',
+    p_expected_revision: 6,
+    p_expected_current_period_id: 'period-current',
+    p_expected_current_revision: 2,
+    p_reason: 'School leadership approved term transition',
+  })
+  assert.equal(await page.getByRole('row').filter({ hasText: 'Term 1' }).getByText('Current').count(), 1)
+  assert.equal(await page.getByRole('row').filter({ hasText: 'Term 3' }).getByRole('cell').nth(4).innerText(), 'Not set')
   await parent.goto('http://127.0.0.1:5179/portal/report-periods')
   await parent.waitForURL('http://127.0.0.1:5179/portal')
   assert.deepEqual(errors, [])

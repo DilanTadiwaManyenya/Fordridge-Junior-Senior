@@ -218,6 +218,10 @@ await rejects(
   () => db.query("select register_reporting_period($1,2027,'Term 1')", [campus]),
   /Administrator access required/,
 )
+await rejects(
+  () => db.query("select review_reporting_period($1,'reopen',1,null,null,'Admin review required')", [registeredPeriodId]),
+  /Administrator access required/,
+)
 await as('admin')
 const term = await db.query(
   "select * from create_term_fee_record($1,'Form 1','ZIMSEC',1,2026,'Term 3',null)",
@@ -796,6 +800,78 @@ await rejects(
 await rejects(
   () => db.query("insert into learner_records(student_id,kind,event_date,title,subject,score,max_score,academic_year,academic_term,assessment_type) values($1,'academic',current_date,'Direct after close','Science',70,100,2026,'Term 1','markbook')", [ids.stream_student]),
   /reporting period is closed/,
+)
+assert.equal(
+  (await db.query("select review_reporting_period($1,'reopen',2,null,null,'Verified corrections are required') as revision", [registeredPeriodId])).rows[0].revision,
+  3,
+  'reviewed reopen advances the period revision',
+)
+assert.deepEqual(
+  (await db.query('select period_status,revision from reporting_periods where id=$1', [registeredPeriodId])).rows[0],
+  { period_status: 'open', revision: 3 },
+  'reviewed reopen changes a closed period back to open',
+)
+assert.equal(
+  (await db.query("select reason from reporting_period_events where period_id=$1 and revision=3 and action='reopened'", [registeredPeriodId])).rows[0].reason,
+  'Verified corrections are required',
+  'reopen reason is kept in the event history',
+)
+const nextCurrentPeriodId = (await db.query(
+  "select register_reporting_period($1,2026,'Term 2') as id", [campus],
+)).rows[0].id
+await rejects(
+  () => db.query("select review_reporting_period($1,'make_current',1,null,null,'short')", [nextCurrentPeriodId]),
+  /at least 8 characters/,
+)
+const initialCurrent = (await db.query(
+  'select id,revision from reporting_periods where campus_id=$1 and is_current', [campus],
+)).rows[0] || null
+await db.query(
+  "select review_reporting_period($1,'make_current',3,$2,$3,'Initial term selection reviewed by school leadership')",
+  [registeredPeriodId, initialCurrent?.id ?? null, initialCurrent?.revision ?? null],
+)
+const previousCurrent = (await db.query(
+  'select id,revision from reporting_periods where campus_id=$1 and is_current', [campus],
+)).rows[0]
+assert.equal(
+  (await db.query("select review_reporting_period($1,'make_current',1,$2,$3,'Term transition reviewed by school leadership') as revision", [nextCurrentPeriodId, previousCurrent?.id ?? null, previousCurrent?.revision ?? null])).rows[0].revision,
+  2,
+  'making a different period current advances its revision',
+)
+assert.deepEqual(
+  (await db.query('select is_current,revision from reporting_periods where id=$1', [registeredPeriodId])).rows[0],
+  { is_current: false, revision: previousCurrent.id === registeredPeriodId ? 5 : 4 },
+  'switching current period clears the previous selection and advances its revision',
+)
+assert.deepEqual(
+  (await db.query('select is_current,revision from reporting_periods where id=$1', [nextCurrentPeriodId])).rows[0],
+  { is_current: true, revision: 2 },
+  'the selected open period becomes current with its own revision',
+)
+assert.equal(
+  (await db.query("select count(*) from reporting_period_events where action in ('made_current','made_not_current') and reason='Term transition reviewed by school leadership'", [])).rows[0].count,
+  2,
+  'both sides of the current-period switch have reasoned events',
+)
+assert.equal(
+  (await db.query("select count(*) from audit_trail where entity_type='reporting_period' and action in ('made_current','made_not_current') and detail->>'reason'='Term transition reviewed by school leadership'", [])).rows[0].count,
+  2,
+  'both sides of the current-period switch are in the activity audit trail',
+)
+const staleCurrentTargetId = (await db.query(
+  "select register_reporting_period($1,2026,'Term 3') as id", [campus],
+)).rows[0].id
+await rejects(
+  () => db.query("select review_reporting_period($1,'make_current',1,$2,1,'Repeat stale term transition')", [staleCurrentTargetId, registeredPeriodId]),
+  /current reporting period changed/,
+)
+const reopenedPeriodRevision = (await db.query(
+  'select revision from reporting_periods where id=$1', [registeredPeriodId],
+)).rows[0].revision
+assert.equal(
+  (await db.query("select close_reporting_period($1,$2,'Final close after reviewed term transition') as revision", [registeredPeriodId, reopenedPeriodRevision])).rows[0].revision,
+  reopenedPeriodRevision + 1,
+  'period can be closed again after review changes',
 )
 await db.query(
   "insert into report_grade_bands(campus_id,minimum_percent,maximum_percent,grade,descriptor) values($1,0,100,'A','Excellent')",
