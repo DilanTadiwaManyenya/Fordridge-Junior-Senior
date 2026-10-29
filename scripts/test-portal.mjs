@@ -780,6 +780,81 @@ const statusAfterRollover = (await db.query(
   'select year_rollover_batch_run_status($1,$2,$3) as result', [2026, 2027, campus],
 )).rows[0].result
 assert.equal(statusAfterRollover.status, 'applied', 'the applied batch can be verified by cycle and campus')
+const reversalPreview = (await db.query(
+  'select preview_year_rollover_batch_reversal($1,$2,$3) as result', [2026, 2027, campus],
+)).rows[0].result
+assert.equal(reversalPreview.can_reverse, true, 'an unchanged applied batch is eligible for reversal')
+assert.equal(reversalPreview.eligible_count, 4, 'reversal preview checks every learner in the applied batch')
+assert.equal(reversalPreview.blocked_count, 0, 'the initial reversal preview has no changed learner placements')
+await as('teacher')
+await rolloverRejectsInSavepoint(
+  () => db.query('select preview_year_rollover_batch_reversal($1,$2,$3)', [2026, 2027, campus]),
+  /Main administrator access required/,
+)
+await as('admin')
+await rolloverRejectsInSavepoint(
+  () => db.query('select reverse_year_rollover_batch($1,$2,$3,$4,$5,$6)',
+    [2026, 2027, campus, 4, 'short', 'REVERSE YEAR ROLLOVER 2026 TO 2027']),
+  /reversal reason between 10 and 500 characters/,
+)
+await rolloverRejectsInSavepoint(
+  () => db.query('select reverse_year_rollover_batch($1,$2,$3,$4,$5,$6)',
+    [2026, 2027, campus, 4, 'Approved correction after review', 'wrong confirmation']),
+  /exact reversal confirmation/,
+)
+await db.exec('reset role')
+await db.query('update profiles set class_level=$2 where id=$1', [ids.stranger, 'Form 9'])
+await db.exec('set role authenticated')
+const changedReversalPreview = (await db.query(
+  'select preview_year_rollover_batch_reversal($1,$2,$3) as result', [2026, 2027, campus],
+)).rows[0].result
+assert.equal(changedReversalPreview.can_reverse, false, 'a learner changed after rollover makes the whole reversal ineligible')
+assert.equal(changedReversalPreview.blocked_count, 1, 'the preview identifies how many learner placements changed')
+await rolloverRejectsInSavepoint(
+  () => db.query('select reverse_year_rollover_batch($1,$2,$3,$4,$5,$6)',
+    [2026, 2027, campus, 4, 'Approved correction after review', 'REVERSE YEAR ROLLOVER 2026 TO 2027']),
+  /changed after rollover/,
+)
+await db.exec('reset role')
+await db.query('update profiles set class_level=$2 where id=$1', [ids.stranger, 'Form 2'])
+await db.exec('set role authenticated')
+const reversedRollover = (await db.query(
+  'select reverse_year_rollover_batch($1,$2,$3,$4,$5,$6) as result',
+  [2026, 2027, campus, 4, 'Approved correction after review', 'REVERSE YEAR ROLLOVER 2026 TO 2027'],
+)).rows[0].result
+assert.equal(reversedRollover.already_reversed, false, 'eligible reversal records one completed reversal')
+assert.equal(reversedRollover.learner_count, 4, 'one reversal restores every learner from the batch')
+const restoredProfiles = (await db.query(
+  'select id, full_name, admission_number, campus_id, class_level, class_stream, enrollment_status from profiles where id=any($1::uuid[]) order by id',
+  [Object.keys(rolloverProfileSnapshots)],
+)).rows
+assert.deepEqual(restoredProfiles, Object.values(rolloverProfileSnapshots).sort((left, right) => left.id.localeCompare(right.id)),
+  'reversal restores the original learner placement and enrolment snapshots exactly')
+for (const learnerId of Object.keys(rolloverProfileSnapshots)) {
+  assert.deepEqual((await db.query(
+    `select
+      (select count(*)::integer from learner_records where student_id=$1) as records,
+      (select count(*)::integer from fee_records where student_id=$1) as fees,
+      (select count(*)::integer from student_guardians where student_id=$1) as guardians`, [learnerId],
+  )).rows[0], protectedRolloverHistory[learnerId], 'reversal also preserves records, fees and guardian links')
+}
+assert.equal((await db.query(
+  "select count(*)::integer as count from audit_trail where entity_type='year_rollover' and action='reversed'",
+)).rows[0].count, 4, 'each restored learner receives a separate reversal audit event')
+assert.equal((await db.query(
+  "select count(*)::integer as count from audit_trail where entity_type='year_rollover_batch' and action='reversed'",
+)).rows[0].count, 1, 'the reversal has one batch-level audit event')
+assert.equal((await db.query(
+  'select year_rollover_batch_run_status($1,$2,$3) as result', [2026, 2027, campus],
+)).rows[0].result.status, 'reversed', 'batch status preserves both apply and reversal lifecycle state')
+const repeatedReversal = (await db.query(
+  'select reverse_year_rollover_batch($1,$2,$3,$4,$5,$6) as result',
+  [2026, 2027, campus, 4, 'Approved correction after review', 'REVERSE YEAR ROLLOVER 2026 TO 2027'],
+)).rows[0].result
+assert.equal(repeatedReversal.already_reversed, true, 'repeating reversal returns the existing result without restoring learners twice')
+assert.equal((await db.query(
+  "select count(*)::integer as count from audit_trail where entity_type='year_rollover_batch' and action='reversed'",
+)).rows[0].count, 1, 'idempotent reversal does not duplicate batch audit events')
 const repeatedRollover = (await db.query(
   'select apply_year_rollover_batch($1,$2,$3,$4,$5,$6) as result',
   [2026, 2027, campus, 4, 'APPLY YEAR ROLLOVER 2026 TO 2027', true],

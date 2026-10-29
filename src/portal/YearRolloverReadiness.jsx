@@ -45,6 +45,11 @@ export default function YearRolloverReadiness() {
   const [acceptUnknownCapacity, setAcceptUnknownCapacity] = useState(false)
   const [applyingBatch, setApplyingBatch] = useState(false)
   const [applyError, setApplyError] = useState('')
+  const [reversalPreview, setReversalPreview] = useState(null)
+  const [reversalReason, setReversalReason] = useState('')
+  const [reversalConfirmation, setReversalConfirmation] = useState('')
+  const [reversingBatch, setReversingBatch] = useState(false)
+  const [reversalError, setReversalError] = useState('')
   const [page, setPage] = useState(1)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -95,6 +100,9 @@ export default function YearRolloverReadiness() {
     if (!Number.isInteger(sourceYear) || sourceYear < 2000 || !Number.isInteger(destinationYear) || destinationYear <= sourceYear) {
       setBatchPreview(null)
       setAppliedRun(null)
+      setReversalPreview(null)
+      setReversalReason('')
+      setReversalConfirmation('')
       return
     }
     let mounted = true
@@ -113,10 +121,17 @@ export default function YearRolloverReadiness() {
           p_campus_id: filters.campusId,
         })
       : Promise.resolve({ data: null, error: null })
-    Promise.all([batchRequest, runRequest]).then(([{ data, error: queryError }, { data: runData, error: runError }]) => {
+    const reversalRequest = filters.campusId
+      ? supabase.rpc('preview_year_rollover_batch_reversal', {
+          p_source_academic_year: sourceYear,
+          p_destination_academic_year: destinationYear,
+          p_campus_id: filters.campusId,
+        })
+      : Promise.resolve({ data: null, error: null })
+    Promise.all([batchRequest, runRequest, reversalRequest]).then(([{ data, error: queryError }, { data: runData, error: runError }, { data: reversalData, error: reversalQueryError }]) => {
       if (!mounted) return
-      if (queryError || runError) setBatchError(workflowError(queryError || runError))
-      else { setBatchError(''); setBatchPreview(data); setAppliedRun(runData) }
+      if (queryError || runError || reversalQueryError) setBatchError(workflowError(queryError || runError || reversalQueryError))
+      else { setBatchError(''); setBatchPreview(data); setAppliedRun(runData); setReversalPreview(reversalData) }
       setBatchLoading(false)
     })
     return () => { mounted = false }
@@ -153,6 +168,7 @@ export default function YearRolloverReadiness() {
       setApplyConfirmation('')
       setAcceptUnknownCapacity(false)
       setAppliedRun(null)
+      setReversalPreview(null)
     }
     setFilters({ ...draft, search: draft.search.trim() })
   }
@@ -254,6 +270,29 @@ export default function YearRolloverReadiness() {
     setApplyingBatch(false)
   }
 
+  async function reverseYearRollover() {
+    if (!batchPreview || !filters.campusId || !reversalPreview?.can_reverse) return
+    setReversingBatch(true)
+    setReversalError('')
+    const { error: reversalFailure } = await supabase.rpc('reverse_year_rollover_batch', {
+      p_source_academic_year: Number(decisionYears.source),
+      p_destination_academic_year: Number(decisionYears.destination),
+      p_campus_id: filters.campusId,
+      p_expected_learner_count: reversalPreview.learner_count,
+      p_reason: reversalReason.trim(),
+      p_confirmation: reversalConfirmation.trim(),
+    })
+    if (reversalFailure) {
+      setReversalError(workflowError(reversalFailure))
+      setReversingBatch(false)
+      return
+    }
+    setReversalReason('')
+    setReversalConfirmation('')
+    setReversingBatch(false)
+    setBatchRevision(value => value + 1)
+  }
+
   const summary = preview?.summary || { ready_for_decision: 0, needs_review: 0, not_currently_active: 0 }
   const rows = preview?.rows || []
   const expectedApplyConfirmation = `APPLY YEAR ROLLOVER ${decisionYears.source} TO ${decisionYears.destination}`
@@ -310,10 +349,10 @@ export default function YearRolloverReadiness() {
       <section className="workflow-panel rollover-cycle-panel">
         <div className="workflow-form rollover-cycle-form">
           <label>Decision source academic year
-            <input type="number" min="2000" step="1" value={decisionYears.source} onChange={event => { setDecisionYears(value => ({ ...value, source: event.target.value })); setDecisionDrafts({}); setDecisionNotice(''); setBatchPage(1); setApplyConfirmation(''); setAcceptUnknownCapacity(false); setAppliedRun(null) }} placeholder="Enter confirmed year" />
+            <input type="number" min="2000" step="1" value={decisionYears.source} onChange={event => { setDecisionYears(value => ({ ...value, source: event.target.value })); setDecisionDrafts({}); setDecisionNotice(''); setBatchPage(1); setApplyConfirmation(''); setAcceptUnknownCapacity(false); setAppliedRun(null); setReversalPreview(null); setReversalReason(''); setReversalConfirmation('') }} placeholder="Enter confirmed year" />
           </label>
           <label>Decision destination academic year
-            <input type="number" min="2000" step="1" value={decisionYears.destination} onChange={event => { setDecisionYears(value => ({ ...value, destination: event.target.value })); setDecisionDrafts({}); setDecisionNotice(''); setBatchPage(1); setApplyConfirmation(''); setAcceptUnknownCapacity(false); setAppliedRun(null) }} placeholder="Enter confirmed year" />
+            <input type="number" min="2000" step="1" value={decisionYears.destination} onChange={event => { setDecisionYears(value => ({ ...value, destination: event.target.value })); setDecisionDrafts({}); setDecisionNotice(''); setBatchPage(1); setApplyConfirmation(''); setAcceptUnknownCapacity(false); setAppliedRun(null); setReversalPreview(null); setReversalReason(''); setReversalConfirmation('') }} placeholder="Enter confirmed year" />
           </label>
           <p className="progress-report-note">Enter the school-confirmed years. Decisions are review records only; they do not promote learners, change enrolment, or assign classes or streams.</p>
         </div>
@@ -407,11 +446,34 @@ export default function YearRolloverReadiness() {
           {batchLoading && <span role="status">Refreshing batch preview…</span>}
         </header>
         {batchError && <p className="workflow-error" role="alert">{batchError}</p>}
-        {appliedRun ? <div className="workflow-success" role="status">
-          <h3>Year rollover applied</h3>
-          <p>{appliedRun.learner_count} learner(s) processed for {decisionYears.source} → {decisionYears.destination} at the selected campus.</p>
-          <p>Applied {appliedRun.applied_at ? new Date(appliedRun.applied_at).toLocaleString() : 'successfully'}{appliedRun.applied_by_name ? ` by ${appliedRun.applied_by_name}` : ''}. The batch is locked against duplicate application.</p>
-        </div> : <>
+        {appliedRun ? <>
+          <div className="workflow-success" role="status">
+            <h3>{appliedRun.status === 'reversed' ? 'Year rollover reversed' : 'Year rollover applied'}</h3>
+            <p>{appliedRun.learner_count} learner(s) processed for {decisionYears.source} → {decisionYears.destination} at the selected campus.</p>
+            <p>Applied {appliedRun.applied_at ? new Date(appliedRun.applied_at).toLocaleString() : 'successfully'}{appliedRun.applied_by_name ? ` by ${appliedRun.applied_by_name}` : ''}. The original application record is retained.</p>
+            {appliedRun.status === 'reversed' && <p>Reversed {appliedRun.reversed_at ? new Date(appliedRun.reversed_at).toLocaleString() : ''}{appliedRun.reversed_by_name ? ` by ${appliedRun.reversed_by_name}` : ''}. Reason: {appliedRun.reversal_reason}</p>}
+            {appliedRun.status === 'reversed' && <p>This campus and year pair remains closed to duplicate runs so its apply/reversal audit history stays intact.</p>}
+          </div>
+          {appliedRun.status !== 'reversed' && <section className="workflow-panel rollover-cycle-panel" aria-labelledby="rollover-reversal-heading">
+            <h3 id="rollover-reversal-heading">Audit and reverse this rollover</h3>
+            {reversalPreview && <>
+              <p>{reversalPreview.eligible_count} of {reversalPreview.learner_count} learner(s) still match the exact placement and enrolment state recorded at application.</p>
+              {!reversalPreview.can_reverse && <p className="workflow-error" role="alert">This batch cannot be reversed safely. {reversalPreview.blocked_count} learner record(s) changed after rollover, or the applied audit set is incomplete. Later work will be preserved.</p>}
+              {reversalPreview.blocked_count > 0 && <ul>{reversalPreview.rows.filter(row => !row.unchanged).map(row => <li key={row.learner_id}>{row.full_name || 'Learner'} ({row.admission_number || 'no admission number'}) has a different placement or enrolment status.</li>)}</ul>}
+              {reversalPreview.can_reverse && <>
+                <p>Reversal restores the saved campus, class, stream, and enrolment status for this batch. It does not remove marks, fees, guardian links, or report history. A reason and exact confirmation are recorded in the audit log.</p>
+                <label>Reason for reversing this rollover
+                  <textarea minLength={10} maxLength={500} value={reversalReason} onChange={event => setReversalReason(event.target.value)} placeholder="At least 10 characters" />
+                </label>
+                <label>Type <strong>REVERSE YEAR ROLLOVER {decisionYears.source} TO {decisionYears.destination}</strong> to confirm
+                  <input value={reversalConfirmation} onChange={event => setReversalConfirmation(event.target.value)} autoComplete="off" />
+                </label>
+                <button type="button" className="secondary-action" disabled={reversingBatch || batchLoading || reversalReason.trim().length < 10 || reversalConfirmation.trim() !== `REVERSE YEAR ROLLOVER ${decisionYears.source} TO ${decisionYears.destination}`} onClick={reverseYearRollover}>{reversingBatch ? 'Reversing rollover…' : 'Reverse reviewed rollover'}</button>
+              </>}
+            </>}
+            {reversalError && <p className="workflow-error" role="alert">{reversalError}</p>}
+          </section>}
+        </> : <>
         <div className="rollover-batch-summary">
           <article><span>Active learners</span><strong>{batchPreview.summary?.active_learners ?? 0}</strong></article>
           <article><span>Decisions recorded</span><strong>{batchPreview.summary?.decisions_recorded ?? 0}</strong></article>

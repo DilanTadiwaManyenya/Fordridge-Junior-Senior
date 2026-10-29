@@ -97,6 +97,7 @@ async function pageFor(
   })))
   let rolloverDecisions = []
   let rolloverAppliedRun = null
+  let rolloverReversedRun = false
   const reportRecords = [
     { id: 'senior-mark', student_id: student.id, title: 'Term assessment', subject: 'Mathematics', assessment_type: 'markbook', score: 74, max_score: 100, event_date: '2026-01-15', academic_year: 2026, academic_term: 'Term 1', student },
     { id: 'senior-coursework', student_id: student.id, title: 'Course Work', subject: 'Mathematics', assessment_type: 'coursework', score: 100, max_score: 100, event_date: '2026-01-14', academic_year: 2026, academic_term: 'Term 1', student },
@@ -214,13 +215,33 @@ async function pageFor(
         summary: { active_learners: 1, decisions_recorded: saved ? 1 : 0, needs_decision: saved ? 0 : 1, placements_missing: saved && !hasPlacement ? 1 : 0, stale_roster: 0, destinations_unavailable: 0, ready_for_review: saved && (hasPlacement || ['transfer', 'complete'].includes(saved.decision)) ? 1 : 0, capacity_exceeded: 0, capacity_unknown: 0 },
       })
     }
-    if (path.endsWith('/rpc/year_rollover_batch_run_status')) return send(rolloverAppliedRun)
+    if (path.endsWith('/rpc/year_rollover_batch_run_status'))
+      return send(rolloverAppliedRun ? {
+        ...rolloverAppliedRun,
+        status: rolloverReversedRun ? 'reversed' : 'applied',
+        reversed_at: rolloverReversedRun ? '2026-10-29T13:00:00.000Z' : null,
+        reversed_by_name: rolloverReversedRun ? 'Main Admin' : null,
+        reversal_reason: rolloverReversedRun ? 'Corrected after approval review' : null,
+      } : null)
+    if (path.endsWith('/rpc/preview_year_rollover_batch_reversal'))
+      return send(rolloverAppliedRun ? {
+        status: rolloverReversedRun ? 'reversed' : 'applied',
+        learner_count: 1,
+        eligible_count: rolloverReversedRun ? 0 : 1,
+        blocked_count: 0,
+        can_reverse: !rolloverReversedRun,
+        rows: [],
+      } : { status: 'not_applied', learner_count: 0, eligible_count: 0, blocked_count: 0, can_reverse: false, rows: [] })
     if (path.endsWith('/rpc/apply_year_rollover_batch')) {
       rolloverAppliedRun = {
         id: 'rollover-run-1', status: 'applied', learner_count: body.p_expected_learner_count,
         applied_by_name: 'Main Admin', applied_at: '2026-10-29T12:30:00.000Z',
       }
       return send({ already_applied: false, batch_run_id: 'rollover-run-1', learner_count: 1, applied_at: rolloverAppliedRun.applied_at })
+    }
+    if (path.endsWith('/rpc/reverse_year_rollover_batch')) {
+      rolloverReversedRun = true
+      return send({ already_reversed: false, batch_run_id: 'rollover-run-1', learner_count: 1, reversal_reason: body.p_reason })
     }
     if (path.endsWith('/rpc/save_year_rollover_decision')) {
       rolloverDecisions = rolloverDecisions.filter(item => item.learner_id !== body.p_learner_id)
@@ -875,6 +896,27 @@ try {
     p_expected_learner_count: 1,
     p_confirmation: 'APPLY YEAR ROLLOVER 2026 TO 2027',
     p_accept_unknown_capacity: false,
+  })
+  await page.getByRole('heading', { name: 'Audit and reverse this rollover' }).waitFor()
+  const reverseButton = page.getByRole('button', { name: 'Reverse reviewed rollover' })
+  await reverseButton.waitFor()
+  assert.equal(await reverseButton.isDisabled(), true, 'reversal remains disabled until reason and exact confirmation are provided')
+  await page.getByLabel('Reason for reversing this rollover').fill('Correction approved after review')
+  await page.getByLabel(/Type REVERSE YEAR ROLLOVER 2026 TO 2027 to confirm/).fill('REVERSE YEAR ROLLOVER 2026 TO 2027')
+  assert.equal(await reverseButton.isDisabled(), false, 'an eligible batch can be reversed after explicit reason and confirmation')
+  await reverseButton.click()
+  await page.getByRole('heading', { name: 'Year rollover reversed' }).waitFor()
+  await page.getByText('Reason: Correction approved after review', { exact: true }).waitFor()
+  assert.equal(await page.getByRole('button', { name: 'Reverse reviewed rollover' }).count(), 0,
+    'a completed reversal cannot be submitted again')
+  const reversedRolloverWrite = writes.find(write => write.path.endsWith('/rpc/reverse_year_rollover_batch'))
+  assert.deepEqual(reversedRolloverWrite.body, {
+    p_source_academic_year: 2026,
+    p_destination_academic_year: 2027,
+    p_campus_id: 'campus',
+    p_expected_learner_count: 1,
+    p_reason: 'Correction approved after review',
+    p_confirmation: 'REVERSE YEAR ROLLOVER 2026 TO 2027',
   })
   await page.getByRole('heading', { name: 'Destination capacity preview' }).waitFor()
   await page.getByLabel('Destination class', { exact: true }).selectOption('class-form-1')
