@@ -800,6 +800,8 @@ await db.query(
   "insert into announcements(campus_id,title,body,published_at,expires_at) values($1,'Draft','hidden',null,null),($1,'Published','visible',now(),null),($1,'Scheduled','future',now()+interval '1 day',null),($1,'Expired','old',now()-interval '2 days',now()-interval '1 day')",
   [campus],
 )
+const visibleNewsletterId = (await db.query("select id from announcements where title='Published'")).rows[0].id
+const hiddenNewsletterId = (await db.query("select id from announcements where title='Draft'")).rows[0].id
 await rejects(
   () => db.query("insert into announcements(campus_id,title,body,published_at,expires_at) values($1,'Invalid expiry','hidden',now(),now()-interval '1 second')", [campus]),
   /announcements_expiry_after_publication/,
@@ -830,6 +832,34 @@ await rejects(
 )
 await as('student')
 await rejects(() => pay(1), /Administrator/)
+await db.query(
+  "insert into announcement_reads(announcement_id,user_id,read_at) values($1,$2,'2000-01-01T00:00:00Z')",
+  [visibleNewsletterId, ids.student],
+)
+const serverStampedRead = (await db.query(
+  'select read_at > $2::timestamptz as stamped_by_server from announcement_reads where announcement_id=$1 and user_id=$3',
+  [visibleNewsletterId, '2020-01-01T00:00:00Z', ids.student],
+)).rows[0]
+assert.equal(serverStampedRead.stamped_by_server, true, 'newsletter acknowledgement time is assigned by the database')
+const originalReadAt = (await db.query('select read_at from announcement_reads where announcement_id=$1 and user_id=$2', [visibleNewsletterId, ids.student])).rows[0].read_at
+await db.query(
+  "insert into announcement_reads(announcement_id,user_id,read_at) values($1,$2,'2000-01-01T00:00:00Z') on conflict(announcement_id,user_id) do nothing",
+  [visibleNewsletterId, ids.student],
+)
+assert.equal((await db.query('select count(*) from announcement_reads where announcement_id=$1 and user_id=$2', [visibleNewsletterId, ids.student])).rows[0].count, 1,
+  'a duplicate acknowledgement does not create another receipt')
+assert.equal(new Date((await db.query('select read_at from announcement_reads where announcement_id=$1 and user_id=$2', [visibleNewsletterId, ids.student])).rows[0].read_at).getTime(), new Date(originalReadAt).getTime(),
+  'a duplicate acknowledgement cannot rewrite the original read time')
+await rejects(
+  () => db.query('insert into announcement_reads(announcement_id,user_id) values($1,$2)', [hiddenNewsletterId, ids.student]),
+  /row-level security|policy/i,
+)
+await rejects(
+  () => db.query('insert into announcement_reads(announcement_id,user_id) values($1,$2)', [visibleNewsletterId, ids.parent]),
+  /row-level security|policy/i,
+)
+assert.equal((await db.query("update announcement_reads set read_at='2000-01-01T00:00:00Z' where announcement_id=$1 and user_id=$2 returning read_at", [visibleNewsletterId, ids.student])).rows.length, 0,
+  'users cannot rewrite an existing newsletter acknowledgement')
 await rejects(
   () => db.query('select * from principal_finance_fee_records()'),
   /Principal finance access required/,
@@ -859,6 +889,9 @@ assert.equal(
   'wellbeing notes stay private',
 )
 await as('parent')
+await db.query('insert into announcement_reads(announcement_id,user_id) values($1,$2)', [visibleNewsletterId, ids.parent])
+assert.equal((await db.query('select count(*) from announcement_reads where user_id=$1', [ids.parent])).rows[0].count, 1,
+  'a linked parent can acknowledge a newsletter visible to their active role')
 assert.equal((await db.query('select * from learner_records')).rows.length, 2)
 assert.equal((await db.query('select subject from timetable')).rows.length, 1)
 assert.equal(
@@ -910,6 +943,8 @@ assert.equal((await db.query('select * from fee_transactions')).rows.length, 0,
   'linked learner payment history is unavailable when the active role is not Parent')
 assert.equal((await db.query("select * from announcements where title='Published'")).rows.length, 0,
   'parent-linked announcements are unavailable when the active role is not Parent')
+assert.equal((await db.query('select * from announcement_reads')).rows.length, 0,
+  'newsletter acknowledgements disappear when their audience is no longer visible to the active role')
 assert.equal((await db.query("select * from timetable where subject='Maths'")).rows.length, 0,
   'parent-linked timetable is unavailable when the active role is not Parent')
 await rejects(
@@ -2682,5 +2717,5 @@ assert.ok((await db.query('select preview_fee_reconciliation(null,2026,$1) as re
 await db.exec('rollback')
 await db.close()
 console.log(
-  'PASS: migrations, Stages 70–73 teacher/parent learning-library allocation, enrollment, campus, stream, Storage and file lifecycle boundaries, newsletter publication/audience/expiry, report readiness/release attribution/announcement/audit, atomic payments/retries/rollback, class and subject scope, role membership isolation/grants/revocation/provisioning, active-role parent/child boundaries, teacher profile/record/RPC scope, guardian access, private records and teacher login.',
+  'PASS: migrations, Stages 70–74 teacher/parent learning-library allocation, enrollment, campus, stream, Storage and file lifecycle boundaries, newsletter publication/audience/expiry and user-bound acknowledgement, report readiness/release attribution/announcement/audit, atomic payments/retries/rollback, class and subject scope, role membership isolation/grants/revocation/provisioning, active-role parent/child boundaries, teacher profile/record/RPC scope, guardian access, private records and teacher login.',
 )

@@ -547,7 +547,7 @@ export default function PortalDashboard() {
         ) : ['announcements', 'timetable'].includes(view) ? (
           <SchoolContent key={view} view={view} profile={profile} user={user} />
         ) : view === 'notifications' ? (
-          <NotificationCenter user={user} />
+          <NotificationCenter user={user} profile={profile} />
         ) : view === 'account' ? (
           <AccountSettings />
         ) : admin ? (
