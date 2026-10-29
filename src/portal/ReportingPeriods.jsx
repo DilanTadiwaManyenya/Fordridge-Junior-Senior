@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { Fragment, useCallback, useEffect, useMemo, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { workflowError } from './workflow'
 
@@ -14,6 +14,9 @@ export default function ReportingPeriods({ profile }) {
   const [notice, setNotice] = useState('')
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+  const [closingPeriodId, setClosingPeriodId] = useState('')
+  const [closeReason, setCloseReason] = useState('')
+  const [closing, setClosing] = useState(false)
 
   const load = useCallback(async () => {
     const [campusResult, periodResult, publicationResult] = await Promise.all([
@@ -61,5 +64,27 @@ export default function ReportingPeriods({ profile }) {
     setSaving(false)
   }
 
-  return <section><header className="workflow-heading"><div><p className="eyebrow">Academic services</p><h1>Reporting periods</h1><p className="progress-report-note">Register campus, year and term periods. Open/closed status is tracked separately from report publication. No term dates are assumed.</p></div></header>{error && <p className="workflow-error" role="alert">{error}</p>}{notice && <p className="workflow-notice" role="status">{notice}</p>}<form className="workflow-panel workflow-form" onSubmit={register}><label>Campus<select required value={campusId} onChange={event => setCampusId(event.target.value)}>{campuses.map(item => <option value={item.id} key={item.id}>{item.name}</option>)}</select></label><label>Academic year<input type="number" min="2000" max="2100" required value={form.academic_year} onChange={event => setForm({ ...form, academic_year: event.target.value })} /></label><label>Term<select required value={form.academic_term} onChange={event => setForm({ ...form, academic_term: event.target.value })}>{terms.map(item => <option key={item}>{item}</option>)}</select></label><div className="workflow-actions workflow-wide"><button className="primary-action" disabled={saving || !campusId}>{saving ? 'Registering…' : 'Register period'}</button></div></form><section className="workflow-panel"><h2>Registered periods</h2>{loading ? <p role="status">Loading reporting periods…</p> : periods.length ? <div className="workflow-table-wrap"><table className="workflow-table"><thead><tr><th>Campus</th><th>Academic year</th><th>Term</th><th>Period state</th><th>Current</th><th>Revision</th><th>Report release</th></tr></thead><tbody>{periods.map(item => { const publication = publicationByPeriod.get(`${item.campus_id}|${item.academic_year}|${item.academic_term}`); return <tr key={item.id}><td>{item.campus?.name || 'Campus'}</td><td>{item.academic_year}</td><td>{item.academic_term}</td><td>{item.period_status === 'closed' ? 'Closed' : 'Open'}</td><td>{item.is_current ? 'Current' : 'Not set'}</td><td>{item.revision}</td><td>{publication?.published_at ? 'Published' : publication ? 'Draft' : 'Not started'}</td></tr> })}</tbody></table></div> : <p className="portal-empty-copy">No reporting periods are registered yet.</p>}</section></section>
+  async function closePeriod(event, period) {
+    event.preventDefault()
+    if (closeReason.trim().length < 8) return setError('Enter a reason of at least 8 characters to close this period.')
+    setClosing(true)
+    setError('')
+    setNotice('')
+    const { error: closeError } = await supabase.rpc('close_reporting_period', {
+      p_period_id: period.id,
+      p_expected_revision: period.revision,
+      p_reason: closeReason.trim(),
+    })
+    if (closeError) setError(workflowError(closeError))
+    else {
+      setNotice(`${period.academic_year} ${period.academic_term} closed at revision ${period.revision + 1}.`)
+      setCloseReason('')
+      setClosingPeriodId('')
+      setLoading(true)
+      await load()
+    }
+    setClosing(false)
+  }
+
+  return <section><header className="workflow-heading"><div><p className="eyebrow">Academic services</p><h1>Reporting periods</h1><p className="progress-report-note">Register campus, year and term periods. Open/closed status is tracked separately from report publication. No term dates are assumed.</p></div></header>{error && <p className="workflow-error" role="alert">{error}</p>}{notice && <p className="workflow-notice" role="status">{notice}</p>}<form className="workflow-panel workflow-form" onSubmit={register}><label>Campus<select required value={campusId} onChange={event => setCampusId(event.target.value)}>{campuses.map(item => <option value={item.id} key={item.id}>{item.name}</option>)}</select></label><label>Academic year<input type="number" min="2000" max="2100" required value={form.academic_year} onChange={event => setForm({ ...form, academic_year: event.target.value })} /></label><label>Term<select required value={form.academic_term} onChange={event => setForm({ ...form, academic_term: event.target.value })}>{terms.map(item => <option key={item}>{item}</option>)}</select></label><div className="workflow-actions workflow-wide"><button className="primary-action" disabled={saving || !campusId}>{saving ? 'Registering…' : 'Register period'}</button></div></form><section className="workflow-panel"><h2>Registered periods</h2>{loading ? <p role="status">Loading reporting periods…</p> : periods.length ? <div className="workflow-table-wrap"><table className="workflow-table"><thead><tr><th>Campus</th><th>Academic year</th><th>Term</th><th>Period state</th><th>Current</th><th>Revision</th><th>Report release</th><th>Action</th></tr></thead><tbody>{periods.map(item => { const publication = publicationByPeriod.get(`${item.campus_id}|${item.academic_year}|${item.academic_term}`); return <Fragment key={item.id}><tr><td>{item.campus?.name || 'Campus'}</td><td>{item.academic_year}</td><td>{item.academic_term}</td><td>{item.period_status === 'closed' ? 'Closed' : 'Open'}</td><td>{item.is_current ? 'Current' : 'Not set'}</td><td>{item.revision}</td><td>{publication?.published_at ? 'Published' : publication ? 'Draft' : 'Not started'}</td><td>{item.period_status === 'open' ? <button type="button" className="secondary-action" disabled={closing} onClick={() => { setError(''); setClosingPeriodId(item.id); setCloseReason('') }}>Close period</button> : '—'}</td></tr>{closingPeriodId === item.id && <tr><td colSpan="8"><form className="workflow-form" onSubmit={event => closePeriod(event, item)}><label>Reason for closing this period<textarea required minLength={8} maxLength={500} value={closeReason} onChange={event => setCloseReason(event.target.value)} /></label><div className="workflow-actions"><button className="primary-action" disabled={closing || closeReason.trim().length < 8}>{closing ? 'Closing…' : 'Confirm close'}</button><button type="button" className="secondary-action" disabled={closing} onClick={() => { setClosingPeriodId(''); setCloseReason('') }}>Cancel</button></div></form></td></tr>}</Fragment> })}</tbody></table></div> : <p className="portal-empty-copy">No reporting periods are registered yet.</p>}</section></section>
 }

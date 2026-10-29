@@ -212,8 +212,8 @@ await rejects(
   /already registered/,
 )
 await as('teacher')
-assert.equal((await db.query('select count(*) from reporting_periods')).rows[0].count, 0,
-  'teachers cannot read the administrator period registry')
+assert.equal((await db.query('select count(*) from reporting_periods')).rows[0].count, 1,
+  'teachers can read the reporting-period status needed to prevent closed-period mark entry')
 await rejects(
   () => db.query("select register_reporting_period($1,2027,'Term 1')", [campus]),
   /Administrator access required/,
@@ -761,6 +761,42 @@ await db.query("select record_bulk_marks('Baseline mark','Science',current_date,
   { student_id: ids.other_student, score: 60 },
   { student_id: ids.stranger, score: 55 },
 ])])
+assert.equal(
+  (await db.query("select close_reporting_period($1,1,'Marks reviewed and term results checked') as revision", [registeredPeriodId])).rows[0].revision,
+  2,
+  'closing a period advances its expected revision',
+)
+assert.deepEqual(
+  (await db.query('select period_status,revision from reporting_periods where id=$1', [registeredPeriodId])).rows[0],
+  { period_status: 'closed', revision: 2 },
+  'reviewed close changes the registry state to closed',
+)
+assert.equal(
+  (await db.query("select reason from reporting_period_events where period_id=$1 and revision=2 and action='closed'", [registeredPeriodId])).rows[0].reason,
+  'Marks reviewed and term results checked',
+  'close reason is preserved in the append-only event history',
+)
+assert.equal(
+  (await db.query("select count(*) from audit_trail where entity_type='reporting_period' and entity_id=$1 and action='closed'", [registeredPeriodId])).rows[0].count,
+  1,
+  'period close is recorded in the activity audit trail',
+)
+await rejects(
+  () => db.query("select close_reporting_period($1,1,'Marks reviewed and term results checked')", [registeredPeriodId]),
+  /period changed/,
+)
+await rejects(
+  () => db.query("select close_reporting_period($1,2,'short')", [registeredPeriodId]),
+  /at least 8 characters/,
+)
+await rejects(
+  () => db.query("select record_bulk_coursework_marks('Attempt after close','Science',current_date,2026,'Term 1',100,$1::jsonb)", [JSON.stringify([{ student_id: ids.stream_student, score: 50 }])]),
+  /reporting period is closed/,
+)
+await rejects(
+  () => db.query("insert into learner_records(student_id,kind,event_date,title,subject,score,max_score,academic_year,academic_term,assessment_type) values($1,'academic',current_date,'Direct after close','Science',70,100,2026,'Term 1','markbook')", [ids.stream_student]),
+  /reporting period is closed/,
+)
 await db.query(
   "insert into report_grade_bands(campus_id,minimum_percent,maximum_percent,grade,descriptor) values($1,0,100,'A','Excellent')",
   [campus],
@@ -775,8 +811,8 @@ const publicationId = (await db.query(
 )).rows[0].id
 assert.equal(
   (await db.query('select period_status from reporting_periods where id=$1', [registeredPeriodId])).rows[0].period_status,
-  'open',
-  'publishing report snapshots does not change the separate period status',
+  'closed',
+  'publishing report snapshots does not change the separate closed-period status',
 )
 const markbookAverage = (await db.query(
   "select round(avg(score / max_score * 100), 2) as value from learner_records where student_id=$1 and kind='academic' and assessment_type='markbook' and academic_year=2026 and academic_term='Term 1'",
@@ -792,15 +828,15 @@ assert.equal(frozen.average_percent, markbookAverage, 'coursework remains visibl
 assert.equal(frozen.subject_signatories.Science, 'T', 'whole-class subject allocations appear on stream-specific report snapshots')
 await rejects(
   () => db.query("select record_bulk_coursework_marks('After publication','Science',current_date,2026,'Term 1',100,$1::jsonb)", [JSON.stringify([{ student_id: ids.stream_student, score: 50 }])]),
-  /academic period has been published/,
+  /reporting period is closed|academic period has been published/,
 )
 await rejects(
   () => db.query("insert into learner_records(student_id,kind,event_date,title,subject,score,max_score,academic_year,academic_term,assessment_type) values($1,'academic',current_date,'Direct late mark','Science',70,100,2026,'Term 1','markbook')", [ids.stream_student]),
-  /academic period has been published/,
+  /reporting period is closed|academic period has been published/,
 )
 await rejects(
   () => db.query("delete from learner_records where student_id=$1 and title='Quiz 1' and assessment_type='coursework'", [ids.stream_student]),
-  /academic period has been published/,
+  /reporting period is closed|academic period has been published/,
 )
 await as('teacher')
 await rejects(

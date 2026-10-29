@@ -12,6 +12,7 @@ export default function BulkMarks({ profile, assessmentType = 'markbook' }) {
   const admin = profile.role === 'admin'
   const [learners, setLearners] = useState([])
   const [allocations, setAllocations] = useState([])
+  const [periods, setPeriods] = useState([])
   const [groups, setGroups] = useState([])
   const [group, setGroup] = useState('')
   const [subject, setSubject] = useState('')
@@ -21,12 +22,14 @@ export default function BulkMarks({ profile, assessmentType = 'markbook' }) {
   const [saving, setSaving] = useState(false)
   const [form, setForm] = useState({ title: '', event_date: new Date().toLocaleDateString('en-CA'), academic_year: String(new Date().getFullYear()), academic_term: 'Term 1', max_score: '100' })
   const load = useCallback(async () => {
-    const [students, assigned] = await Promise.all([
+    const [students, assigned, reportingPeriods] = await Promise.all([
       supabase.from('profiles').select('id,full_name,class_level,class_stream,campus_id,campus:campuses(name)').eq('role', 'student').neq('enrollment_status', 'inactive').order('full_name'),
       supabase.from('teacher_class_assignments').select('id,teacher_id,campus_id,class_level,class_stream,subject,campus:campuses(name)').not('subject', 'is', null).order('class_level'),
+      supabase.from('reporting_periods').select('campus_id,academic_year,academic_term,period_status'),
     ])
     if (students.error) { setError(workflowError(students.error)); return }
     if (assigned.error) { setError(workflowError(assigned.error)); return }
+    if (reportingPeriods.error) { setError(workflowError(reportingPeriods.error)); return }
     const availableAllocations = (assigned.data || []).filter(item => admin || item.teacher_id === profile.id)
     const keys = new Set()
     const same = (left, right) => String(left || '').trim().toLowerCase() === String(right || '').trim().toLowerCase()
@@ -36,6 +39,7 @@ export default function BulkMarks({ profile, assessmentType = 'markbook' }) {
     }
     setLearners(students.data || [])
     setAllocations(availableAllocations)
+    setPeriods(reportingPeriods.data || [])
     setGroups([...keys])
     setGroup(current => keys.has(current) ? current : [...keys][0] || '')
   }, [admin, profile.id])
@@ -43,6 +47,7 @@ export default function BulkMarks({ profile, assessmentType = 'markbook' }) {
   const [campusId, level, stream] = useMemo(() => { try { return JSON.parse(group) } catch { return [] } }, [group])
   const selected = useMemo(() => learners.filter(item => item.campus_id === campusId && same(item.class_level, level) && same(item.class_stream, stream)), [learners, campusId, level, stream])
   const subjectOptions = useMemo(() => [...new Map(allocations.filter(item => item.campus_id === campusId && same(item.class_level, level) && (!item.class_stream || same(item.class_stream, stream))).map(item => [item.subject.trim().toLowerCase(), item.subject.trim()])).values()], [allocations, campusId, level, stream])
+  const periodClosed = periods.some(item => item.campus_id === campusId && Number(item.academic_year) === Number(form.academic_year) && item.academic_term === form.academic_term && item.period_status === 'closed')
   const subjectKey = subjectOptions.join('|')
   useEffect(() => {
     if (!subjectOptions.includes(subject)) setSubject(subjectOptions[0] || '')
@@ -52,6 +57,7 @@ export default function BulkMarks({ profile, assessmentType = 'markbook' }) {
   }, [selected])
   async function save(event) {
     event.preventDefault()
+    if (periodClosed) return setError('This reporting period is closed. Contact an administrator before changing marks.')
     if (!form.title.trim()) return setError('Enter an assessment title.')
     if (!subject) return setError('Choose a subject allocated to this class.')
     if (!form.event_date || form.event_date > localDateValue()) return setError('Enter an assessment date that is today or earlier.')
@@ -73,5 +79,5 @@ export default function BulkMarks({ profile, assessmentType = 'markbook' }) {
     setSaving(false)
   }
   const isCoursework = assessmentType === 'coursework'
-  return <section><header className="workflow-heading"><div><p className="eyebrow">{isCoursework ? 'Course Work' : 'Assessment register'}</p><h1>{isCoursework ? 'Course Work' : 'Bulk mark entry'}</h1><p className="progress-report-note">{isCoursework ? 'Record raw coursework marks for your allocated learners. School weighting rules have not been configured.' : 'Enter marks only for a subject allocated to this class and teacher.'}</p></div></header>{error && <p className="workflow-error" role="alert">{error}</p>}{notice && <p className="workflow-notice" role="status">{notice}</p>}<form className="workflow-panel" onSubmit={save}><div className="bulk-marks-controls"><label>Class<select value={group} onChange={event => setGroup(event.target.value)}><option value="">Select class</option>{groups.map(key => { const [id, classLevel, classStream] = JSON.parse(key); const learner = learners.find(item => item.campus_id === id && same(item.class_level, classLevel) && same(item.class_stream, classStream)); return <option key={key} value={key}>{learner?.campus?.name || 'Campus'} · {classLevel}{classStream ? ` · ${classStream}` : ' · All streams'}</option> })}</select></label><label>Subject<select required value={subject} onChange={event => setSubject(event.target.value)}><option value="">Select allocated subject</option>{subjectOptions.map(item => <option key={item}>{item}</option>)}</select></label><label>{isCoursework ? 'Coursework title' : 'Assessment title'}<input required value={form.title} onChange={event => setForm({ ...form, title: event.target.value })} /></label><label>Date<input type="date" max={localDateValue()} required value={form.event_date} onChange={event => setForm({ ...form, event_date: event.target.value })} /></label><label>Year<input type="number" min="2000" max={new Date().getFullYear()} required value={form.academic_year} onChange={event => setForm({ ...form, academic_year: event.target.value })} /></label><label>Term<select value={form.academic_term} onChange={event => setForm({ ...form, academic_term: event.target.value })}>{['Term 1', 'Term 2', 'Term 3'].map(item => <option key={item}>{item}</option>)}</select></label><label>Out of<input type="number" min="0.01" required value={form.max_score} onChange={event => setForm({ ...form, max_score: event.target.value })} /></label></div>{selected.length && subject ? <><div className="bulk-marks-list">{selected.map(item => <label key={item.id}><span>{item.full_name}</span><input type="number" min="0" max={form.max_score} step="0.01" required value={marks[item.id] || ''} onChange={event => setMarks({ ...marks, [item.id]: event.target.value })} /></label>)}</div><button className="primary-action" disabled={saving}>{saving ? 'Saving…' : isCoursework ? 'Save coursework marks' : 'Save subject marks'}</button></> : <p className="portal-empty-copy">{allocations.length ? 'Choose an allocated class and subject to start mark entry.' : 'No subject allocations are available yet. Ask an administrator to add confirmed subjects in Subject allocations.'}</p>}</form></section>
+  return <section><header className="workflow-heading"><div><p className="eyebrow">{isCoursework ? 'Course Work' : 'Assessment register'}</p><h1>{isCoursework ? 'Course Work' : 'Bulk mark entry'}</h1><p className="progress-report-note">{isCoursework ? 'Record raw coursework marks for your allocated learners. School weighting rules have not been configured.' : 'Enter marks only for a subject allocated to this class and teacher.'}</p></div></header>{periodClosed && <p className="workflow-error" role="alert">This reporting period is closed. Contact an administrator before changing marks.</p>}{error && <p className="workflow-error" role="alert">{error}</p>}{notice && <p className="workflow-notice" role="status">{notice}</p>}<form className="workflow-panel" onSubmit={save}><div className="bulk-marks-controls"><label>Class<select value={group} onChange={event => setGroup(event.target.value)}><option value="">Select class</option>{groups.map(key => { const [id, classLevel, classStream] = JSON.parse(key); const learner = learners.find(item => item.campus_id === id && same(item.class_level, classLevel) && same(item.class_stream, classStream)); return <option key={key} value={key}>{learner?.campus?.name || 'Campus'} · {classLevel}{classStream ? ` · ${classStream}` : ' · All streams'}</option> })}</select></label><label>Subject<select required value={subject} onChange={event => setSubject(event.target.value)}><option value="">Select allocated subject</option>{subjectOptions.map(item => <option key={item}>{item}</option>)}</select></label><label>{isCoursework ? 'Coursework title' : 'Assessment title'}<input required value={form.title} onChange={event => setForm({ ...form, title: event.target.value })} /></label><label>Date<input type="date" max={localDateValue()} required value={form.event_date} onChange={event => setForm({ ...form, event_date: event.target.value })} /></label><label>Year<input type="number" min="2000" max={new Date().getFullYear()} required value={form.academic_year} onChange={event => setForm({ ...form, academic_year: event.target.value })} /></label><label>Term<select value={form.academic_term} onChange={event => setForm({ ...form, academic_term: event.target.value })}>{['Term 1', 'Term 2', 'Term 3'].map(item => <option key={item}>{item}</option>)}</select></label><label>Out of<input type="number" min="0.01" required value={form.max_score} onChange={event => setForm({ ...form, max_score: event.target.value })} /></label></div>{selected.length && subject ? <><div className="bulk-marks-list">{selected.map(item => <label key={item.id}><span>{item.full_name}</span><input type="number" min="0" max={form.max_score} step="0.01" required value={marks[item.id] || ''} onChange={event => setMarks({ ...marks, [item.id]: event.target.value })} /></label>)}</div><button className="primary-action" disabled={saving || periodClosed}>{saving ? 'Saving…' : isCoursework ? 'Save coursework marks' : 'Save subject marks'}</button></> : <p className="portal-empty-copy">{allocations.length ? 'Choose an allocated class and subject to start mark entry.' : 'No subject allocations are available yet. Ask an administrator to add confirmed subjects in Subject allocations.'}</p>}</form></section>
 }

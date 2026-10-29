@@ -70,6 +70,10 @@ async function pageFor(
     failPayment = true,
     activityAttempts = 0,
     activityCanSucceed = false
+  const reportingPeriods = [{
+    id: 'period-open', campus_id: 'campus', academic_year: 2026, academic_term: 'Term 1',
+    period_status: 'open', is_current: false, revision: 4, campus: { name: 'Junior School' },
+  }]
   await page.exposeFunction('allowActivitySuccess', () => {
     activityCanSucceed = true
   })
@@ -117,7 +121,22 @@ async function pageFor(
     if (path.endsWith('/rpc/admin_update_profile')) return send(null)
     if (path.endsWith('/rpc/admin_correct_learner_profile')) return send(null)
     if (path.endsWith('/rpc/admin_record_parent_recovery_support')) return send(null)
-    if (path.endsWith('/rpc/register_reporting_period')) return send('period-id')
+    if (path.endsWith('/rpc/register_reporting_period')) {
+      reportingPeriods.push({
+        id: 'period-registered', campus_id: body.p_campus_id, academic_year: body.p_academic_year,
+        academic_term: body.p_academic_term, period_status: 'open', is_current: false, revision: 1,
+        campus: { name: 'Junior School' },
+      })
+      return send('period-registered')
+    }
+    if (path.endsWith('/rpc/close_reporting_period')) {
+      const period = reportingPeriods.find(item => item.id === body.p_period_id)
+      if (period && period.revision === body.p_expected_revision) {
+        period.period_status = 'closed'
+        period.revision += 1
+      }
+      return send(period?.revision ?? null)
+    }
     if (path.endsWith('/rpc/record_fee_payment')) {
       if (failPayment) {
         failPayment = false
@@ -231,7 +250,8 @@ async function pageFor(
       return send(
         method === 'GET' ? [] : single ? { id: 'saved' } : [{ id: 'saved' }],
       )
-    if (['reporting_periods', 'reporting_period_events', 'report_publications'].some(table => path.endsWith('/' + table)))
+    if (path.endsWith('/reporting_periods')) return send(reportingPeriods)
+    if (['reporting_period_events', 'report_publications'].some(table => path.endsWith('/' + table)))
       return send([])
     throw new Error(`Unmocked request: ${method} ${path}`)
   })
@@ -558,11 +578,23 @@ try {
   await page.getByRole('status').filter({ hasText: 'registered as open' }).waitFor()
   const periodWrite = writes.filter(write => write.path.endsWith('register_reporting_period')).at(-1)
   assert.deepEqual(periodWrite.body, { p_campus_id: 'campus', p_academic_year: 2027, p_academic_term: 'Term 2' })
+  const openPeriodRow = page.getByRole('row').filter({ hasText: 'Term 1' })
+  await openPeriodRow.getByRole('button', { name: 'Close period' }).click()
+  await page.getByLabel('Reason for closing this period').fill('Reviewed marks and verified term results')
+  await page.getByRole('button', { name: 'Confirm close' }).click()
+  await page.getByRole('status').filter({ hasText: 'closed at revision 5' }).waitFor()
+  const closeWrite = writes.filter(write => write.path.endsWith('close_reporting_period')).at(-1)
+  assert.deepEqual(closeWrite.body, {
+    p_period_id: 'period-open',
+    p_expected_revision: 4,
+    p_reason: 'Reviewed marks and verified term results',
+  })
+  assert.equal(await page.getByRole('row').filter({ hasText: 'Term 1' }).getByText('Closed').count(), 1)
   await parent.goto('http://127.0.0.1:5179/portal/report-periods')
   await parent.waitForURL('http://127.0.0.1:5179/portal')
   assert.deepEqual(errors, [])
   console.log(
-    'PASS: profile editing, account creation, reporting-period registration, publishing, records, timetable, payment retry, teacher sign-in and Coursework access, parent route guards, linked-account directory/search, credential-free audited recovery guidance, mobile layout; no uncaught browser errors. All backend requests were mocked.',
+    'PASS: profile editing, account creation, reporting-period registration and reviewed close, publishing, records, timetable, payment retry, teacher sign-in and Coursework access, parent route guards, linked-account directory/search, credential-free audited recovery guidance, mobile layout; no uncaught browser errors. All backend requests were mocked.',
   )
 } catch (error) {
   const p = browser.contexts()[0]?.pages()[0]
