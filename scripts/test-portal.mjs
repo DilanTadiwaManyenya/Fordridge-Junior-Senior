@@ -546,6 +546,30 @@ await rejects(
 await as('admin')
 assert.equal((await db.query("select has_function_privilege('anon','public.preview_year_rollover(uuid,text,text,integer,integer)','EXECUTE') as allowed")).rows[0].allowed,
   false, 'anonymous callers cannot access the rollover readiness preview')
+await db.query("update school_classes set capacity=3 where id=$1", [formOne])
+await db.query("update school_class_streams set capacity=1 where id=$1", [streamA])
+const destinationPreview = (await db.query(
+  'select preview_year_rollover_destinations($1) as result', [campus],
+)).rows[0].result
+const formOneDestination = destinationPreview.find(destination => destination.id === formOne)
+const formTwoDestination = destinationPreview.find(destination => destination.class_level === 'Form 2')
+assert.equal(formOneDestination.current_count, 2, 'destination preview counts the active roster for each configured class')
+assert.equal(formOneDestination.capacity, 3, 'destination preview returns the configured class capacity')
+assert.equal(formOneDestination.streams.find(stream => stream.id === streamA).current_count, 1,
+  'destination preview counts active learners in a configured stream')
+assert.equal(formOneDestination.streams.find(stream => stream.id === streamA).capacity, 1,
+  'destination preview preserves the configured stream capacity')
+assert.equal(formOneDestination.unmatched_stream_count, 0, 'destination preview reports no unresolved stream assignments when all learners match')
+assert.equal(formTwoDestination.streams.length, 0, 'destination preview does not invent streams for a class with no configured streams')
+assert.equal(formTwoDestination.capacity, null, 'an unset class capacity remains unknown')
+await as('teacher')
+await rejects(
+  () => db.query('select preview_year_rollover_destinations($1)', [campus]),
+  /Main administrator access required/,
+)
+await as('admin')
+assert.equal((await db.query("select has_function_privilege('anon','public.preview_year_rollover_destinations(uuid)','EXECUTE') as allowed")).rows[0].allowed,
+  false, 'anonymous callers cannot access rollover destination counts')
 await db.query('select admin_update_profile($1,$2,$3,$4,$5,$6,$7)', [ids.stream_teacher, 'Stream Teacher', campus, null, null, null, null])
 await db.query('select admin_update_profile($1,$2,$3,$4,$5,$6,$7)', [ids.subject_teacher, 'Subject Teacher', campus, null, null, null, null])
 await db.query(

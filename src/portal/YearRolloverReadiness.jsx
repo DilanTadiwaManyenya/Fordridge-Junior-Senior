@@ -21,6 +21,12 @@ export default function YearRolloverReadiness() {
   const [filters, setFilters] = useState({ campusId: '', search: '', readiness: 'all' })
   const [draft, setDraft] = useState(filters)
   const [preview, setPreview] = useState(null)
+  const [destinations, setDestinations] = useState([])
+  const [destinationLoading, setDestinationLoading] = useState(true)
+  const [destinationError, setDestinationError] = useState('')
+  const [destinationClassId, setDestinationClassId] = useState('')
+  const [destinationStreamId, setDestinationStreamId] = useState('')
+  const [proposedCount, setProposedCount] = useState('0')
   const [page, setPage] = useState(1)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -40,6 +46,17 @@ export default function YearRolloverReadiness() {
     setLoading(false)
   }, [filters, page])
 
+  const loadDestinations = useCallback(async () => {
+    setDestinationLoading(true)
+    setDestinationError('')
+    const { data, error: queryError } = await supabase.rpc('preview_year_rollover_destinations', {
+      p_campus_id: filters.campusId || null,
+    })
+    if (queryError) setDestinationError(workflowError(queryError))
+    else setDestinations(Array.isArray(data) ? data : [])
+    setDestinationLoading(false)
+  }, [filters.campusId])
+
   useEffect(() => {
     let mounted = true
     async function loadCampuses() {
@@ -53,6 +70,7 @@ export default function YearRolloverReadiness() {
   }, [])
 
   useEffect(() => { loadPreview() }, [loadPreview])
+  useEffect(() => { loadDestinations() }, [loadDestinations])
 
   function applyFilters(event) {
     event.preventDefault()
@@ -62,6 +80,23 @@ export default function YearRolloverReadiness() {
 
   const summary = preview?.summary || { ready_for_decision: 0, needs_review: 0, not_currently_active: 0 }
   const rows = preview?.rows || []
+  const destinationClass = destinations.find(item => item.id === destinationClassId)
+  const destinationStreams = destinationClass?.streams || []
+  const destinationStream = destinationStreams.find(item => item.id === destinationStreamId)
+  const hasStreams = destinationStreams.length > 0
+  const proposed = /^\d+$/.test(proposedCount) ? Number(proposedCount) : null
+  const currentDestinationCount = hasStreams ? destinationStream?.current_count : destinationClass?.current_count
+  const configuredCapacity = hasStreams ? destinationStream?.capacity : destinationClass?.capacity
+  const projectedCount = proposed === null || currentDestinationCount == null ? null : currentDestinationCount + proposed
+  const capacityStatus = !destinationClass
+    ? 'Select an existing destination class.'
+    : hasStreams && !destinationStream
+      ? 'Select an existing stream. Stream allocations are not inferred.'
+      : configuredCapacity == null
+        ? 'Capacity is not set; fit cannot be determined.'
+        : projectedCount > configuredCapacity
+          ? 'Proposed total exceeds the recorded capacity.'
+          : 'Proposed total is within the recorded capacity.'
 
   return (
     <section>
@@ -121,6 +156,42 @@ export default function YearRolloverReadiness() {
             <button type="button" className="secondary-action" disabled={loading || page >= (preview?.total_pages || 1)} onClick={() => setPage(value => value + 1)}>Next</button>
           </div>
         </footer>
+      </section>
+      <section className="workflow-panel rollover-readiness-panel rollover-destination-panel">
+        <header className="rollover-panel-heading">
+          <div><h2>Destination capacity preview</h2><p>Compare a proposed additional learner count with recorded active roster counts and configured capacity. This is a what-if check only; it does not assign learners.</p></div>
+          {destinationLoading && <span role="status">Refreshing destinations…</span>}
+        </header>
+        {destinationError && <p className="workflow-error" role="alert">{destinationError}</p>}
+        {!destinationLoading && !destinationError && destinations.length === 0 && <p className="portal-empty-copy">No active destination classes are configured for this campus filter. Add only school-approved class and stream names in Classes after allocations are confirmed.</p>}
+        {destinations.length > 0 && <div className="rollover-destination-content">
+          <div className="workflow-form rollover-destination-form">
+            <label>Destination class
+              <select value={destinationClassId} onChange={event => { setDestinationClassId(event.target.value); setDestinationStreamId('') }}>
+                <option value="">Choose configured class</option>
+                {destinations.map(item => <option key={item.id} value={item.id}>{item.campus_name} · {item.class_level}</option>)}
+              </select>
+            </label>
+            {hasStreams && <label>Destination stream
+              <select value={destinationStreamId} onChange={event => setDestinationStreamId(event.target.value)}>
+                <option value="">Choose configured stream</option>
+                {destinationStreams.map(item => <option key={item.id} value={item.id}>{item.stream_name}</option>)}
+              </select>
+            </label>}
+            <label>Additional learners proposed
+              <input type="number" min="0" step="1" inputMode="numeric" value={proposedCount} onChange={event => setProposedCount(event.target.value)} />
+            </label>
+          </div>
+          {destinationClass && <div className="rollover-destination-details" aria-live="polite">
+            <p><strong>Destination:</strong> {destinationClass.campus_name} · {destinationClass.class_level}{hasStreams && destinationStream ? ` · ${destinationStream.stream_name}` : ''}</p>
+            <p><strong>Current active count:</strong> {currentDestinationCount == null ? (hasStreams && !destinationStream ? 'Choose a stream' : 'Unavailable') : currentDestinationCount}</p>
+            <p><strong>Recorded capacity:</strong> {configuredCapacity == null ? 'Not set' : configuredCapacity}</p>
+            <p><strong>Projected total:</strong> {projectedCount == null ? 'Enter a whole number and select a destination' : projectedCount}</p>
+            <p className="workflow-notice" role="status">{proposed === null ? 'Enter a whole number of zero or more.' : capacityStatus}</p>
+            {hasStreams && destinationClass.unmatched_stream_count > 0 && <p className="workflow-notice" role="note">{destinationClass.unmatched_stream_count} current active learner(s) have an unset or unmatched stream in this class; their destination is unresolved and they are excluded from each stream count.</p>}
+            <p className="progress-report-note">A missing capacity stays unknown and is never treated as zero. Proposed counts are not saved.</p>
+          </div>}
+        </div>}
       </section>
     </section>
   )

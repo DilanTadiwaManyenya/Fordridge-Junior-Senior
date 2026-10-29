@@ -181,6 +181,15 @@ async function pageFor(
         total_pages: 1,
         summary: { ready_for_decision: 1, needs_review: 1, not_currently_active: 0 },
       })
+    if (path.endsWith('/rpc/preview_year_rollover_destinations'))
+      return send([{
+        id: 'class-form-1', campus_id: 'campus', campus_name: 'Junior School', class_level: 'Form 1',
+        capacity: 4, current_count: 2, unmatched_stream_count: 1,
+        streams: [
+          { id: 'stream-a', stream_name: 'A', capacity: 2, current_count: 1 },
+          { id: 'stream-b', stream_name: 'B', capacity: null, current_count: 1 },
+        ],
+      }])
     if (path.endsWith('/audit_trail')) {
       activityAttempts += 1
       if (!activityCanSucceed)
@@ -756,6 +765,17 @@ try {
   await page.getByText('Learner Needs Review', { exact: true }).waitFor()
   await page.getByText('Campus is not recorded.', { exact: false }).waitFor()
   await page.getByText('This preview does not change learner profiles, promote learners, or assign streams.', { exact: false }).waitFor()
+  await page.getByRole('heading', { name: 'Destination capacity preview' }).waitFor()
+  await page.getByLabel('Destination class').selectOption('class-form-1')
+  await page.getByLabel('Destination stream').selectOption('stream-a')
+  await page.getByLabel('Additional learners proposed').fill('2')
+  await page.locator('.rollover-destination-details').getByText(/Projected total: 3/).waitFor()
+  await page.getByRole('status').filter({ hasText: 'exceeds the recorded capacity' }).waitFor()
+  await page.getByText('1 current active learner(s) have an unset or unmatched stream', { exact: false }).waitFor()
+  await page.getByLabel('Destination stream').selectOption('stream-b')
+  await page.getByText('Capacity is not set; fit cannot be determined.', { exact: true }).waitFor()
+  assert.equal(writes.filter(write => write.path.includes('/rpc/preview_year_rollover_destinations')).length > 0, true,
+    'destination capacity preview is loaded from its read-only database RPC')
   await page.goto('http://127.0.0.1:5179/portal/report-verification')
   await page.getByRole('heading', { name: 'Report verification' }).waitFor()
   await page.getByLabel('Integrity hash').fill('a'.repeat(32))
@@ -896,7 +916,7 @@ try {
   await parent.waitForURL('http://127.0.0.1:5179/portal')
   assert.deepEqual(errors, [])
   console.log(
-    'PASS: profile editing, account creation, Reliance grade-band boundary preview and audited scale save, read-only rollover readiness and review reasons, report readiness and release attribution, report integrity verified/mismatch/not-found flows, historical release-time learner/class/stream/campus identity and legacy-context disclosure, Junior/Senior/Sixth Form report variants, A4 print context/title/width and hidden portal controls, coursework exclusion from averages, reporting-period registration and reviewed close, publishing, records, timetable, payment retry, teacher sign-in and Coursework access, parent route guards, linked-account directory/search, credential-free audited recovery guidance, mobile layout; no uncaught browser errors. All backend requests were mocked.',
+    'PASS: profile editing, account creation, Reliance grade-band boundary preview and audited scale save, read-only rollover readiness and review reasons, destination capacity what-if/unknown-capacity/unmatched-stream preview, report readiness and release attribution, report integrity verified/mismatch/not-found flows, historical release-time learner/class/stream/campus identity and legacy-context disclosure, Junior/Senior/Sixth Form report variants, A4 print context/title/width and hidden portal controls, coursework exclusion from averages, reporting-period registration and reviewed close, publishing, records, timetable, payment retry, teacher sign-in and Coursework access, parent route guards, linked-account directory/search, credential-free audited recovery guidance, mobile layout; no uncaught browser errors. All backend requests were mocked.',
   )
 } catch (error) {
   const p = browser.contexts()[0]?.pages()[0]
