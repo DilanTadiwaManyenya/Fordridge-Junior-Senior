@@ -1,7 +1,7 @@
 # Fordridge portal roadmap inspired by Reliance
 
 Updated: 29 October 2026
-Current checkpoint: Stages 1–60 are implemented or documented in the stage tracker, with deployment checkpoints still pending as listed. Stages 58–60 add a retry-safe fee receipt, map Fordridge finance sources to Reliance categories, and provide a Main Admin-only Income & expenses review. Stage 61 adds auditable cashbook expense submission, approval/rejection, reversal, and correction with legacy rows explicitly unreviewed; its migration and frontend are locally validated, but production migration, frontend release, and browser verification remain pending. See the Stage 61 record and tracker. Stage 62 is next.
+Current checkpoint: Stage 61 adds auditable cashbook expense submission, approval/rejection, reversal, and correction with legacy rows explicitly unreviewed; its migration and frontend are locally validated, but production migration, frontend release, and browser verification remain pending. Stage 62's source audit confirms that Fordridge's Inventory & POS menu is only an outbound link to an external service; its owner, authentication, API, data access, and security boundary could not be verified. No connection or data transfer was attempted. Stage 63 must remain a decision checkpoint until the owner supplies the external system identity and supported integration details. See the Stage 61 and Stage 62 records and tracker.
 
 ## Purpose
 
@@ -104,7 +104,7 @@ Stages 1–17 are completed foundation, catalogue, teacher-scope, role-membershi
 | 59 | Map income & expenses categories | Define complete sources, classifications and reconciliation outcomes. |
 | 60 | Improve income and expense review | View reconciles to ledger and exported totals match active filters. |
 | 61 | Add expense review/correction steps | Submit, approve/reject, reverse and correct with Main Admin authorization, idempotency and audit controls. |
-| 62 | Inspect external POS integration | Confirm owner, access, supported API/data and security boundaries first. |
+| 62 | Inspect external POS integration | Record verified ownership, access, supported API/data and security boundaries; keep unknowns explicit until the owner provides evidence. |
 | 63 | Decide POS connection or native scope | School decision records inventory, checkout, payments, orders and reconciliation scope. |
 | 64 | Design inventory catalogue | Variants and stock units work with the agreed system boundary. |
 | 65 | Add auditable stock receipts | Opening/received quantities have an actor, source and movement record. |
