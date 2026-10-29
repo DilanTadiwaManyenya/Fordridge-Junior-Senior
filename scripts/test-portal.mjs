@@ -1002,6 +1002,13 @@ const frozen = (await db.query(
   'select * from report_release_snapshots where publication_id=$1 and student_id=$2',
   [publicationId, ids.stream_student],
 )).rows[0]
+assert.equal(frozen.integrity_version, 2, 'new report snapshots use the identity-aware fingerprint version')
+assert.equal(frozen.identity_context_recorded, true, 'new report snapshots mark release-time identity as captured')
+assert.equal(frozen.captured_learner_name, 'Stream B Learner', 'issued reports freeze the learner name at release')
+assert.equal(frozen.captured_class_level, 'Form 1', 'issued reports freeze the learner class at release')
+assert.equal(frozen.captured_class_stream, 'B', 'issued reports freeze the learner stream at release')
+assert.equal(frozen.captured_admission_number, 'B001', 'issued reports freeze the admission number at release')
+assert.equal(frozen.captured_campus_name, 'Fordridge Junior School', 'issued reports freeze the campus name at release')
 const verification = (await db.query(
   'select * from verify_report_snapshot_integrity($1)',
   [frozen.integrity_hash],
@@ -1035,6 +1042,14 @@ await db.query('reset role')
 await db.query('update report_release_snapshots set average_percent=$2 where id=$1', [frozen.id, frozen.average_percent])
 await as('admin')
 await db.query('reset role')
+await db.query("update report_release_snapshots set captured_class_level='Form 9' where id=$1", [frozen.id])
+await as('admin')
+assert.equal((await db.query('select * from verify_report_snapshot_integrity($1)', [frozen.integrity_hash])).rows[0].integrity_valid, false,
+  'changing the frozen class identity fails the identity-aware fingerprint check')
+await db.query('reset role')
+await db.query('update report_release_snapshots set captured_class_level=$2 where id=$1', [frozen.id, frozen.captured_class_level])
+await as('admin')
+await db.query('reset role')
 await db.query('update report_release_snapshots set integrity_hash=$2 where id=$1', [frozen.id, 'c'.repeat(32)])
 await as('admin')
 assert.equal((await db.query('select * from verify_report_snapshot_integrity($1)', [frozen.integrity_hash])).rows[0].integrity_valid, false,
@@ -1042,9 +1057,34 @@ assert.equal((await db.query('select * from verify_report_snapshot_integrity($1)
 assert.equal((await db.query(
   "select count(*) from audit_trail where actor_id=$1 and entity_type='report_snapshot' and entity_id=$2 and action='integrity_mismatch'",
   [ids.admin, frozen.id],
-)).rows[0].count, 2, 'each integrity mismatch is recorded in Activity Log')
+)).rows[0].count, 3, 'each integrity mismatch is recorded in Activity Log')
 await db.query('reset role')
 await db.query('update report_release_snapshots set integrity_hash=$2 where id=$1', [frozen.id, frozen.integrity_hash])
+await as('admin')
+const legacyHash = (await db.query(`
+  select md5(concat_ws('|', publication_id::text, student_id::text, assessments::text,
+    coalesce(average_percent::text, ''), coalesce(overall_grade, ''), coalesce(class_rank::text, ''),
+    coalesce(class_teacher_name, ''), coalesce(head_of_school_name, ''), released_at::text)) as value
+  from report_release_snapshots where id=$1
+`, [frozen.id])).rows[0].value
+await db.query('reset role')
+await db.query(`update report_release_snapshots set
+  captured_learner_name=null, captured_admission_number=null, captured_class_level=null,
+  captured_class_stream=null, captured_campus_name=null, identity_context_recorded=false,
+  integrity_version=1, integrity_hash=$2 where id=$1`, [frozen.id, legacyHash])
+await as('admin')
+const legacyVerification = (await db.query('select * from verify_report_snapshot_integrity($1)', [legacyHash])).rows[0]
+assert.equal(legacyVerification.integrity_valid, true, 'legacy fingerprint v1 continues to verify unchanged')
+assert.equal(legacyVerification.campus_name, null, 'legacy verification does not invent release-time campus identity')
+await db.query('reset role')
+await db.query(`update report_release_snapshots set
+  captured_learner_name=$2, captured_admission_number=$3, captured_class_level=$4,
+  captured_class_stream=$5, captured_campus_name=$6, identity_context_recorded=$7,
+  integrity_version=$8, integrity_hash=$9 where id=$1`, [
+  frozen.id, frozen.captured_learner_name, frozen.captured_admission_number, frozen.captured_class_level,
+  frozen.captured_class_stream, frozen.captured_campus_name, frozen.identity_context_recorded,
+  frozen.integrity_version, frozen.integrity_hash,
+])
 await as('admin')
 assert.equal((await db.query('select * from verify_report_snapshot_integrity($1)', [frozen.integrity_hash])).rows[0].integrity_valid, true,
   'restoring the original snapshot values restores successful verification')

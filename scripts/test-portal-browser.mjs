@@ -333,6 +333,42 @@ async function pageFor(
       )
     if (path.endsWith('/reporting_periods')) return send(reportingPeriods)
     if (path.endsWith('/report_grade_bands')) return send(gradeBands)
+    if (path.endsWith('/report_release_snapshots'))
+      return send([{
+        id: 'snapshot-current',
+        academic_year: 2026,
+        academic_term: 'Term 1',
+        assessments: [{ title: 'Exam', subject: 'Mathematics', assessment_type: 'markbook', score: 74, max_score: 100, event_date: '2026-01-15' }],
+        average_percent: 74,
+        overall_grade: 'B',
+        class_rank: 2,
+        class_size: 12,
+        subject_signatories: { Mathematics: 'TM' },
+        released_at: '2026-10-29T12:00:00.000Z',
+        captured_learner_name: 'Test Learner at Release',
+        captured_admission_number: 'F001',
+        captured_class_level: 'Form 1',
+        captured_class_stream: 'A',
+        captured_campus_name: 'Junior School at Release',
+        identity_context_recorded: true,
+      }, {
+        id: 'snapshot-legacy',
+        academic_year: 2025,
+        academic_term: 'Term 3',
+        assessments: [],
+        average_percent: 61,
+        overall_grade: 'C',
+        class_rank: null,
+        class_size: null,
+        subject_signatories: {},
+        released_at: '2025-10-29T12:00:00.000Z',
+        captured_learner_name: null,
+        captured_admission_number: null,
+        captured_class_level: null,
+        captured_class_stream: null,
+        captured_campus_name: null,
+        identity_context_recorded: false,
+      }])
     if (['reporting_period_events', 'report_publications'].some(table => path.endsWith('/' + table)))
       return send([])
     throw new Error(`Unmocked request: ${method} ${path}`)
@@ -696,6 +732,16 @@ try {
   await page.getByText('No released report matches that fingerprint.').waitFor()
   const verificationWrites = writes.filter(write => write.path.endsWith('/rpc/verify_report_snapshot_integrity'))
   assert.deepEqual(verificationWrites.map(write => write.body.p_integrity_hash), ['a'.repeat(32), 'b'.repeat(32), 'd'.repeat(32)])
+  await page.setViewportSize({ width: 1365, height: 900 })
+  await page.goto('http://127.0.0.1:5179/portal/official-reports')
+  await page.getByRole('heading', { name: 'Official reports' }).waitFor()
+  const releaseIdentity = await page.locator('.official-report-identity').innerText()
+  assert.match(releaseIdentity, /Test Learner at Release · F001/)
+  assert.match(releaseIdentity, /Junior School at Release · Form 1 · A/)
+  const reportChoices = page.locator('.official-report-list button')
+  assert.equal(await reportChoices.count(), 2, 'the archive includes both the current and legacy test reports')
+  await reportChoices.nth(1).click()
+  await page.getByText('Historical learner, class, and campus identity was not captured when this report was released.', { exact: true }).waitFor()
   await page.goto('http://127.0.0.1:5179/portal/report-release')
   await page.getByRole('heading', { name: 'Report release' }).waitFor()
   await page.getByLabel('Campus').selectOption('campus')
@@ -811,7 +857,7 @@ try {
   await parent.waitForURL('http://127.0.0.1:5179/portal')
   assert.deepEqual(errors, [])
   console.log(
-    'PASS: profile editing, account creation, Reliance grade-band boundary preview and audited scale save, report readiness and release attribution, report integrity verified/mismatch/not-found flows, Junior/Senior/Sixth Form report variants, A4 print context/title/width and hidden portal controls, coursework exclusion from averages, reporting-period registration and reviewed close, publishing, records, timetable, payment retry, teacher sign-in and Coursework access, parent route guards, linked-account directory/search, credential-free audited recovery guidance, mobile layout; no uncaught browser errors. All backend requests were mocked.',
+    'PASS: profile editing, account creation, Reliance grade-band boundary preview and audited scale save, report readiness and release attribution, report integrity verified/mismatch/not-found flows, historical release-time learner/class/stream/campus identity and legacy-context disclosure, Junior/Senior/Sixth Form report variants, A4 print context/title/width and hidden portal controls, coursework exclusion from averages, reporting-period registration and reviewed close, publishing, records, timetable, payment retry, teacher sign-in and Coursework access, parent route guards, linked-account directory/search, credential-free audited recovery guidance, mobile layout; no uncaught browser errors. All backend requests were mocked.',
   )
 } catch (error) {
   const p = browser.contexts()[0]?.pages()[0]

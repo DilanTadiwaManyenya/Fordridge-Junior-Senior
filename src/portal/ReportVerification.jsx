@@ -61,7 +61,7 @@ export default function ReportVerification() {
       {result?.integrity_valid && (
         <section className="workflow-panel report-verification-result">
           <span>Verified release</span>
-          <h2>{result.campus_name || 'Fordridge Schools'} · {result.academic_year} · {result.academic_term}</h2>
+          <h2>{result.campus_name || 'Historical campus not recorded'} · {result.academic_year} · {result.academic_term}</h2>
           <p>Released {new Date(result.released_at).toLocaleString()}</p>
         </section>
       )}
