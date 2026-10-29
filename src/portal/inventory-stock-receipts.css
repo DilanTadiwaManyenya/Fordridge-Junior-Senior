@@ -1,0 +1,35 @@
+.inventory-stock-receipts{display:grid;gap:18px;min-width:0}
+.inventory-stock-notice{padding:13px 16px;border-left:4px solid #bd922f;background:#fff8e6;color:#665626;font-size:.84rem;line-height:1.55}
+.inventory-stock-recovery{display:flex;align-items:center;justify-content:space-between;gap:18px;padding:15px 18px;border:1px solid #e6c979;border-radius:9px;background:#fff9e9}
+.inventory-stock-recovery p{margin:6px 0 0;color:#65738a;font-size:.84rem;line-height:1.5}
+.inventory-stock-recovery button,.inventory-receipt-lines-heading button,.inventory-add-variant button,.inventory-remove-line{border:1px solid #cbd3df;border-radius:6px;padding:8px 11px;background:#fff;color:#10264a;font:inherit;font-size:.78rem;font-weight:800;cursor:pointer}
+.inventory-stock-summary{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}
+.inventory-stock-summary article{display:grid;gap:7px;padding:18px;border:1px solid #e1e8f0;border-radius:9px;background:#fff}
+.inventory-stock-summary article span{color:#65738a;font-size:.78rem;font-weight:800}
+.inventory-stock-summary article strong{color:#10264a;font-size:1.5rem}
+.inventory-stock-summary article small{color:#78859a;font-size:.72rem}
+.inventory-product-form h2,.inventory-receipt-form h2{grid-column:1/-1;margin:0;color:#10264a;font-size:1.1rem}
+.inventory-product-form>p,.inventory-receipt-form>p{grid-column:1/-1;margin:0;color:#65738a;font-size:.84rem;line-height:1.5}
+.inventory-receipt-form{grid-template-columns:repeat(2,minmax(0,1fr))}
+.inventory-wide{grid-column:1/-1}
+.inventory-receipt-lines{display:grid;gap:12px}
+.inventory-receipt-lines-heading{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.inventory-receipt-lines-heading h3{margin:0;color:#10264a;font-size:.95rem}
+.inventory-receipt-line{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));align-items:end;gap:12px;padding:14px;border:1px solid #e1e8f0;border-radius:8px;background:#f8faff}
+.inventory-receipt-line label{display:grid;gap:6px;min-width:0;color:#334863;font-size:.77rem;font-weight:800}
+.inventory-receipt-line input,.inventory-receipt-line select{box-sizing:border-box;width:100%;min-width:0;min-height:42px;padding:9px;border:1px solid #cbd3df;border-radius:6px;background:white;font:inherit;font-size:.9rem}
+.inventory-remove-line{justify-self:start;color:#8c2339}
+.inventory-stock-receipts .workflow-actions{grid-column:1/-1}
+.inventory-products-panel,.inventory-receipt-history{padding:0;overflow:hidden}
+.inventory-products-panel>header,.inventory-receipt-history>header{padding:18px 20px;border-bottom:1px solid #e1e8f0}
+.inventory-products-panel>header h2,.inventory-receipt-history>header h2{margin:0;color:#10264a;font-size:1.05rem}
+.inventory-products-panel>header p,.inventory-receipt-history>header p{margin:6px 0 0;color:#65738a;font-size:.82rem;line-height:1.45}
+.inventory-products-panel>.workflow-scroll,.inventory-receipt-history>.workflow-scroll{padding:0}
+.inventory-products-panel .workflow-table,.inventory-receipt-history .workflow-table{min-width:800px}
+.inventory-products-panel .workflow-table td small,.inventory-receipt-history .workflow-table td small{display:block;margin-top:4px;color:#65738a;font-size:.74rem;overflow-wrap:anywhere}
+.inventory-variant-list,.inventory-history-lines{display:grid;gap:4px;margin:0 0 8px;padding-left:18px;font-size:.76rem}
+.inventory-add-variant{display:flex;gap:6px;min-width:190px}
+.inventory-add-variant input{min-width:0;width:100%;padding:7px;border:1px solid #cbd3df;border-radius:5px;font:inherit;font-size:.76rem}
+.inventory-history-lines{min-width:250px}
+@media(max-width:760px){.inventory-stock-summary{grid-template-columns:1fr}.inventory-receipt-form{grid-template-columns:1fr}.inventory-wide,.inventory-stock-receipts .workflow-actions{grid-column:auto}.inventory-receipt-line{grid-template-columns:1fr 1fr}.inventory-stock-recovery{align-items:flex-start;flex-direction:column}.inventory-stock-recovery button{width:100%}}
+@media(max-width:460px){.inventory-receipt-line{grid-template-columns:1fr}.inventory-receipt-lines-heading{align-items:flex-start;flex-direction:column}.inventory-receipt-lines-heading button{width:100%}}

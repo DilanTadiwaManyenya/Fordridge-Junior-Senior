@@ -2,7 +2,7 @@
 
 ## Scope
 
-This stage defines a **conceptual design** for a Fordridge-native catalogue, following Reliance's product/variant workflow. The Stage 63 recommendation remains pending owner confirmation. This document does not create database objects, product records, settings, or permissions.
+This stage defines the conceptual design for a Fordridge-native catalogue, following Reliance's product/variant workflow. Stage 65 implements only the empty product/variant foundation required by stock receipt entry. This document itself does not create database objects, product records, settings, or permissions.
 
 ## Proposed catalogue model
 
@@ -32,7 +32,7 @@ Reliance demonstrates a catalogue with an optional size/stock variant editor, hi
 
 ## Decisions still required before migration
 
-1. Confirm the Stage 63 direction: Fordridge-native POS, or provide verified external ownership/API documentation.
+1. Confirm whether to keep the staged Fordridge-native direction or provide verified external ownership/API documentation before production integration.
 2. Confirm whether inventory is shared school-wide or allocated separately by campus; do not assign campuses from item names.
 3. Confirm initial categories, allowed stock units, whether variants are size-only, and whether price differs by size.
 4. Confirm who may manage the catalogue, receive/adjust stock, sell, view receipts, and request parent orders. Keep these permissions disabled until confirmed and enforced by backend policy.

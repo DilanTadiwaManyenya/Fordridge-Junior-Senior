@@ -22,12 +22,12 @@ assert.deepEqual(
 )
 assert.deepEqual(
   getFinanceNavigation('admin').items.map((item) => item.label),
-  ['Finance', 'Income & expenses', 'Expenses & Cashbook', 'Inventory & POS'],
-  'Main Admin receives the new Income & expenses review alongside existing finance links',
+  ['Finance', 'Income & expenses', 'Expenses & Cashbook', 'Inventory & POS', 'External Inventory & POS'],
+  'Main Admin receives native stock receipts while retaining a separately labeled external POS link',
 )
 assert.deepEqual(
   getFinanceNavigation('staff').items.map((item) => item.label),
-  ['Inventory & POS'],
+  ['External Inventory & POS'],
   'ordinary Staff do not see finance ledgers or cashbook',
 )
 assert.deepEqual(
@@ -343,6 +343,112 @@ await rejects(
   () => db.query("insert into cashbook_expenses(expense_date,category,description,amount) values(current_date,'Fuel','direct write',1)"),
   /permission denied/,
 )
+await as('admin')
+const simpleProductRequest = '65000000-0000-4000-8000-000000000001'
+const simpleProduct = (await db.query(
+  'select * from create_inventory_product($1,$2,$3,$4,$5,$6)',
+  [simpleProductRequest, 'Test exercise book', 'TEST-BOOK-1', 'Stationery', 'each', false],
+)).rows[0]
+assert.equal(simpleProduct.created_by, ids.admin)
+assert.equal(simpleProduct.stock_unit, 'each')
+assert.equal(simpleProduct.tracks_variants, false)
+assert.equal(
+  (await db.query('select * from create_inventory_product($1,$2,$3,$4,$5,$6)', [simpleProductRequest, 'Test exercise book', 'TEST-BOOK-1', 'Stationery', 'each', false])).rows[0].id,
+  simpleProduct.id,
+  'retrying product creation with the same request returns one product',
+)
+await rejects(
+  () => db.query('select * from create_inventory_product($1,$2,$3,$4,$5,$6)', [simpleProductRequest, 'Different product', null, null, 'each', false]),
+  /already used/,
+)
+const variantProduct = (await db.query(
+  'select * from create_inventory_product($1,$2,$3,$4,$5,$6)',
+  ['65000000-0000-4000-8000-000000000002', 'Test school shirt', null, 'Uniforms', 'each', true],
+)).rows[0]
+const shirtVariant = (await db.query(
+  'select * from add_inventory_product_variant($1,$2,$3,$4)',
+  ['65000000-0000-4000-8000-000000000003', variantProduct.id, 'Size 10', 'TEST-SHIRT-10'],
+)).rows[0]
+assert.equal(shirtVariant.product_id, variantProduct.id)
+assert.equal(
+  (await db.query('select * from add_inventory_product_variant($1,$2,$3,$4)', ['65000000-0000-4000-8000-000000000003', variantProduct.id, 'Size 10', 'TEST-SHIRT-10'])).rows[0].id,
+  shirtVariant.id,
+  'retrying variant creation with the same request returns one variant',
+)
+await rejects(
+  () => db.query('select * from add_inventory_product_variant($1,$2,$3,$4)', ['65000000-0000-4000-8000-000000000004', simpleProduct.id, 'Size 10', null]),
+  /one stock balance/,
+)
+const receiptItems = [
+  { product_id: simpleProduct.id, variant_id: null, quantity: '12', unit_cost: '0.50', cost_currency: 'USD' },
+  { product_id: variantProduct.id, variant_id: shirtVariant.id, quantity: '6', unit_cost: '8.25', cost_currency: 'USD' },
+]
+const receiptRequest = '65000000-0000-4000-8000-000000000005'
+await rejects(
+  () => db.query('select record_inventory_stock_receipt($1,$2,$3,$4,$5,$6::jsonb)', [receiptRequest, 'supplier_delivery', 'Uniform supplier', null, null, JSON.stringify([{ ...receiptItems[0], quantity: '0' }])]),
+  /valid product, positive whole quantity/,
+)
+await rejects(
+  () => db.query('select record_inventory_stock_receipt($1,$2,$3,$4,$5,$6::jsonb)', [receiptRequest, 'supplier_delivery', 'Uniform supplier', null, null, JSON.stringify([{ ...receiptItems[0], unit_cost: null, cost_currency: null }])]),
+  /known supplier unit cost/,
+)
+await rejects(
+  () => db.query('select record_inventory_stock_receipt($1,$2,$3,$4,$5,$6::jsonb)', ['65000000-0000-4000-8000-000000000008', 'opening_stock', null, null, null, JSON.stringify(receiptItems)]),
+  /reason for opening stock/,
+)
+const receiptId = (await db.query(
+  'select record_inventory_stock_receipt($1,$2,$3,$4,$5,$6::jsonb) as id',
+  [receiptRequest, 'supplier_delivery', 'School supplier', 'INV-TEST-1', 'Stage 65 test receipt', JSON.stringify(receiptItems)],
+)).rows[0].id
+assert.equal((await db.query('select record_inventory_stock_receipt($1,$2,$3,$4,$5,$6::jsonb) as id', [receiptRequest, 'supplier_delivery', 'School supplier', 'INV-TEST-1', 'Stage 65 test receipt', JSON.stringify(receiptItems)])).rows[0].id, receiptId, 'receipt retries do not add stock a second time')
+await rejects(
+  () => db.query('select record_inventory_stock_receipt($1,$2,$3,$4,$5,$6::jsonb)', [receiptRequest, 'supplier_delivery', 'Different supplier', 'INV-TEST-1', 'Stage 65 test receipt', JSON.stringify(receiptItems)]),
+  /already used/,
+)
+const receiptLines = (await db.query('select * from inventory_stock_receipt_lines where receipt_id=$1 order by product_name_snapshot', [receiptId])).rows
+assert.equal(receiptLines.length, 2)
+assert.deepEqual(receiptLines.map((line) => [line.product_name_snapshot, line.variant_label_snapshot, line.stock_unit_snapshot, line.quantity_received]), [
+  ['Test exercise book', null, 'each', 12],
+  ['Test school shirt', 'Size 10', 'each', 6],
+])
+assert.equal(Number((await db.query('select sum(quantity_delta) from inventory_stock_movements where product_id=$1', [simpleProduct.id])).rows[0].sum), 12)
+assert.equal(Number((await db.query('select sum(quantity_delta) from inventory_stock_movements where product_id=$1 and variant_id=$2', [variantProduct.id, shirtVariant.id])).rows[0].sum), 6)
+assert.equal((await db.query("select action from audit_trail where entity_type='inventory_stock_receipt' and entity_id=$1", [receiptId])).rows[0].action, 'received')
+await rejects(
+  () => db.query('select record_inventory_stock_receipt($1,$2,$3,$4,$5,$6::jsonb)', ['65000000-0000-4000-8000-000000000010', 'supplier_delivery', 'School supplier', null, null, JSON.stringify([receiptItems[0], { product_id: '00000000-0000-4000-8000-000000000099', variant_id: null, quantity: '1', unit_cost: '1.00', cost_currency: 'USD' }])]),
+  /selected product is unavailable/,
+)
+assert.equal(Number((await db.query('select count(*) from inventory_stock_receipts where request_id=$1', ['65000000-0000-4000-8000-000000000010'])).rows[0].count), 0, 'a failed multi-line receipt rolls back its header and earlier lines')
+assert.equal(Number((await db.query('select sum(quantity_delta) from inventory_stock_movements where product_id=$1', [simpleProduct.id])).rows[0].sum), 12, 'a failed receipt does not partially add stock')
+const openingReceiptId = (await db.query(
+  'select record_inventory_stock_receipt($1,$2,$3,$4,$5,$6::jsonb) as id',
+  ['65000000-0000-4000-8000-000000000006', 'opening_stock', null, null, 'Opening count verified by school inventory review', JSON.stringify([{ product_id: simpleProduct.id, variant_id: null, quantity: '5', unit_cost: null, cost_currency: null }])],
+)).rows[0].id
+assert.equal((await db.query('select receipt_kind from inventory_stock_receipts where id=$1', [openingReceiptId])).rows[0].receipt_kind, 'opening_stock')
+assert.equal((await db.query('select unit_cost from inventory_stock_receipt_lines where receipt_id=$1', [openingReceiptId])).rows[0].unit_cost, null, 'unknown historic opening cost remains explicitly unknown')
+assert.equal(Number((await db.query('select sum(quantity_delta) from inventory_stock_movements where product_id=$1', [simpleProduct.id])).rows[0].sum), 17)
+await rejects(
+  () => db.query('update inventory_stock_movements set quantity_delta=0 where receipt_line_id=$1', [receiptLines[0].id]),
+  /permission denied/,
+)
+await rejects(
+  () => db.query("insert into inventory_stock_movements(product_id,movement_type,quantity_delta,receipt_line_id,actor_id,reason) values($1,'receipt',1,$2,$3,'direct write')", [simpleProduct.id, receiptLines[0].id, ids.admin]),
+  /permission denied/,
+)
+await rejects(
+  () => db.query('update inventory_products set name=$2 where id=$1', [simpleProduct.id, 'Forged product name']),
+  /permission denied/,
+)
+await as('teacher')
+await rejects(
+  () => db.query('select record_inventory_stock_receipt($1,$2,$3,$4,$5,$6::jsonb)', ['65000000-0000-4000-8000-000000000009', 'supplier_delivery', 'No access', null, null, JSON.stringify(receiptItems)]),
+  /Main Admin access required/,
+)
+await rejects(
+  () => db.query('select * from create_inventory_product($1,$2,$3,$4,$5,$6)', ['65000000-0000-4000-8000-000000000007', 'Unauthorized', null, null, 'each', false]),
+  /Main Admin access required/,
+)
+assert.equal(Number((await db.query('select count(*) from inventory_stock_receipts')).rows[0].count), 0, 'other roles cannot read Main Admin stock receipts')
 await as('admin')
 assert.deepEqual(
   (await db.query("select band_group,count(*)::integer as count from report_grade_bands where campus_id is null group by band_group order by band_group")).rows,

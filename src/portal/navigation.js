@@ -18,9 +18,15 @@ const financeItems = [
     icon: '¤',
   },
   {
+    roles: ['admin'],
+    to: '/portal/inventory-stock',
+    label: 'Inventory & POS',
+    icon: '▣',
+  },
+  {
     roles: ['staff', 'admin'],
     href: 'https://inventory-management-system-3xi2f.sevalla.page/',
-    label: 'Inventory & POS',
+    label: 'External Inventory & POS',
     icon: '▣',
   },
 ]

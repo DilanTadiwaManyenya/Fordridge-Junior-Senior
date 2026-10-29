@@ -2,7 +2,7 @@
 
 ## Decision status
 
-**Recommendation prepared; owner confirmation is required before catalogue schema or feature implementation.** Stage 62 found only a hardcoded Fordridge link to an external POS app. Its owner, API, authentication, data model, and security boundaries are unverified. Building an integration against an unknown service would make stock and payment records depend on an unverified data owner and access model.
+**The Fordridge-native recommendation is being used for local staged development under the approved roadmap.** Stage 62 found only a hardcoded Fordridge link to an external POS app. Its owner, API, authentication, data model, and security boundaries are unverified. That external service remains separate and unconnected; no external ownership or integration is claimed.
 
 ## Recommended boundary
 
@@ -38,13 +38,13 @@ These are proposed capabilities and workflows. Fordridge-specific product catalo
 
 ## Requested owner confirmation
 
-Before catalogue schema or feature implementation begins, confirm one choice:
+Before production migration, frontend release, checkout, or external integration, confirm the final operational scope and school configuration:
 
-1. **Fordridge-native (recommended):** proceed with a separate native catalogue/stock/POS ledger. Confirm which Fordridge roles may manage products and which may sell.
-2. **Connect the existing app:** provide its product and account owner, official API/security documentation, and an approved sandbox/test account. No production credentials should be posted in chat.
+1. **Fordridge-native:** continue the separate native catalogue/stock/POS ledger. Confirm which Fordridge roles may manage products and which may sell.
+2. **Connect the existing app:** first provide its product and account owner, official API/security documentation, and an approved sandbox/test account. No production credentials should be posted in chat.
 
-If neither choice is confirmed, leave the external link unchanged and keep product, variant, stock, payment, and campus configuration unset.
+Until detailed operational scope is confirmed, keep real product, variant, stock, payment, and campus configuration unset. The existing external destination remains a separately labeled link.
 
 ## Validation and deployment
 
-This is a documentation-only recommendation based on read-only Fordridge source review and Reliance workflow documentation/source. No database or application changes were made, and no external account was accessed. Stage 64 documents a conceptual catalogue design only. Catalogue schema and feature implementation remain blocked on owner confirmation.
+This is a scope recommendation based on read-only Fordridge source review and Reliance workflow documentation/source. Stage 65 follows the native recommendation for local staged work only; production migration, hosted release, and any external integration remain separate. No external account was accessed.

@@ -23,6 +23,7 @@ import ClassAssignments from './ClassAssignments'
 import MyClass from './MyClass'
 import SubjectAllocations from './SubjectAllocations'
 import ExpenseCashbook from './ExpenseCashbook'
+import InventoryStockReceipts from './InventoryStockReceipts'
 import ActivityLog from './ActivityLog'
 import ParentAccounts from './ParentAccounts'
 import NotificationCenter from './NotificationCenter'
@@ -249,6 +250,7 @@ export default function PortalDashboard() {
     (view === 'my-class' && !teacherMyClass) ||
     (view === 'subject-allocations' && !assignments) ||
     (view === 'cashbook' && !admin) ||
+    (view === 'inventory-stock' && !admin) ||
     (view === 'activity' && !admin) ||
     ![
       'overview',
@@ -281,6 +283,7 @@ export default function PortalDashboard() {
       'my-class',
       'subject-allocations',
       'cashbook',
+      'inventory-stock',
       'activity',
       'notifications',
       'announcements',
@@ -526,6 +529,8 @@ export default function PortalDashboard() {
           <SubjectAllocations profile={profile} />
         ) : view === 'cashbook' ? (
           <ExpenseCashbook profile={profile} user={user} />
+        ) : view === 'inventory-stock' ? (
+          <InventoryStockReceipts profile={profile} user={user} />
         ) : view === 'activity' ? (
           <ActivityLog />
         ) : view === 'parent-accounts' ? (
