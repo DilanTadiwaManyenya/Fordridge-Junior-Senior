@@ -1,30 +1,41 @@
-# Stage 43 — Grade-band review by school level
+# Stage 43 — Grade bands by school level
 
-Status: Existing behavior reviewed; awaiting Fordridge-approved Junior and Senior scales
+Status: Implemented and locally verified. Production migration and frontend release are pending.
 
-## Verified in Fordridge
+## Owner decision
 
-- `report_grade_bands` stores a campus, minimum and maximum percentage, grade, and optional descriptor. It has no school-level, class-level, or scale-version field.
-- The Grade bands page configures ranges by campus only. The report preview matches bands by campus and uses inclusive minimum/maximum comparisons. The released report snapshot calculation also uses inclusive `BETWEEN`, choosing the matching row with the greatest minimum percentage.
-- Database checks constrain endpoints to 0–100 and require maximum >= minimum. They do not prevent overlaps or gaps, or require a complete scale. If ranges overlap, the highest minimum wins; the same rule is used by the preview and snapshot calculation.
-- The isolated portal suite currently inserts a generic 0–100 test band for snapshot coverage. It does not verify school-approved thresholds or Junior/Senior boundaries.
-- The report preview still says to confirm the official Fordridge grading scale before issuing formal reports. No approved Junior/Senior percentage-to-grade matrix was found in Fordridge's tracked documentation.
+The owner directed Fordridge to follow Reliance's grade sequence for now, with the option to change it later. These thresholds and labels are provisional reference defaults, not a declaration of permanent Fordridge policy. No Reliance school records, accounts, credentials, or environment values were copied.
 
-## Decision needed before changing grade logic
+## Delivered
 
-Do not infer official cutoffs from sample data or another school's configuration. No grading ranges, descriptors, report calculation, or production data were changed in this review.
+- Added three independent scales: Junior ECD/Primary, Senior O Level, and Senior A Level.
+- Mapped ECD and Grade labels to Junior; Form 1–4 to O Level; and Lower/Upper Six, Sixth Form, and A Level 1/2 labels to A Level. Unknown class labels continue to use Fordridge's existing campus-only legacy bands.
+- Seeded the 21 Reliance reference bands as global defaults. A campus can edit a local override without changing another campus's scale. Existing campus-only legacy rows are preserved.
+- Matched percentage boundaries against whole-number Reliance thresholds by flooring fractional percentages for mapped levels. For example, 84.99% follows the 84 threshold. Legacy fallback retains its prior inclusive-range calculation.
+- Added a boundary checker, complete-scale validation (whole-number limits covering 0–100 without gaps or overlaps), and reason-required administrator saves through an audited RPC with optimistic concurrency checks.
+- Removed direct authenticated table writes to grade bands; changes must use the validated save function.
+- Updated the report preview, readiness checks, publication preflight, and newly created release snapshot grades to use the learner's level-specific scale.
+- Existing issued report snapshots are not recalculated. No production records were changed.
 
-To complete level-specific verification, Fordridge needs to confirm for each school level:
+## Provisional Reliance sequences
 
-1. Which confirmed class/form names use the Junior scale and which use the Senior scale.
-2. Every grade label, minimum and maximum percentage, and descriptor for each scale.
-3. Whether boundaries are inclusive at both ends, and the approved handling of any gaps, overlaps, or decimal precision.
-4. Whether grade bands apply at campus level or may vary by campus as well as school level.
+| Group | Minimum thresholds and outcomes |
+| --- | --- |
+| Junior ECD/Primary | 85 Unit 1; 77 Unit 2; 70 Unit 3; 60 Unit 4; 50 Unit 5; 40 Unit 6; 30 Unit 7; 20 Unit 8; 0 Unit 9 |
+| O Level | 75 A; 65 B; 50 C; 40 D; 0 E |
+| A Level | 80 A; 70 B; 60 C; 50 D; 40 E; 30 O; 0 F |
 
-Once these rules are provided, Stage 43 can test values immediately below, at, and above every boundary against both the report preview and released snapshot calculation. Until then, level-specific implementation and Stage 44 remain pending in roadmap order.
+Each band has an inclusive integer range, points, and descriptor stored in the migration and editable in the Grade bands screen.
 
 ## Validation
 
-- Source/schema review covered the Grade bands editor, report preview matcher, snapshot grade query, and grade-band migration constraints.
-- `node scripts/test-portal.mjs` — passed as a baseline. Its generic 0–100 fixture does not assert Junior/Senior scales or boundary examples.
+- `node scripts/test-grade-bands.mjs` — passed 5 checks for level mapping, boundaries, campus/global/legacy precedence, and complete scale validation.
+- `node scripts/test-portal.mjs` — passed isolated PGlite migration, policy, RPC, and portal regression suite.
+- `npm run lint` — passed with the repository's existing warnings.
+- `npm run build` — passed; Vite reports the existing large JavaScript chunk warning.
+- `node scripts/test-portal-browser.mjs` with the installed Chrome executable — passed; grade threshold preview and audited scale save were exercised with mocked backend requests.
 - `git diff --check` — passed.
+
+## Release state and next stage
+
+Migration `20261029140000_level_grade_bands.sql` has not been applied to production. The frontend has not been deployed. Production database changes and hosted deployment remain subject to the separate approval gate. Stage 44 (Progress report variants) is next in roadmap order after this stage's code and documentation checkpoint is pushed.
