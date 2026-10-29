@@ -483,10 +483,10 @@ const formOne = (await db.query(
   "insert into school_classes(campus_id,class_level) values($1,'Form 1') returning id",
   [campus],
 )).rows[0].id
-await db.query(
-  "insert into school_classes(campus_id,class_level) values($1,'Form 2')",
+const formTwo = (await db.query(
+  "insert into school_classes(campus_id,class_level) values($1,'Form 2') returning id",
   [campus],
-)
+)).rows[0].id
 const streamA = (await db.query(
   "insert into school_class_streams(class_id,stream_name) values($1,'A') returning id",
   [formOne],
@@ -616,6 +616,62 @@ await rejects(
 )
 assert.equal((await db.query("select has_function_privilege('anon','public.save_year_rollover_decision(uuid,integer,integer,text,text,uuid,text,text,text)','EXECUTE') as allowed")).rows[0].allowed,
   false, 'anonymous callers cannot record rollover decisions')
+await db.query('select save_year_rollover_placement($1,$2,$3,$4,$5)', [ids.student, 2026, 2027, formOne, streamA])
+const rolloverBatch = (await db.query(
+  'select preview_year_rollover_batch($1,$2,$3,1,25) as result', [2026, 2027, campus],
+)).rows[0].result
+assert.equal(rolloverBatch.summary.active_learners, 4, 'batch preview counts the full active campus roster')
+assert.equal(rolloverBatch.summary.decisions_recorded, 1, 'batch preview identifies learners with explicit decisions')
+const plannedLearner = rolloverBatch.rows.find(row => row.id === ids.student)
+assert.equal(plannedLearner.review_status, 'ready_for_review', 'batch preview marks a reviewed valid destination ready for final review')
+assert.equal(plannedLearner.destination_class_level, 'Form 1', 'batch preview resolves the configured destination class name')
+assert.equal(plannedLearner.destination_stream_name, 'A', 'batch preview resolves the configured destination stream name')
+assert.equal(plannedLearner.capacity_status, 'within_capacity', 'batch preview compares the proposed roster with configured stream capacity')
+assert.equal(rolloverBatch.summary.capacity_exceeded, 0, 'batch preview summarizes capacity overruns across the cycle')
+assert.deepEqual((await db.query(
+  'select id, campus_id, class_level, class_stream, enrollment_status from profiles where id=$1', [ids.student],
+)).rows[0], decisionProfileBefore, 'planning and previewing a batch does not move or alter the learner')
+await db.query('select save_year_rollover_placement($1,$2,$3,$4,null)', [ids.student, 2026, 2027, formTwo])
+const unknownCapacityBatch = (await db.query(
+  'select preview_year_rollover_batch($1,$2,$3,1,25) as result', [2026, 2027, campus],
+)).rows[0].result
+assert.equal(unknownCapacityBatch.rows.find(row => row.id === ids.student).capacity_status, 'unknown',
+  'an unset class capacity remains unknown in the batch preview')
+await db.query('select save_year_rollover_placement($1,$2,$3,$4,$5)', [ids.student, 2026, 2027, formOne, streamA])
+const secondDecisionProfile = (await db.query(
+  'select campus_id, class_level, class_stream, enrollment_status from profiles where id=$1', [ids.stream_student],
+)).rows[0]
+await db.query('select save_year_rollover_decision($1,$2,$3,$4,$5,$6,$7,$8,$9)', [
+  ids.stream_student, 2026, 2027, 'promote', 'Progression approved for next cycle',
+  secondDecisionProfile.campus_id, secondDecisionProfile.class_level, secondDecisionProfile.class_stream, secondDecisionProfile.enrollment_status,
+])
+await db.query('select save_year_rollover_placement($1,$2,$3,$4,$5)', [ids.stream_student, 2026, 2027, formOne, streamA])
+const overCapacityBatch = (await db.query(
+  'select preview_year_rollover_batch($1,$2,$3,1,25) as result', [2026, 2027, campus],
+)).rows[0].result
+assert.equal(overCapacityBatch.summary.capacity_exceeded, 2, 'batch preview flags every proposed learner whose shared target exceeds capacity')
+await rejects(
+  () => db.query('select save_year_rollover_placement($1,$2,$3,$4,null)', [ids.student, 2026, 2027, formOne]),
+  /Choose a configured destination stream/,
+)
+await as('teacher')
+await rejects(
+  () => db.query('select preview_year_rollover_batch($1,$2,$3,1,25)', [2026, 2027, campus]),
+  /Main administrator access required/,
+)
+await rejects(
+  () => db.query('select save_year_rollover_placement($1,$2,$3,$4,$5)', [ids.student, 2026, 2027, formOne, streamA]),
+  /Main administrator access required/,
+)
+await as('admin')
+await db.query('select save_year_rollover_decision($1,$2,$3,$4,$5,$6,$7,$8,$9)', [
+  ids.student, 2026, 2027, 'transfer', 'Family transfer approved by administration',
+  decisionProfileBefore.campus_id, decisionProfileBefore.class_level, decisionProfileBefore.class_stream, decisionProfileBefore.enrollment_status,
+])
+assert.deepEqual((await db.query(
+  'select destination_class_id, destination_stream_id from year_rollover_decisions where learner_id=$1', [ids.student],
+)).rows[0], { destination_class_id: null, destination_stream_id: null },
+'changing to Transfer clears an obsolete internal destination proposal')
 await db.query('select admin_update_profile($1,$2,$3,$4,$5,$6,$7)', [ids.stream_teacher, 'Stream Teacher', campus, null, null, null, null])
 await db.query('select admin_update_profile($1,$2,$3,$4,$5,$6,$7)', [ids.subject_teacher, 'Subject Teacher', campus, null, null, null, null])
 await db.query(

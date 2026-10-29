@@ -193,6 +193,26 @@ async function pageFor(
       }])
     if (path.endsWith('/rpc/preview_year_rollover_decisions'))
       return send(rolloverDecisions.filter(item => body.p_learner_ids.includes(item.learner_id)))
+    if (path.endsWith('/rpc/preview_year_rollover_batch')) {
+      const saved = rolloverDecisions.find(item => item.learner_id === 'rollover-active')
+      const hasPlacement = Boolean(saved?.destination_class_id)
+      return send({
+        rows: [{
+          id: 'rollover-active', full_name: 'Ready Learner', admission_number: 'R001',
+          campus_id: 'campus', campus_name: 'Junior School', class_level: 'Form 1', class_stream: null,
+          decision: saved?.decision || null, reason: saved?.reason || null, reviewer_name: saved?.reviewer_name || null,
+          destination_class_id: saved?.destination_class_id || null, destination_stream_id: saved?.destination_stream_id || null,
+          destination_campus_name: hasPlacement ? 'Junior School' : null,
+          destination_class_level: hasPlacement ? 'Form 1' : null,
+          destination_stream_name: saved?.destination_stream_id ? 'A' : null,
+          review_status: !saved ? 'needs_decision' : hasPlacement || ['transfer', 'complete'].includes(saved.decision) ? 'ready_for_review' : 'placement_missing',
+          capacity_unknown: false,
+          capacity_status: hasPlacement ? 'within_capacity' : 'not_checked',
+        }],
+        total_count: 1, page: body.p_page, page_size: 25, total_pages: 1,
+        summary: { active_learners: 1, decisions_recorded: saved ? 1 : 0, needs_decision: saved ? 0 : 1, placements_missing: saved && !hasPlacement ? 1 : 0, stale_roster: 0, destinations_unavailable: 0, ready_for_review: saved && (hasPlacement || ['transfer', 'complete'].includes(saved.decision)) ? 1 : 0, capacity_exceeded: 0, capacity_unknown: 0 },
+      })
+    }
     if (path.endsWith('/rpc/save_year_rollover_decision')) {
       rolloverDecisions = rolloverDecisions.filter(item => item.learner_id !== body.p_learner_id)
       rolloverDecisions.push({
@@ -207,6 +227,14 @@ async function pageFor(
         current_enrollment_status: body.p_expected_enrollment_status,
       })
       return send({ learner_id: body.p_learner_id, decision: body.p_decision, reviewed_at: '2026-10-29T12:00:00.000Z' })
+    }
+    if (path.endsWith('/rpc/save_year_rollover_placement')) {
+      const saved = rolloverDecisions.find(item => item.learner_id === body.p_learner_id)
+      if (saved) {
+        saved.destination_class_id = body.p_destination_class_id
+        saved.destination_stream_id = body.p_destination_stream_id
+      }
+      return send(null)
     }
     if (path.endsWith('/audit_trail')) {
       activityAttempts += 1
@@ -790,6 +818,23 @@ try {
   await page.getByRole('row', { name: /Ready Learner R001/ }).getByRole('button', { name: 'Save decision' }).click()
   await page.getByRole('status').filter({ hasText: 'Decision recorded for Ready Learner' }).waitFor()
   await page.getByText('Saved promote · Main Admin', { exact: false }).waitFor()
+  await page.getByRole('heading', { name: 'Year rollover batch preview' }).waitFor()
+  await page.getByText('placement missing', { exact: true }).waitFor()
+  await page.getByLabel('Proposed destination class for Ready Learner').selectOption('class-form-1')
+  await page.getByLabel('Proposed destination stream for Ready Learner').selectOption('stream-a')
+  await page.getByRole('row', { name: /Ready Learner R001/ }).getByRole('button', { name: 'Save proposed placement' }).click()
+  await page.getByRole('status').filter({ hasText: 'Proposed placement saved for Ready Learner' }).waitFor()
+  await page.locator('.rollover-batch-table').getByText('Junior School · Form 1 · A', { exact: true }).waitFor()
+  await page.locator('.rollover-batch-table').getByText('ready for review', { exact: true }).waitFor()
+  await page.locator('.rollover-batch-table').getByText('Within configured capacity.', { exact: true }).waitFor()
+  const savedPlacement = writes.filter(write => write.path.endsWith('/rpc/save_year_rollover_placement')).at(-1)
+  assert.deepEqual(savedPlacement.body, {
+    p_learner_id: 'rollover-active',
+    p_source_academic_year: 2026,
+    p_destination_academic_year: 2027,
+    p_destination_class_id: 'class-form-1',
+    p_destination_stream_id: 'stream-a',
+  })
   const savedRolloverDecision = writes.filter(write => write.path.endsWith('/rpc/save_year_rollover_decision')).at(-1)
   assert.deepEqual(savedRolloverDecision.body, {
     p_learner_id: 'rollover-active',
@@ -803,13 +848,13 @@ try {
     p_expected_enrollment_status: 'active',
   })
   await page.getByRole('heading', { name: 'Destination capacity preview' }).waitFor()
-  await page.getByLabel('Destination class').selectOption('class-form-1')
-  await page.getByLabel('Destination stream').selectOption('stream-a')
+  await page.getByLabel('Destination class', { exact: true }).selectOption('class-form-1')
+  await page.getByLabel('Destination stream', { exact: true }).selectOption('stream-a')
   await page.getByLabel('Additional learners proposed').fill('2')
   await page.locator('.rollover-destination-details').getByText(/Projected total: 3/).waitFor()
   await page.getByRole('status').filter({ hasText: 'exceeds the recorded capacity' }).waitFor()
   await page.getByText('1 current active learner(s) have an unset or unmatched stream', { exact: false }).waitFor()
-  await page.getByLabel('Destination stream').selectOption('stream-b')
+  await page.getByLabel('Destination stream', { exact: true }).selectOption('stream-b')
   await page.getByText('Capacity is not set; fit cannot be determined.', { exact: true }).waitFor()
   assert.equal(writes.filter(write => write.path.includes('/rpc/preview_year_rollover_destinations')).length > 0, true,
     'destination capacity preview is loaded from its read-only database RPC')
@@ -953,7 +998,7 @@ try {
   await parent.waitForURL('http://127.0.0.1:5179/portal')
   assert.deepEqual(errors, [])
   console.log(
-    'PASS: profile editing, account creation, Reliance grade-band boundary preview and audited scale save, read-only rollover readiness and review reasons, reviewed per-learner promote/retain/transfer/complete decision save, destination capacity what-if/unknown-capacity/unmatched-stream preview, report readiness and release attribution, report integrity verified/mismatch/not-found flows, historical release-time learner/class/stream/campus identity and legacy-context disclosure, Junior/Senior/Sixth Form report variants, A4 print context/title/width and hidden portal controls, coursework exclusion from averages, reporting-period registration and reviewed close, publishing, records, timetable, payment retry, teacher sign-in and Coursework access, parent route guards, linked-account directory/search, credential-free audited recovery guidance, mobile layout; no uncaught browser errors. All backend requests were mocked.',
+    'PASS: profile editing, account creation, Reliance grade-band boundary preview and audited scale save, read-only rollover readiness and review reasons, reviewed per-learner promote/retain/transfer/complete decision save, configured destination proposal and capacity-aware year-rollover batch preview, destination capacity what-if/unknown-capacity/unmatched-stream preview, report readiness and release attribution, report integrity verified/mismatch/not-found flows, historical release-time learner/class/stream/campus identity and legacy-context disclosure, Junior/Senior/Sixth Form report variants, A4 print context/title/width and hidden portal controls, coursework exclusion from averages, reporting-period registration and reviewed close, publishing, records, timetable, payment retry, teacher sign-in and Coursework access, parent route guards, linked-account directory/search, credential-free audited recovery guidance, mobile layout; no uncaught browser errors. All backend requests were mocked.',
   )
 } catch (error) {
   const p = browser.contexts()[0]?.pages()[0]

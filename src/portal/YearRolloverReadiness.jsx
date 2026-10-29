@@ -30,9 +30,16 @@ export default function YearRolloverReadiness() {
   const [decisionYears, setDecisionYears] = useState({ source: '', destination: '' })
   const [decisions, setDecisions] = useState({})
   const [decisionDrafts, setDecisionDrafts] = useState({})
+  const [placementDrafts, setPlacementDrafts] = useState({})
   const [savingDecision, setSavingDecision] = useState('')
+  const [savingPlacement, setSavingPlacement] = useState('')
   const [decisionError, setDecisionError] = useState('')
   const [decisionNotice, setDecisionNotice] = useState('')
+  const [batchPreview, setBatchPreview] = useState(null)
+  const [batchPage, setBatchPage] = useState(1)
+  const [batchLoading, setBatchLoading] = useState(false)
+  const [batchError, setBatchError] = useState('')
+  const [batchRevision, setBatchRevision] = useState(0)
   const [page, setPage] = useState(1)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -80,6 +87,29 @@ export default function YearRolloverReadiness() {
   useEffect(() => {
     const sourceYear = Number(decisionYears.source)
     const destinationYear = Number(decisionYears.destination)
+    if (!Number.isInteger(sourceYear) || sourceYear < 2000 || !Number.isInteger(destinationYear) || destinationYear <= sourceYear) {
+      setBatchPreview(null)
+      return
+    }
+    let mounted = true
+    setBatchLoading(true)
+    supabase.rpc('preview_year_rollover_batch', {
+      p_source_academic_year: sourceYear,
+      p_destination_academic_year: destinationYear,
+      p_campus_id: filters.campusId || null,
+      p_page: batchPage,
+      p_page_size: PAGE_SIZE,
+    }).then(({ data, error: queryError }) => {
+      if (!mounted) return
+      if (queryError) setBatchError(workflowError(queryError))
+      else { setBatchError(''); setBatchPreview(data) }
+      setBatchLoading(false)
+    })
+    return () => { mounted = false }
+  }, [decisionYears, filters.campusId, batchPage, batchRevision])
+  useEffect(() => {
+    const sourceYear = Number(decisionYears.source)
+    const destinationYear = Number(decisionYears.destination)
     const learnerIds = (preview?.rows || []).map(row => row.id)
     if (!Number.isInteger(sourceYear) || sourceYear < 2000 || !Number.isInteger(destinationYear) || destinationYear <= sourceYear || !learnerIds.length) {
       setDecisions({})
@@ -104,6 +134,7 @@ export default function YearRolloverReadiness() {
   function applyFilters(event) {
     event.preventDefault()
     setPage(1)
+    setBatchPage(1)
     setFilters({ ...draft, search: draft.search.trim() })
   }
 
@@ -140,6 +171,39 @@ export default function YearRolloverReadiness() {
     })
     if (Array.isArray(data) && data[0]) setDecisions(value => ({ ...value, [row.id]: data[0] }))
     setDecisionDrafts(value => ({ ...value, [row.id]: undefined }))
+    setPlacementDrafts(value => ({ ...value, [row.id]: undefined }))
+    setBatchRevision(value => value + 1)
+  }
+
+  async function savePlacement(row) {
+    const decision = decisions[row.id]
+    const draft = placementDrafts[row.id] || {}
+    const targetClassId = draft.classId ?? decision?.destination_class_id ?? ''
+    const targetStreamId = draft.streamId ?? decision?.destination_stream_id ?? ''
+    setSavingPlacement(row.id)
+    setDecisionError('')
+    setDecisionNotice('')
+    const { error: saveError } = await supabase.rpc('save_year_rollover_placement', {
+      p_learner_id: row.id,
+      p_source_academic_year: Number(decisionYears.source),
+      p_destination_academic_year: Number(decisionYears.destination),
+      p_destination_class_id: targetClassId || null,
+      p_destination_stream_id: targetStreamId || null,
+    })
+    setSavingPlacement('')
+    if (saveError) {
+      setDecisionError(workflowError(saveError))
+      return
+    }
+    setDecisionNotice(`Proposed placement saved for ${row.full_name || 'learner'}. The learner was not moved.`)
+    const { data } = await supabase.rpc('preview_year_rollover_decisions', {
+      p_learner_ids: [row.id],
+      p_source_academic_year: Number(decisionYears.source),
+      p_destination_academic_year: Number(decisionYears.destination),
+    })
+    if (Array.isArray(data) && data[0]) setDecisions(value => ({ ...value, [row.id]: data[0] }))
+    setPlacementDrafts(value => ({ ...value, [row.id]: undefined }))
+    setBatchRevision(value => value + 1)
   }
 
   const summary = preview?.summary || { ready_for_decision: 0, needs_review: 0, not_currently_active: 0 }
@@ -193,10 +257,10 @@ export default function YearRolloverReadiness() {
       <section className="workflow-panel rollover-cycle-panel">
         <div className="workflow-form rollover-cycle-form">
           <label>Decision source academic year
-            <input type="number" min="2000" step="1" value={decisionYears.source} onChange={event => { setDecisionYears(value => ({ ...value, source: event.target.value })); setDecisionDrafts({}); setDecisionNotice('') }} placeholder="Enter confirmed year" />
+            <input type="number" min="2000" step="1" value={decisionYears.source} onChange={event => { setDecisionYears(value => ({ ...value, source: event.target.value })); setDecisionDrafts({}); setDecisionNotice(''); setBatchPage(1) }} placeholder="Enter confirmed year" />
           </label>
           <label>Decision destination academic year
-            <input type="number" min="2000" step="1" value={decisionYears.destination} onChange={event => { setDecisionYears(value => ({ ...value, destination: event.target.value })); setDecisionDrafts({}); setDecisionNotice('') }} placeholder="Enter confirmed year" />
+            <input type="number" min="2000" step="1" value={decisionYears.destination} onChange={event => { setDecisionYears(value => ({ ...value, destination: event.target.value })); setDecisionDrafts({}); setDecisionNotice(''); setBatchPage(1) }} placeholder="Enter confirmed year" />
           </label>
           <p className="progress-report-note">Enter the school-confirmed years. Decisions are review records only; they do not promote learners, change enrolment, or assign classes or streams.</p>
         </div>
@@ -251,6 +315,27 @@ export default function YearRolloverReadiness() {
                 </label>
                 {decisions[row.id] && <small>Saved {decisions[row.id].decision} · {decisions[row.id].reviewer_name} · {new Date(decisions[row.id].reviewed_at).toLocaleDateString()}</small>}
                 <button type="button" className="secondary-action" disabled={savingDecision === row.id || !decisionYears.source || !decisionYears.destination || row.readiness !== 'ready_for_decision' || row.enrollment_status !== 'active' || !(decisionDrafts[row.id]?.decision ?? decisions[row.id]?.decision) || (decisionDrafts[row.id]?.reason ?? decisions[row.id]?.reason ?? '').trim().length < 10} onClick={() => saveDecision(row)}>{savingDecision === row.id ? 'Saving…' : decisions[row.id] ? 'Update decision' : 'Save decision'}</button>
+                {((decisionDrafts[row.id]?.decision ?? decisions[row.id]?.decision) === 'promote' || (decisionDrafts[row.id]?.decision ?? decisions[row.id]?.decision) === 'retain') && <>
+                  <label>Proposed destination class
+                    <select aria-label={`Proposed destination class for ${row.full_name || 'learner'}`} value={placementDrafts[row.id]?.classId ?? decisions[row.id]?.destination_class_id ?? ''} onChange={event => setPlacementDrafts(value => ({ ...value, [row.id]: { ...value[row.id], classId: event.target.value, streamId: '' } }))}>
+                      <option value="">Choose configured class</option>
+                      {destinations.map(item => <option key={item.id} value={item.id}>{item.campus_name} · {item.class_level}</option>)}
+                    </select>
+                  </label>
+                  {(() => {
+                    const classId = placementDrafts[row.id]?.classId ?? decisions[row.id]?.destination_class_id
+                    const targetClass = destinations.find(item => item.id === classId)
+                    if (!targetClass?.streams?.length) return null
+                    return <label>Proposed destination stream
+                      <select aria-label={`Proposed destination stream for ${row.full_name || 'learner'}`} value={placementDrafts[row.id]?.streamId ?? decisions[row.id]?.destination_stream_id ?? ''} onChange={event => setPlacementDrafts(value => ({ ...value, [row.id]: { ...value[row.id], streamId: event.target.value } }))}>
+                        <option value="">Choose configured stream</option>
+                        {targetClass.streams.map(stream => <option key={stream.id} value={stream.id}>{stream.stream_name}</option>)}
+                      </select>
+                    </label>
+                  })()}
+                  <button type="button" className="secondary-action" disabled={savingPlacement === row.id || !decisionYears.source || !decisionYears.destination || !decisions[row.id] || !(placementDrafts[row.id]?.classId ?? decisions[row.id]?.destination_class_id) || (() => { const target = destinations.find(item => item.id === (placementDrafts[row.id]?.classId ?? decisions[row.id]?.destination_class_id)); return Boolean(target?.streams?.length && !(placementDrafts[row.id]?.streamId ?? decisions[row.id]?.destination_stream_id)) })()} onClick={() => savePlacement(row)}>{savingPlacement === row.id ? 'Saving…' : 'Save proposed placement'}</button>
+                </>}
+                {(decisionDrafts[row.id]?.decision ?? decisions[row.id]?.decision) === 'transfer' || (decisionDrafts[row.id]?.decision ?? decisions[row.id]?.decision) === 'complete' ? <small>No internal destination is required for this reviewed decision.</small> : null}
               </div></td>
             </tr>)}</tbody>
           </table>
@@ -263,6 +348,35 @@ export default function YearRolloverReadiness() {
           </div>
         </footer>
       </section>
+      {batchPreview && <section className="workflow-panel rollover-readiness-panel rollover-batch-panel">
+        <header className="rollover-panel-heading">
+          <div><h2>Year rollover batch preview</h2><p>Cycle {decisionYears.source} → {decisionYears.destination}. Review each active learner’s recorded decision and configured destination before any future execution. This preview cannot move learners.</p></div>
+          {batchLoading && <span role="status">Refreshing batch preview…</span>}
+        </header>
+        {batchError && <p className="workflow-error" role="alert">{batchError}</p>}
+        <div className="rollover-batch-summary">
+          <article><span>Active learners</span><strong>{batchPreview.summary?.active_learners ?? 0}</strong></article>
+          <article><span>Decisions recorded</span><strong>{batchPreview.summary?.decisions_recorded ?? 0}</strong></article>
+          <article><span>Needs decision</span><strong>{batchPreview.summary?.needs_decision ?? 0}</strong></article>
+          <article><span>Missing placement</span><strong>{batchPreview.summary?.placements_missing ?? 0}</strong></article>
+          <article><span>Capacity exceeded</span><strong>{batchPreview.summary?.capacity_exceeded ?? 0}</strong></article>
+          <article><span>Capacity unknown</span><strong>{batchPreview.summary?.capacity_unknown ?? 0}</strong></article>
+          <article><span>Ready for review</span><strong>{batchPreview.summary?.ready_for_review ?? 0}</strong></article>
+        </div>
+        <p className="workflow-notice" role="note">“Ready for review” means the learner has a current roster, a saved decision, and any required configured destination. It is not permission to execute the rollover. Capacity overruns are flagged; capacity not set remains unknown.</p>
+        <div className="workflow-table-wrap"><table className="workflow-table rollover-batch-table">
+          <thead><tr><th>Learner</th><th>Current placement</th><th>Decision and reason</th><th>Proposed destination</th><th>Review status</th></tr></thead>
+          <tbody>{(batchPreview.rows || []).map(row => <tr key={row.id}>
+            <td><strong>{row.full_name || 'Name not recorded'}</strong><small>{row.admission_number || 'Admission number not recorded'}</small></td>
+            <td>{row.campus_name || 'Campus not recorded'} · {row.class_level || 'Class not recorded'} · {row.class_stream || 'Stream not set'}</td>
+            <td>{row.decision || 'Decision not recorded'}<small>{row.reason || 'Reason not recorded'}</small></td>
+            <td>{row.destination_class_level ? `${row.destination_campus_name} · ${row.destination_class_level}${row.destination_stream_name ? ` · ${row.destination_stream_name}` : ''}` : row.decision === 'transfer' || row.decision === 'complete' ? 'No internal destination' : 'Not assigned'}{row.capacity_unknown && <small>Capacity is not set.</small>}</td>
+            <td><span className={`rollover-status is-${row.review_status}`}>{row.review_status?.replaceAll('_', ' ')}</span>{row.capacity_status === 'over_capacity' && <small>Proposed roster exceeds configured capacity.</small>}{row.capacity_status === 'unknown' && <small>Capacity is not set; fit is unknown.</small>}{row.capacity_status === 'within_capacity' && <small>Within configured capacity.</small>}{row.reviewer_name && <small>Reviewed by {row.reviewer_name}</small>}</td>
+          </tr>)}</tbody>
+        </table></div>
+        {!batchPreview.rows?.length && <p className="portal-empty-copy">No active learners are in this batch scope.</p>}
+        <footer className="rollover-pagination"><span>Page {batchPreview.page} of {batchPreview.total_pages}; {batchPreview.total_count} active learners in scope</span><div className="workflow-actions"><button type="button" className="secondary-action" disabled={batchLoading || batchPage <= 1} onClick={() => setBatchPage(value => Math.max(value - 1, 1))}>Previous batch page</button><button type="button" className="secondary-action" disabled={batchLoading || batchPage >= (batchPreview.total_pages || 1)} onClick={() => setBatchPage(value => value + 1)}>Next batch page</button></div></footer>
+      </section>}
       <section className="workflow-panel rollover-readiness-panel rollover-destination-panel">
         <header className="rollover-panel-heading">
           <div><h2>Destination capacity preview</h2><p>Compare a proposed additional learner count with recorded active roster counts and configured capacity. This is a what-if check only; it does not assign learners.</p></div>
@@ -273,13 +387,13 @@ export default function YearRolloverReadiness() {
         {destinations.length > 0 && <div className="rollover-destination-content">
           <div className="workflow-form rollover-destination-form">
             <label>Destination class
-              <select value={destinationClassId} onChange={event => { setDestinationClassId(event.target.value); setDestinationStreamId('') }}>
+              <select aria-label="Destination class" value={destinationClassId} onChange={event => { setDestinationClassId(event.target.value); setDestinationStreamId('') }}>
                 <option value="">Choose configured class</option>
                 {destinations.map(item => <option key={item.id} value={item.id}>{item.campus_name} · {item.class_level}</option>)}
               </select>
             </label>
             {hasStreams && <label>Destination stream
-              <select value={destinationStreamId} onChange={event => setDestinationStreamId(event.target.value)}>
+              <select aria-label="Destination stream" value={destinationStreamId} onChange={event => setDestinationStreamId(event.target.value)}>
                 <option value="">Choose configured stream</option>
                 {destinationStreams.map(item => <option key={item.id} value={item.id}>{item.stream_name}</option>)}
               </select>
