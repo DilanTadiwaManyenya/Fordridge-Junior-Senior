@@ -1,6 +1,6 @@
 # Fordridge stage tracker
 
-Last updated: 28 October 2026
+Last updated: 29 October 2026
 Plan: [Fordridge portal roadmap](FORDRIDGE-ROADMAP.md)
 GitHub: https://github.com/DilanTadiwaManyenya/Fordridge-Junior-Senior
 
@@ -48,6 +48,7 @@ A stage is Complete only after its deliverable and relevant checks are recorded 
 | 38 | Scope decision recorded and pushed; implementation follows in Stage 39 | Fordridge needs a distinct Course Work workspace, following Reliance's junior/senior Coursework workflows; weights and term-specific policy remain unset | [Stage 38 record](STAGE-38-COURSEWORK-SCOPE.md); documentation-only review; no school-specific formula or production change assumed |
 | 39 | Implemented and locally verified; database migration and frontend release pending | Added a distinct Course Work workspace and assessment type; preserves assignment access and published-period immutability; raw coursework excluded from markbook aggregates until policy is confirmed | Migration: `20261029100000_coursework_model.sql`; isolated PGlite, lint, build, mocked Chrome browser suite and diff check pass; production migration not applied; frontend not deployed |
 | 40 | Implemented and locally verified; database migration and frontend release pending | Campus/year/term registry records period state, current flag, revision and events; report publication remains separate | Migration: `20261029110000_reporting_period_registry.sql`; isolated PGlite, lint, build, mocked Chrome browser suite and diff check pass; production migration not applied; frontend not deployed |
+| 41 | Implemented and locally verified; database migration and frontend release pending | Administrator closes a period with a reason and expected revision; teacher mark entry displays/blocks closed periods; the database blocks direct academic record writes | Migration: `20261029120000_close_reporting_period.sql`; [Stage 41 record](STAGE-41-REVIEWED-PERIOD-CLOSE.md); isolated PGlite, lint, build, mocked Chrome close flow and diff check pass; production migration not applied; frontend not deployed |
 
 ## Stage 5 follow-up status
 
