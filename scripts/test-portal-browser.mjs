@@ -485,6 +485,11 @@ try {
   await teacher.getByLabel('Password', { exact: true }).fill('test123')
   await teacher.getByRole('button', { name: 'Sign in to portal' }).click()
   await teacher.waitForURL('**/portal')
+  const coursework = await pageFor('teacher')
+  await coursework.goto('http://127.0.0.1:5179/portal/coursework')
+  await coursework.getByRole('heading', { name: 'Course Work', exact: true }).waitFor()
+  await coursework.getByText('No subject allocations are available yet.', { exact: false }).waitFor()
+  assert.equal(await coursework.getByRole('link', { name: 'Course Work', exact: true }).count(), 1)
   const recovery = await pageFor('student', false)
   await recovery.goto('http://127.0.0.1:5179/portal/student/login')
   await recovery.getByRole('button', { name: 'Forgot password?' }).click()
@@ -515,6 +520,8 @@ try {
   )
   await parent.goto('http://127.0.0.1:5179/portal/parent-accounts')
   await parent.waitForURL('http://127.0.0.1:5179/portal')
+  await parent.goto('http://127.0.0.1:5179/portal/coursework')
+  await parent.waitForURL('http://127.0.0.1:5179/portal')
   await page.getByRole('button', { name: 'Open portal navigation' }).click()
   await page.getByRole('link', { name: 'Parent accounts', exact: true }).click()
   await page.getByRole('heading', { name: 'Parent accounts' }).waitFor()
@@ -541,7 +548,7 @@ try {
   assert.deepEqual(recoveryWrite.body, { p_parent_id: 'parent', p_identity_verified: true })
   assert.deepEqual(errors, [])
   console.log(
-    'PASS: profile editing, account creation, publishing, records, timetable, payment retry, teacher sign-in, parent route guards, linked-account directory/search, credential-free audited recovery guidance, mobile layout; no uncaught browser errors. All backend requests were mocked.',
+    'PASS: profile editing, account creation, publishing, records, timetable, payment retry, teacher sign-in and Coursework access, parent route guards, linked-account directory/search, credential-free audited recovery guidance, mobile layout; no uncaught browser errors. All backend requests were mocked.',
   )
 } catch (error) {
   const p = browser.contexts()[0]?.pages()[0]

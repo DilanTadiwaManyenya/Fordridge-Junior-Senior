@@ -603,6 +603,16 @@ await rejects(
   /Choose an allocated subject/,
 )
 await db.query("select record_bulk_marks('Quiz 1','Science',current_date,2026,'Term 1',100,$1::jsonb)", [JSON.stringify([{ student_id: ids.stream_student, score: 75 }])])
+await db.query("select record_bulk_coursework_marks('Quiz 1','Science',current_date,2026,'Term 1',100,$1::jsonb)", [JSON.stringify([{ student_id: ids.stream_student, score: 40 }])])
+assert.equal(
+  (await db.query("select assessment_type from learner_records where student_id=$1 and title='Quiz 1' and assessment_type='coursework'", [ids.stream_student])).rows[0].assessment_type,
+  'coursework',
+  'the Coursework RPC records a separately classified score for an assigned learner',
+)
+await rejects(
+  () => db.query("select record_bulk_coursework_marks('Out of scope coursework','Science',current_date,2026,'Term 1',100,$1::jsonb)", [JSON.stringify([{ student_id: ids.other_student, score: 40 }])]),
+  /Subject is not allocated/,
+)
 await rejects(
   () => db.query("select record_bulk_marks('Quiz 1','Science',current_date,2026,'Term 1',100,$1::jsonb)", [JSON.stringify([{ student_id: ids.stream_student, score: 75 }])]),
   /already exist for this assessment/,
@@ -737,12 +747,30 @@ const publicationId = (await db.query(
   "insert into report_publications(campus_id,academic_year,academic_term,published_at,published_by) values($1,2026,'Term 1',now(),$2) returning id",
   [campus, ids.admin],
 )).rows[0].id
+const markbookAverage = (await db.query(
+  "select round(avg(score / max_score * 100), 2) as value from learner_records where student_id=$1 and kind='academic' and assessment_type='markbook' and academic_year=2026 and academic_term='Term 1'",
+  [ids.stream_student],
+)).rows[0].value
 const frozen = (await db.query(
-  'select assessments,subject_signatories from report_release_snapshots where publication_id=$1 and student_id=$2',
+  'select assessments,subject_signatories,average_percent from report_release_snapshots where publication_id=$1 and student_id=$2',
   [publicationId, ids.stream_student],
 )).rows[0]
 assert.ok(frozen.assessments.some(item => item.title === 'Quiz 1' && item.subject === 'Science'), 'official snapshots preserve the allocated subject')
+assert.ok(frozen.assessments.some(item => item.title === 'Quiz 1' && item.assessment_type === 'coursework'), 'official snapshots retain the separate Coursework classification')
+assert.equal(frozen.average_percent, markbookAverage, 'coursework remains visible but does not affect an unapproved report average')
 assert.equal(frozen.subject_signatories.Science, 'T', 'whole-class subject allocations appear on stream-specific report snapshots')
+await rejects(
+  () => db.query("select record_bulk_coursework_marks('After publication','Science',current_date,2026,'Term 1',100,$1::jsonb)", [JSON.stringify([{ student_id: ids.stream_student, score: 50 }])]),
+  /academic period has been published/,
+)
+await rejects(
+  () => db.query("insert into learner_records(student_id,kind,event_date,title,subject,score,max_score,academic_year,academic_term,assessment_type) values($1,'academic',current_date,'Direct late mark','Science',70,100,2026,'Term 1','markbook')", [ids.stream_student]),
+  /academic period has been published/,
+)
+await rejects(
+  () => db.query("delete from learner_records where student_id=$1 and title='Quiz 1' and assessment_type='coursework'", [ids.stream_student]),
+  /academic period has been published/,
+)
 await as('teacher')
 await rejects(
   () => db.query('select admin_correct_learner_profile($1,$2,$3,$4,$5,$6,$7,$8)', [
@@ -753,7 +781,7 @@ await rejects(
 await as('admin')
 await correctLearner(ids.stream_student, 'Corrected After Publication', 'B001', 'Form 1', 'B')
 const frozenAfterCorrection = (await db.query(
-  'select assessments,subject_signatories from report_release_snapshots where publication_id=$1 and student_id=$2',
+  'select assessments,subject_signatories,average_percent from report_release_snapshots where publication_id=$1 and student_id=$2',
   [publicationId, ids.stream_student],
 )).rows[0]
 assert.deepEqual(frozenAfterCorrection, frozen, 'correcting the current learner profile leaves the issued report snapshot unchanged')

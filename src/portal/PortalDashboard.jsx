@@ -28,6 +28,7 @@ import NotificationCenter from './NotificationCenter'
 import AttendanceHistory from './AttendanceHistory'
 import LearningAnalytics from './LearningAnalytics'
 import BulkMarks from './BulkMarks'
+import CourseWork from './CourseWork'
 import BulkLearnerImport from './BulkLearnerImport'
 import ReportSettings from './ReportSettings'
 import GradeBands from './GradeBands'
@@ -227,6 +228,7 @@ export default function PortalDashboard() {
     (view === 'attendance-history' && !attendance) ||
     (view === 'analytics' && !analytics) ||
     (view === 'marks' && !attendance) ||
+    (view === 'coursework' && !attendance) ||
     (view === 'import-learners' && !admin) ||
     (view === 'report-settings' && !admin) ||
     (view === 'grade-bands' && !admin) ||
@@ -255,6 +257,7 @@ export default function PortalDashboard() {
       'attendance-history',
       'analytics',
       'marks',
+      'coursework',
       'import-learners',
       'report-settings',
       'grade-bands',
@@ -366,6 +369,7 @@ export default function PortalDashboard() {
           {attendance && nav('/portal/attendance-history', 'Attendance history', '◷')}
           {analytics && nav('/portal/analytics', 'Academic analytics', '▤')}
           {attendance && nav('/portal/marks', 'Bulk mark entry', '✎')}
+          {attendance && nav('/portal/coursework', 'Course Work', '▤')}
           {admin && nav('/portal/assignments', 'Class assignments', '⌘')}
           {teacherMyClass && nav('/portal/my-class', 'My class', '▦')}
           {assignments && nav('/portal/subject-allocations', 'Subject allocations', '▤')}
@@ -495,6 +499,8 @@ export default function PortalDashboard() {
           <LearningAnalytics />
         ) : view === 'marks' ? (
           <BulkMarks profile={profile} />
+        ) : view === 'coursework' ? (
+          <CourseWork profile={profile} />
         ) : view === 'assignments' ? (
           <ClassAssignments profile={profile} />
         ) : view === 'my-class' ? (
