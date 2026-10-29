@@ -352,6 +352,7 @@ const simpleProduct = (await db.query(
 assert.equal(simpleProduct.created_by, ids.admin)
 assert.equal(simpleProduct.stock_unit, 'each')
 assert.equal(simpleProduct.tracks_variants, false)
+assert.equal(simpleProduct.unit_price, null, 'new products have no assumed selling price')
 assert.equal(
   (await db.query('select * from create_inventory_product($1,$2,$3,$4,$5,$6)', [simpleProductRequest, 'Test exercise book', 'TEST-BOOK-1', 'Stationery', 'each', false])).rows[0].id,
   simpleProduct.id,
@@ -458,12 +459,76 @@ assert.equal(Number(variantAdjustment.quantity_after), 4)
 assert.equal(Number((await db.query('select sum(quantity_delta) from inventory_stock_movements where product_id=$1', [simpleProduct.id])).rows[0].sum), 15)
 assert.equal(Number((await db.query('select sum(quantity_delta) from inventory_stock_movements where product_id=$1 and variant_id=$2', [variantProduct.id, shirtVariant.id])).rows[0].sum), 4)
 assert.equal(Number((await db.query("select count(*) from audit_trail where entity_type='inventory_stock_adjustment' and entity_id in (select id from inventory_stock_adjustments)")).rows[0].count), 3)
+const productPriceRequest = '67000000-0000-4000-8000-000000000001'
+await db.query('select set_inventory_product_price($1,$2,$3,$4)', [productPriceRequest, simpleProduct.id, 1.25, 'USD'])
+assert.equal(Number((await db.query('select unit_price from inventory_products where id=$1', [simpleProduct.id])).rows[0].unit_price), 1.25)
+await db.query('select set_inventory_product_price($1,$2,$3,$4)', [productPriceRequest, simpleProduct.id, 1.25, 'USD'])
+assert.equal((await db.query('select price_currency from inventory_products where id=$1', [simpleProduct.id])).rows[0].price_currency, 'USD', 'price configuration retries return the same product')
+await rejects(
+  () => db.query('select set_inventory_product_price($1,$2,$3,$4)', [productPriceRequest, simpleProduct.id, 2.00, 'USD']),
+  /already used/,
+)
+await rejects(
+  () => db.query('select set_inventory_product_price($1,$2,$3,$4)', ['67000000-0000-4000-8000-000000000002', simpleProduct.id, 0, 'USD']),
+  /positive price/,
+)
+await rejects(
+  () => db.query('select set_inventory_product_price($1,$2,$3,$4)', ['67000000-0000-4000-8000-000000000012', simpleProduct.id, 1.234, 'USD']),
+  /positive price/,
+)
+await db.query('select set_inventory_product_price($1,$2,$3,$4)', ['67000000-0000-4000-8000-000000000003', variantProduct.id, 20, 'USD'])
+const saleLines = [
+  { product_id: simpleProduct.id, variant_id: null, quantity: 2 },
+  { product_id: variantProduct.id, variant_id: shirtVariant.id, quantity: 1 },
+]
+const saleRequest = '67000000-0000-4000-8000-000000000004'
+const saleResult = (await db.query('select record_inventory_sale($1,$2::jsonb,$3) as result', [saleRequest, JSON.stringify(saleLines), 'Cash reported by operator'])).rows[0].result
+assert.equal(Number(saleResult.total), 22.5)
+assert.equal(saleResult.currency, 'USD')
+assert.equal(saleResult.lines.length, 2)
+assert.equal((await db.query('select record_inventory_sale($1,$2::jsonb,$3) as result', [saleRequest, JSON.stringify(saleLines), 'Cash reported by operator'])).rows[0].result.id, saleResult.id, 'checkout retries return the original receipt without double-deducting stock')
+await rejects(
+  () => db.query('select record_inventory_sale($1,$2::jsonb,$3)', [saleRequest, JSON.stringify([{ ...saleLines[0], quantity: 3 }]), 'Cash reported by operator']),
+  /already used/,
+)
+assert.equal(Number((await db.query('select sum(quantity_delta) from inventory_stock_movements where product_id=$1', [simpleProduct.id])).rows[0].sum), 13)
+assert.equal(Number((await db.query('select sum(quantity_delta) from inventory_stock_movements where product_id=$1 and variant_id=$2', [variantProduct.id, shirtVariant.id])).rows[0].sum), 3)
+const saleRow = (await db.query('select * from inventory_sales where id=$1', [saleResult.id])).rows[0]
+assert.equal(Number(saleRow.total), 22.5)
+assert.deepEqual((await db.query('select amount,currency,reported_method from inventory_sale_payments where sale_id=$1', [saleResult.id])).rows[0], { amount: '22.50', currency: 'USD', reported_method: 'Cash reported by operator' })
+assert.deepEqual((await db.query('select product_name_snapshot,variant_label_snapshot,stock_unit_snapshot,quantity,unit_price,line_total from inventory_sale_lines where sale_id=$1 order by product_name_snapshot', [saleResult.id])).rows.map((line) => [line.product_name_snapshot, line.variant_label_snapshot, line.stock_unit_snapshot, line.quantity, line.unit_price, line.line_total]), [
+  ['Test exercise book', null, 'each', 2, '1.25', '2.50'],
+  ['Test school shirt', 'Size 10', 'each', 1, '20.00', '20.00'],
+])
+await rejects(
+  () => db.query('select record_inventory_sale($1,$2::jsonb,$3)', ['67000000-0000-4000-8000-000000000005', JSON.stringify([{ ...saleLines[0], quantity: 999 }]), 'Cash']),
+  /Not enough stock/,
+)
+await rejects(
+  () => db.query('select record_inventory_sale($1,$2::jsonb,$3)', ['67000000-0000-4000-8000-000000000006', JSON.stringify([saleLines[0], saleLines[0]]), 'Cash']),
+  /duplicate product and variant lines/,
+)
+await db.query('select set_inventory_product_price($1,$2,$3,$4)', ['67000000-0000-4000-8000-000000000008', variantProduct.id, 20, 'ZiG'])
+await rejects(
+  () => db.query('select record_inventory_sale($1,$2::jsonb,$3)', ['67000000-0000-4000-8000-000000000009', JSON.stringify(saleLines), 'Cash']),
+  /cannot mix currencies/,
+)
+assert.equal(Number((await db.query('select count(*) from inventory_sales')).rows[0].count), 1, 'failed checkout attempts leave no partial sale or payment rows')
+assert.equal((await db.query("select action from audit_trail where entity_type='inventory_sale' and entity_id=$1", [saleResult.id])).rows[0].action, 'checked_out')
 await rejects(
   () => db.query('update inventory_stock_movements set quantity_delta=0 where receipt_line_id=$1', [receiptLines[0].id]),
   /permission denied/,
 )
 await rejects(
   () => db.query('update inventory_stock_adjustments set reason=$2 where id=$1', [stockIncrease.id, 'Forged correction reason']),
+  /permission denied/,
+)
+await rejects(
+  () => db.query('delete from inventory_sales where id=$1', [saleResult.id]),
+  /permission denied/,
+)
+await rejects(
+  () => db.query('update inventory_products set unit_price=0 where id=$1', [simpleProduct.id]),
   /permission denied/,
 )
 await rejects(
@@ -475,6 +540,15 @@ await rejects(
   /permission denied/,
 )
 await as('teacher')
+await rejects(
+  () => db.query('select record_inventory_sale($1,$2::jsonb,$3)', ['67000000-0000-4000-8000-000000000010', JSON.stringify(saleLines), 'Cash']),
+  /Main Admin access required/,
+)
+await rejects(
+  () => db.query('select set_inventory_product_price($1,$2,$3,$4)', ['67000000-0000-4000-8000-000000000011', simpleProduct.id, 1, 'USD']),
+  /Main Admin access required/,
+)
+assert.equal(Number((await db.query('select count(*) from inventory_sales')).rows[0].count), 0, 'other roles cannot read sale/payment history')
 await rejects(
   () => db.query('select adjust_inventory_stock($1,$2,$3,$4,$5)', ['66000000-0000-4000-8000-000000000005', simpleProduct.id, null, 1, 'Unauthorized adjustment']),
   /Main Admin access required/,

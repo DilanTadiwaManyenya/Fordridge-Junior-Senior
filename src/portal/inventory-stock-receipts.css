@@ -38,6 +38,36 @@
 .inventory-products-panel .workflow-table td small,.inventory-receipt-history .workflow-table td small{display:block;margin-top:4px;color:#65738a;font-size:.74rem;overflow-wrap:anywhere}
 .inventory-variant-list,.inventory-history-lines{display:grid;gap:4px;margin:0 0 8px;padding-left:18px;font-size:.76rem}
 .inventory-variant-list li{line-height:1.8}
+.inventory-pos{display:grid;gap:16px;padding:0;overflow:hidden}
+.inventory-pos>header{display:flex;align-items:flex-start;justify-content:space-between;gap:18px;padding:18px 20px;border-bottom:1px solid #e1e8f0}
+.inventory-pos>header h2{margin:0;color:#10264a;font-size:1.1rem}
+.inventory-pos>header p,.inventory-pos-prices>p,.inventory-pos-cart>p{margin:6px 0 0;color:#65738a;font-size:.83rem;line-height:1.5}
+.inventory-pos>header p{max-width:740px}
+.inventory-pos>header button,.inventory-pos-price-row button,.inventory-pos-build button,.inventory-pos-cart button,.inventory-pos-recovery button{border:1px solid #cbd3df;border-radius:6px;padding:8px 11px;background:#fff;color:#10264a;font:inherit;font-size:.76rem;font-weight:800;cursor:pointer}
+.inventory-pos-prices,.inventory-pos-build,.inventory-pos-cart,.inventory-pos-history{display:grid;gap:12px;padding:0 20px}
+.inventory-pos-prices h3,.inventory-pos-build h3,.inventory-pos-cart h3,.inventory-pos-history h3,.inventory-pos-receipt h3{margin:0;color:#10264a;font-size:.96rem}
+.inventory-pos-price-row{display:grid;grid-template-columns:minmax(130px,1.2fr) minmax(115px,1fr) minmax(120px,.8fr) minmax(100px,.6fr) auto;align-items:end;gap:10px;padding:12px;border:1px solid #e1e8f0;border-radius:8px;background:#f8faff}
+.inventory-pos-price-row>strong,.inventory-pos-price-row>span{align-self:center;color:#334863;font-size:.82rem;overflow-wrap:anywhere}
+.inventory-pos-price-row>span{color:#65738a}
+.inventory-pos-price-row label,.inventory-pos-build label,.inventory-pos-cart>label{display:grid;gap:6px;color:#334863;font-size:.75rem;font-weight:800}
+.inventory-pos-price-row input,.inventory-pos-price-row select,.inventory-pos-build input,.inventory-pos-build select,.inventory-pos-cart input{box-sizing:border-box;width:100%;min-width:0;min-height:40px;padding:8px;border:1px solid #cbd3df;border-radius:6px;background:#fff;font:inherit;font-size:.85rem}
+.inventory-pos-build{grid-template-columns:repeat(3,minmax(0,1fr)) auto;align-items:end}
+.inventory-pos-build h3,.inventory-pos-available{grid-column:1/-1}
+.inventory-pos-available{margin:0;color:#65738a;font-size:.78rem}
+.inventory-pos-cart .workflow-table{min-width:660px}
+.inventory-pos-cart td small,.inventory-pos-history td small{display:block;margin-top:4px;color:#65738a}
+.inventory-pos-cart tfoot th{padding-top:12px;color:#10264a;text-align:right}
+.inventory-pos-cart>label{max-width:360px}
+.inventory-pos-cart>button{justify-self:start}
+.inventory-pos-recovery{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:0 20px;padding:12px 14px;border:1px solid #e6c979;border-radius:8px;background:#fff9e9;color:#665626;font-size:.82rem}
+.inventory-pos-receipt{margin:0 20px;padding:16px;border:1px solid #b9dfc4;border-radius:8px;background:#f0faf3;color:#294c34}
+.inventory-pos-receipt p{margin:7px 0;font-size:.82rem;overflow-wrap:anywhere}
+.inventory-pos-receipt strong{display:block;margin-top:12px}
+.inventory-pos-history{padding-bottom:18px}
+.inventory-pos-history ul{min-width:220px;margin:0;padding-left:18px;font-size:.77rem}
+.inventory-pos-history .workflow-table{min-width:900px}
+@media(max-width:900px){.inventory-pos-price-row{grid-template-columns:repeat(2,minmax(0,1fr))}.inventory-pos-price-row>strong,.inventory-pos-price-row>span{grid-column:1/-1}.inventory-pos-build{grid-template-columns:1fr 1fr}.inventory-pos-build h3,.inventory-pos-available{grid-column:1/-1}}
+@media(max-width:560px){.inventory-pos>header{align-items:flex-start;flex-direction:column}.inventory-pos>header button{width:100%}.inventory-pos-prices,.inventory-pos-build,.inventory-pos-cart,.inventory-pos-history{padding-right:14px;padding-left:14px}.inventory-pos-price-row,.inventory-pos-build{grid-template-columns:1fr}.inventory-pos-build h3,.inventory-pos-available{grid-column:auto}.inventory-pos-recovery{align-items:flex-start;flex-direction:column;margin-right:14px;margin-left:14px}.inventory-pos-recovery button{width:100%}.inventory-pos-cart>button{width:100%}.inventory-pos-receipt{margin-right:14px;margin-left:14px}}
 .inventory-add-variant{display:flex;gap:6px;min-width:190px}
 .inventory-add-variant input{min-width:0;width:100%;padding:7px;border:1px solid #cbd3df;border-radius:5px;font:inherit;font-size:.76rem}
 .inventory-history-lines{min-width:250px}

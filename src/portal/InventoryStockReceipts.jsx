@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { workflowError } from './workflow'
+import InventoryPointOfSale from './InventoryPointOfSale'
 import './inventory-stock-receipts.css'
 
 const pageSize = 500
@@ -296,7 +297,7 @@ export default function InventoryStockReceipts({ profile, user }) {
       <div className="workflow-actions inventory-wide"><button className="primary-action" disabled={busy || Object.values(pending).some(Boolean) || !products.length}>{busy ? 'Recording…' : 'Record stock receipt'}</button></div>
     </form>
 
-    <section className="workflow-panel inventory-products-panel"><header><div><h2>Catalogue and current stock</h2><p>Stock is the sum of auditable receipt movements. This is not available for checkout in this stage.</p></div></header>
+    <section className="workflow-panel inventory-products-panel"><header><div><h2>Catalogue and current stock</h2><p>Stock is the sum of auditable movements. Only items with an administrator-configured current price are available at checkout.</p></div></header>
       {loading ? <p role="status">Loading catalogue…</p> : products.length ? <div className="workflow-scroll"><table className="workflow-table"><thead><tr><th>Product</th><th>SKU / category</th><th>Stock unit</th><th>Current stock</th><th>Variants</th><th>Actions</th></tr></thead><tbody>{products.map((product) => {
         const productVariants = variantsByProduct.get(product.id) || []
         const total = product.tracks_variants
@@ -305,6 +306,8 @@ export default function InventoryStockReceipts({ profile, user }) {
         return <tr key={product.id}><td><strong>{product.name}</strong>{!product.active && <small>Archived</small>}</td><td>{product.sku || '—'}<small>{product.category || 'Category unset'}</small></td><td>{product.stock_unit}</td><td>{total.toLocaleString()}</td><td>{product.tracks_variants ? <><ul className="inventory-variant-list">{productVariants.map((variant) => <li key={variant.id}>{variant.label}: {quantities.get(`${product.id}:${variant.id}`) || 0} {product.stock_unit}<button type="button" onClick={() => startAdjustment(product, variant)} disabled={!product.active || !variant.active || busy}>Adjust</button></li>)}</ul><form className="inventory-add-variant" onSubmit={(event) => submitVariant(event, product.id)}><input required maxLength={40} aria-label={`New variant for ${product.name}`} placeholder="Add variant label" value={variantDrafts[product.id] || ''} onChange={(event) => setVariantDrafts((current) => ({ ...current, [product.id]: event.target.value }))} /><button type="submit" disabled={busy || Object.values(pending).some(Boolean)}>Add</button></form></> : 'Single balance'}</td><td>{!product.tracks_variants && <button type="button" className="inventory-adjust-button" onClick={() => startAdjustment(product)} disabled={!product.active || busy}>Adjust stock</button>}</td></tr>
       })}</tbody></table></div> : <p className="portal-empty-copy">No products exist yet. Add only school-confirmed catalogue items.</p>}
     </section>
+
+    <InventoryPointOfSale profile={profile} user={user} products={products} variants={variants} quantities={quantities} onRefresh={load} />
 
     <section className="workflow-panel inventory-receipt-history"><header><div><h2>Receipt history</h2><p>Each entry preserves its source, actor, quantities, unit, variant, and any known purchase cost.</p></div></header>
       {loading ? <p role="status">Loading receipt history…</p> : receipts.length ? <div className="workflow-scroll"><table className="workflow-table"><thead><tr><th>Date / type</th><th>Source</th><th>Items</th><th>Recorded by</th></tr></thead><tbody>{receipts.map((receipt) => {
