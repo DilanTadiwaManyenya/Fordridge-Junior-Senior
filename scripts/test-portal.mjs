@@ -428,7 +428,42 @@ assert.equal((await db.query('select receipt_kind from inventory_stock_receipts 
 assert.equal((await db.query('select unit_cost from inventory_stock_receipt_lines where receipt_id=$1', [openingReceiptId])).rows[0].unit_cost, null, 'unknown historic opening cost remains explicitly unknown')
 assert.equal(Number((await db.query('select sum(quantity_delta) from inventory_stock_movements where product_id=$1', [simpleProduct.id])).rows[0].sum), 17)
 await rejects(
+  () => db.query('select adjust_inventory_stock($1,$2,$3,$4,$5)', ['66000000-0000-4000-8000-000000000010', simpleProduct.id, null, 0, 'No change']),
+  /non-zero whole-number adjustment/,
+)
+await rejects(
+  () => db.query('select adjust_inventory_stock($1,$2,$3,$4,$5)', ['66000000-0000-4000-8000-000000000011', simpleProduct.id, null, 1, 'bad']),
+  /reason of 5 to 1000/,
+)
+const adjustmentRequestId = '66000000-0000-4000-8000-000000000001'
+const stockIncrease = (await db.query('select adjust_inventory_stock($1,$2,$3,$4,$5) as result', [adjustmentRequestId, simpleProduct.id, null, 3, 'Physical count found three extra units'])).rows[0].result
+assert.equal(Number(stockIncrease.quantity_before), 17)
+assert.equal(Number(stockIncrease.quantity_delta), 3)
+assert.equal(Number(stockIncrease.quantity_after), 20)
+assert.equal((await db.query('select adjust_inventory_stock($1,$2,$3,$4,$5) as result', [adjustmentRequestId, simpleProduct.id, null, 3, 'Physical count found three extra units'])).rows[0].result.id, stockIncrease.id, 'retrying the same adjustment returns its original result without changing stock twice')
+await rejects(
+  () => db.query('select adjust_inventory_stock($1,$2,$3,$4,$5)', [adjustmentRequestId, simpleProduct.id, null, 2, 'Different adjustment']),
+  /already used/,
+)
+const stockDecrease = (await db.query('select adjust_inventory_stock($1,$2,$3,$4,$5) as result', ['66000000-0000-4000-8000-000000000002', simpleProduct.id, null, -5, 'Counted damaged units and removed them'])).rows[0].result
+assert.equal(Number(stockDecrease.quantity_before), 20)
+assert.equal(Number(stockDecrease.quantity_after), 15)
+await rejects(
+  () => db.query('select adjust_inventory_stock($1,$2,$3,$4,$5)', ['66000000-0000-4000-8000-000000000003', simpleProduct.id, null, -99, 'Would reduce stock below zero']),
+  /would make stock negative/,
+)
+const variantAdjustment = (await db.query('select adjust_inventory_stock($1,$2,$3,$4,$5) as result', ['66000000-0000-4000-8000-000000000004', variantProduct.id, shirtVariant.id, -2, 'Two damaged shirts removed after inspection'])).rows[0].result
+assert.equal(Number(variantAdjustment.quantity_before), 6)
+assert.equal(Number(variantAdjustment.quantity_after), 4)
+assert.equal(Number((await db.query('select sum(quantity_delta) from inventory_stock_movements where product_id=$1', [simpleProduct.id])).rows[0].sum), 15)
+assert.equal(Number((await db.query('select sum(quantity_delta) from inventory_stock_movements where product_id=$1 and variant_id=$2', [variantProduct.id, shirtVariant.id])).rows[0].sum), 4)
+assert.equal(Number((await db.query("select count(*) from audit_trail where entity_type='inventory_stock_adjustment' and entity_id in (select id from inventory_stock_adjustments)")).rows[0].count), 3)
+await rejects(
   () => db.query('update inventory_stock_movements set quantity_delta=0 where receipt_line_id=$1', [receiptLines[0].id]),
+  /permission denied/,
+)
+await rejects(
+  () => db.query('update inventory_stock_adjustments set reason=$2 where id=$1', [stockIncrease.id, 'Forged correction reason']),
   /permission denied/,
 )
 await rejects(
@@ -440,6 +475,11 @@ await rejects(
   /permission denied/,
 )
 await as('teacher')
+await rejects(
+  () => db.query('select adjust_inventory_stock($1,$2,$3,$4,$5)', ['66000000-0000-4000-8000-000000000005', simpleProduct.id, null, 1, 'Unauthorized adjustment']),
+  /Main Admin access required/,
+)
+assert.equal(Number((await db.query('select count(*) from inventory_stock_adjustments')).rows[0].count), 0, 'non-admin roles cannot read stock adjustment history')
 await rejects(
   () => db.query('select record_inventory_stock_receipt($1,$2,$3,$4,$5,$6::jsonb)', ['65000000-0000-4000-8000-000000000009', 'supplier_delivery', 'No access', null, null, JSON.stringify(receiptItems)]),
   /Main Admin access required/,

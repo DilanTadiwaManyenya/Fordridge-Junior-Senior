@@ -9,6 +9,15 @@
 .inventory-stock-summary article strong{color:#10264a;font-size:1.5rem}
 .inventory-stock-summary article small{color:#78859a;font-size:.72rem}
 .inventory-product-form h2,.inventory-receipt-form h2{grid-column:1/-1;margin:0;color:#10264a;font-size:1.1rem}
+.inventory-adjustment-form h2{grid-column:1/-1;margin:0;color:#10264a;font-size:1.1rem}
+.inventory-adjustment-form>p{grid-column:1/-1;margin:0;color:#65738a;font-size:.84rem;line-height:1.5}
+.inventory-adjustment-form label{display:grid;gap:6px;min-width:0;color:#334863;font-size:.78rem;font-weight:800}
+.inventory-adjustment-form input,.inventory-adjustment-form textarea{box-sizing:border-box;width:100%;min-height:42px;padding:9px;border:1px solid #cbd3df;border-radius:6px;background:white;font:inherit;font-size:.9rem}
+.inventory-adjustment-form textarea{min-height:82px;resize:vertical}
+.inventory-adjustment-preview{font-weight:800;color:#10264a!important}
+.inventory-adjustment-preview.is-invalid{color:#a2233e!important}
+.inventory-adjust-button,.inventory-variant-list button{margin-left:7px;border:1px solid #cbd3df;border-radius:5px;padding:5px 8px;background:#fff;color:#10264a;font:inherit;font-size:.72rem;font-weight:800;cursor:pointer}
+.inventory-adjust-button:disabled,.inventory-variant-list button:disabled{opacity:.55;cursor:not-allowed}
 .inventory-product-form>p,.inventory-receipt-form>p{grid-column:1/-1;margin:0;color:#65738a;font-size:.84rem;line-height:1.5}
 .inventory-receipt-form{grid-template-columns:repeat(2,minmax(0,1fr))}
 .inventory-wide{grid-column:1/-1}
@@ -28,6 +37,7 @@
 .inventory-products-panel .workflow-table,.inventory-receipt-history .workflow-table{min-width:800px}
 .inventory-products-panel .workflow-table td small,.inventory-receipt-history .workflow-table td small{display:block;margin-top:4px;color:#65738a;font-size:.74rem;overflow-wrap:anywhere}
 .inventory-variant-list,.inventory-history-lines{display:grid;gap:4px;margin:0 0 8px;padding-left:18px;font-size:.76rem}
+.inventory-variant-list li{line-height:1.8}
 .inventory-add-variant{display:flex;gap:6px;min-width:190px}
 .inventory-add-variant input{min-width:0;width:100%;padding:7px;border:1px solid #cbd3df;border-radius:5px;font:inherit;font-size:.76rem}
 .inventory-history-lines{min-width:250px}

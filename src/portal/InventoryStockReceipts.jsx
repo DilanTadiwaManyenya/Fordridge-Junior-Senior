@@ -4,11 +4,12 @@ import { workflowError } from './workflow'
 import './inventory-stock-receipts.css'
 
 const pageSize = 500
-const requestKinds = ['product', 'variant', 'receipt']
+const requestKinds = ['product', 'variant', 'receipt', 'adjustment']
 const rpcNames = {
   product: 'create_inventory_product',
   variant: 'add_inventory_product_variant',
   receipt: 'record_inventory_stock_receipt',
+  adjustment: 'adjust_inventory_stock',
 }
 
 function readSavedRequest(key) {
@@ -40,11 +41,13 @@ export default function InventoryStockReceipts({ profile, user }) {
   const [products, setProducts] = useState([])
   const [variants, setVariants] = useState([])
   const [movements, setMovements] = useState([])
+  const [adjustments, setAdjustments] = useState([])
   const [receipts, setReceipts] = useState([])
   const [receiptLines, setReceiptLines] = useState([])
   const [productDraft, setProductDraft] = useState(blankProduct)
   const [variantDrafts, setVariantDrafts] = useState({})
   const [receiptDraft, setReceiptDraft] = useState({ receipt_kind: 'supplier_delivery', supplier_name: '', supplier_reference: '', notes: '', items: [blankLine()] })
+  const [adjustmentDraft, setAdjustmentDraft] = useState(null)
   const [pending, setPending] = useState(() => Object.fromEntries(requestKinds.map((kind) => [kind, readSavedRequest(`fordridge-inventory-${kind}-v1-${userId}`)])))
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState(false)
@@ -65,18 +68,20 @@ export default function InventoryStockReceipts({ profile, user }) {
     setLoading(true)
     setError('')
     try {
-      const [nextProducts, nextVariants, nextMovements, nextReceipts, nextLines] = await Promise.all([
+      const [nextProducts, nextVariants, nextMovements, nextReceipts, nextLines, nextAdjustments] = await Promise.all([
         readAll('inventory_products', 'created_at'),
         readAll('inventory_product_variants', 'created_at'),
         readAll('inventory_stock_movements', 'created_at'),
         readAll('inventory_stock_receipts', 'created_at'),
         readAll('inventory_stock_receipt_lines', 'created_at'),
+        readAll('inventory_stock_adjustments', 'created_at'),
       ])
       setProducts(nextProducts)
       setVariants(nextVariants)
       setMovements(nextMovements)
       setReceipts(nextReceipts)
       setReceiptLines(nextLines)
+      setAdjustments(nextAdjustments)
     } catch (cause) {
       setError(workflowError(cause))
     } finally {
@@ -139,6 +144,10 @@ export default function InventoryStockReceipts({ profile, user }) {
       } else if (kind === 'variant') {
         setVariantDrafts((current) => ({ ...current, [request.p_product_id]: '' }))
         setNotice('Variant added. No stock was assigned to it.')
+      } else if (kind === 'adjustment') {
+        const delta = Number(data?.quantity_delta ?? request.p_quantity_delta)
+        setAdjustmentDraft(null)
+        setNotice(`Stock adjusted by ${delta > 0 ? '+' : ''}${delta}. Balance: ${Number(data?.quantity_before || 0).toLocaleString()} → ${Number(data?.quantity_after || 0).toLocaleString()}. Reason recorded.`)
       } else {
         setReceiptDraft({ receipt_kind: 'supplier_delivery', supplier_name: '', supplier_reference: '', notes: '', items: [blankLine()] })
         setNotice(`Stock receipt recorded${data ? ` · ${data}` : ''}. Quantities are available in the movement ledger.`)
@@ -198,6 +207,25 @@ export default function InventoryStockReceipts({ profile, user }) {
     if (storeRequest('receipt', request)) await runRequest('receipt', request)
   }
 
+  async function submitAdjustment(event) {
+    event.preventDefault()
+    if (!adjustmentDraft || busy || Object.values(pending).some(Boolean)) return
+    const request = {
+      p_request_id: crypto.randomUUID(),
+      p_product_id: adjustmentDraft.product_id,
+      p_variant_id: adjustmentDraft.variant_id || null,
+      p_quantity_delta: Number(adjustmentDraft.quantity_delta),
+      p_reason: adjustmentDraft.reason.trim(),
+    }
+    if (storeRequest('adjustment', request)) await runRequest('adjustment', request)
+  }
+
+  function startAdjustment(product, variant = null) {
+    setError('')
+    setNotice('')
+    setAdjustmentDraft({ product_id: product.id, variant_id: variant?.id || '', quantity_delta: '', reason: '' })
+  }
+
   function updateReceiptLine(index, updates) {
     setReceiptDraft((current) => ({ ...current, items: current.items.map((line, lineIndex) => lineIndex === index ? { ...line, ...updates } : line) }))
   }
@@ -206,14 +234,34 @@ export default function InventoryStockReceipts({ profile, user }) {
 
   return <section className="inventory-stock-receipts" aria-labelledby="inventory-stock-title">
     <header className="workflow-heading"><div><p className="eyebrow">Inventory &amp; POS</p><h1 id="inventory-stock-title">Stock receipts</h1><p className="progress-report-note">Create empty product records, then record each supplier delivery or opening balance with an auditable source.</p></div><button type="button" onClick={load} disabled={loading}>{loading ? 'Loading…' : 'Refresh'}</button></header>
-    <aside className="inventory-stock-notice">This stage records stock only. It does not enable checkout, payment processing, campus allocation, or parent ordering. Enter only school-confirmed products and quantities.</aside>
+    <aside className="inventory-stock-notice">This stage records stock only. It does not enable checkout, payment processing, campus allocation, or parent ordering. Enter only school-confirmed products and quantities. Adjustments require a reason and are recorded as signed stock movements.</aside>
     {notice && <p className="workflow-success" role="status">{notice}</p>}
     {error && <p className="workflow-error" role="alert">{error}</p>}
     {Object.entries(pending).filter(([, request]) => request).map(([kind, request]) => <section className="inventory-stock-recovery" key={kind} aria-label={`${kind} recovery`}>
       <div><strong>{request.invalid ? 'Saved request needs review' : `${kind[0].toUpperCase()}${kind.slice(1)} request awaiting confirmation`}</strong><p>{request.invalid ? 'The saved request could not be read. Refresh and reconcile the catalogue before creating another record.' : 'Retry the same request to confirm its result without duplicating a record.'}</p></div>
       {!request.invalid && <button type="button" disabled={busy} onClick={() => runRequest(kind, request)}>Retry saved request</button>}
     </section>)}
-    <div className="inventory-stock-summary"><article><span>Products</span><strong>{products.length}</strong><small>School-entered records only</small></article><article><span>Units received</span><strong>{movements.reduce((sum, movement) => sum + Number(movement.quantity_delta || 0), 0).toLocaleString()}</strong><small>From recorded receipts</small></article><article><span>Receipts</span><strong>{receipts.length}</strong><small>Supplier and opening entries</small></article></div>
+    <div className="inventory-stock-summary"><article><span>Products</span><strong>{products.length}</strong><small>School-entered records only</small></article><article><span>Net stock movement</span><strong>{movements.reduce((sum, movement) => sum + Number(movement.quantity_delta || 0), 0).toLocaleString()}</strong><small>Receipts plus signed adjustments</small></article><article><span>Receipts</span><strong>{receipts.length}</strong><small>Supplier and opening entries</small></article></div>
+
+    {adjustmentDraft && <form className="workflow-panel workflow-form inventory-adjustment-form" onSubmit={submitAdjustment}>
+      {(() => {
+        const product = products.find((item) => item.id === adjustmentDraft.product_id)
+        const variant = variants.find((item) => item.id === adjustmentDraft.variant_id)
+        const key = `${adjustmentDraft.product_id}:${adjustmentDraft.variant_id || 'product'}`
+        const current = quantities.get(key) || 0
+        const delta = adjustmentDraft.quantity_delta === '' ? null : Number(adjustmentDraft.quantity_delta)
+        const next = delta == null ? current : current + delta
+        const validDelta = Number.isInteger(delta) && delta !== 0 && Math.abs(delta) <= 9999999 && next >= 0
+        return <>
+          <h2>Adjust stock</h2>
+          <p>{product?.name}{variant ? ` · ${variant.label}` : ''} currently has <strong>{current.toLocaleString()} {product?.stock_unit}</strong>. Positive values add stock; negative values remove it. The adjustment and reason are retained in the audit history.</p>
+          <label>Signed quantity change<input autoFocus required type="number" min="-9999999" max="9999999" step="1" value={adjustmentDraft.quantity_delta} onChange={(event) => setAdjustmentDraft({ ...adjustmentDraft, quantity_delta: event.target.value })} aria-describedby="inventory-adjustment-preview" /></label>
+          <label className="inventory-wide">Reason<textarea required minLength="5" maxLength="1000" value={adjustmentDraft.reason} onChange={(event) => setAdjustmentDraft({ ...adjustmentDraft, reason: event.target.value })} placeholder="Explain the verified stock count or correction" /></label>
+          <p className={`inventory-adjustment-preview${delta != null && next < 0 ? ' is-invalid' : ''}`} id="inventory-adjustment-preview">{delta == null ? `Current balance: ${current.toLocaleString()}` : `New balance: ${next.toLocaleString()} ${product?.stock_unit}`}{delta != null && next < 0 ? ' — balance cannot be negative.' : ''}</p>
+          <div className="workflow-actions inventory-wide"><button className="primary-action" disabled={busy || Object.values(pending).some(Boolean) || !validDelta || adjustmentDraft.reason.trim().length < 5}>{busy ? 'Saving…' : 'Save adjustment'}</button><button type="button" onClick={() => setAdjustmentDraft(null)} disabled={busy}>Cancel</button></div>
+        </>
+      })()}
+    </form>}
 
     <form className="workflow-panel workflow-form inventory-product-form" onSubmit={submitProduct}>
       <h2>Add product</h2><p>New products start with zero stock. No sample categories, products, SKUs, sizes, prices, or campus values are preloaded.</p>
@@ -249,12 +297,12 @@ export default function InventoryStockReceipts({ profile, user }) {
     </form>
 
     <section className="workflow-panel inventory-products-panel"><header><div><h2>Catalogue and current stock</h2><p>Stock is the sum of auditable receipt movements. This is not available for checkout in this stage.</p></div></header>
-      {loading ? <p role="status">Loading catalogue…</p> : products.length ? <div className="workflow-scroll"><table className="workflow-table"><thead><tr><th>Product</th><th>SKU / category</th><th>Stock unit</th><th>Current stock</th><th>Variants</th></tr></thead><tbody>{products.map((product) => {
+      {loading ? <p role="status">Loading catalogue…</p> : products.length ? <div className="workflow-scroll"><table className="workflow-table"><thead><tr><th>Product</th><th>SKU / category</th><th>Stock unit</th><th>Current stock</th><th>Variants</th><th>Actions</th></tr></thead><tbody>{products.map((product) => {
         const productVariants = variantsByProduct.get(product.id) || []
         const total = product.tracks_variants
           ? productVariants.reduce((sum, variant) => sum + (quantities.get(`${product.id}:${variant.id}`) || 0), 0)
           : quantities.get(`${product.id}:product`) || 0
-        return <tr key={product.id}><td><strong>{product.name}</strong>{!product.active && <small>Archived</small>}</td><td>{product.sku || '—'}<small>{product.category || 'Category unset'}</small></td><td>{product.stock_unit}</td><td>{total.toLocaleString()}</td><td>{product.tracks_variants ? <><ul className="inventory-variant-list">{productVariants.map((variant) => <li key={variant.id}>{variant.label}: {quantities.get(`${product.id}:${variant.id}`) || 0} {product.stock_unit}</li>)}</ul><form className="inventory-add-variant" onSubmit={(event) => submitVariant(event, product.id)}><input required maxLength={40} aria-label={`New variant for ${product.name}`} placeholder="Add variant label" value={variantDrafts[product.id] || ''} onChange={(event) => setVariantDrafts((current) => ({ ...current, [product.id]: event.target.value }))} /><button type="submit" disabled={busy || Object.values(pending).some(Boolean)}>Add</button></form></> : 'Single balance'}</td></tr>
+        return <tr key={product.id}><td><strong>{product.name}</strong>{!product.active && <small>Archived</small>}</td><td>{product.sku || '—'}<small>{product.category || 'Category unset'}</small></td><td>{product.stock_unit}</td><td>{total.toLocaleString()}</td><td>{product.tracks_variants ? <><ul className="inventory-variant-list">{productVariants.map((variant) => <li key={variant.id}>{variant.label}: {quantities.get(`${product.id}:${variant.id}`) || 0} {product.stock_unit}<button type="button" onClick={() => startAdjustment(product, variant)} disabled={!product.active || !variant.active || busy}>Adjust</button></li>)}</ul><form className="inventory-add-variant" onSubmit={(event) => submitVariant(event, product.id)}><input required maxLength={40} aria-label={`New variant for ${product.name}`} placeholder="Add variant label" value={variantDrafts[product.id] || ''} onChange={(event) => setVariantDrafts((current) => ({ ...current, [product.id]: event.target.value }))} /><button type="submit" disabled={busy || Object.values(pending).some(Boolean)}>Add</button></form></> : 'Single balance'}</td><td>{!product.tracks_variants && <button type="button" className="inventory-adjust-button" onClick={() => startAdjustment(product)} disabled={!product.active || busy}>Adjust stock</button>}</td></tr>
       })}</tbody></table></div> : <p className="portal-empty-copy">No products exist yet. Add only school-confirmed catalogue items.</p>}
     </section>
 
@@ -263,6 +311,14 @@ export default function InventoryStockReceipts({ profile, user }) {
         const lines = linesByReceipt.get(receipt.id) || []
         return <tr key={receipt.id}><td>{new Date(receipt.created_at).toLocaleString('en-ZW')}<small>{receipt.receipt_kind === 'supplier_delivery' ? 'Supplier delivery' : 'Opening stock'}</small></td><td>{receipt.supplier_name || 'Opening balance'}<small>{receipt.supplier_reference || receipt.notes || 'No reference entered'}</small></td><td><ul className="inventory-history-lines">{lines.map((line) => <li key={line.id}>{line.quantity_received} {line.stock_unit_snapshot} · {line.product_name_snapshot}{line.variant_label_snapshot ? ` · ${line.variant_label_snapshot}` : ''}{line.unit_cost == null ? ' · cost unknown' : ` · ${line.cost_currency} ${Number(line.unit_cost).toFixed(2)} per ${line.stock_unit_snapshot}`}</li>)}</ul></td><td>{receipt.received_by}</td></tr>
       })}</tbody></table></div> : <p className="portal-empty-copy">No stock receipts have been recorded.</p>}
+    </section>
+
+    <section className="workflow-panel inventory-receipt-history"><header><div><h2>Stock adjustment history</h2><p>Signed corrections retain the balance before and after, reason, actor, and timestamp.</p></div></header>
+      {loading ? <p role="status">Loading adjustment history…</p> : adjustments.length ? <div className="workflow-scroll"><table className="workflow-table"><thead><tr><th>Date</th><th>Product / variant</th><th>Change</th><th>Balance</th><th>Reason</th><th>Recorded by</th></tr></thead><tbody>{adjustments.map((adjustment) => {
+        const product = products.find((item) => item.id === adjustment.product_id)
+        const variant = variants.find((item) => item.id === adjustment.variant_id)
+        return <tr key={adjustment.id}><td>{new Date(adjustment.created_at).toLocaleString('en-ZW')}</td><td>{product?.name || 'Product'}{variant ? ` · ${variant.label}` : ''}</td><td>{adjustment.quantity_delta > 0 ? '+' : ''}{adjustment.quantity_delta} {product?.stock_unit || ''}</td><td>{Number(adjustment.quantity_before).toLocaleString()} → {Number(adjustment.quantity_after).toLocaleString()}</td><td>{adjustment.reason}</td><td>{adjustment.actor_id}</td></tr>
+      })}</tbody></table></div> : <p className="portal-empty-copy">No stock adjustments have been recorded.</p>}
     </section>
   </section>
 }
