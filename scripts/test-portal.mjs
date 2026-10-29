@@ -504,6 +504,48 @@ await correctLearner(ids.student, 'Updated Student', 'F001', 'Form 1', 'A')
 await correctLearner(ids.stream_student, 'Stream B Learner', 'B001', 'Form 1', 'B')
 await correctLearner(ids.other_student, 'Other Class Learner', 'F201', 'Form 2', '')
 await correctLearner(ids.stranger, 'Unassigned Learner', 'U001', 'Form 2', '')
+const rolloverBefore = (await db.query(
+  'select id, class_level, class_stream, enrollment_status from profiles where id=$1', [ids.stranger],
+)).rows[0]
+const rolloverPreview = (await db.query(
+  'select preview_year_rollover($1,null,null,1,2) as result', [campus],
+)).rows[0].result
+assert.equal(rolloverPreview.total_count, 4, 'read-only rollover preview includes only learners at the selected campus')
+assert.equal(rolloverPreview.page_size, 2, 'rollover preview applies a bounded page size')
+assert.equal(rolloverPreview.total_pages, 2, 'rollover preview reports additional learner pages')
+assert.equal(rolloverPreview.summary.ready_for_decision, 4, 'active learners with recorded campus and class are ready for review')
+assert.equal(rolloverPreview.rows.length, 2, 'rollover preview returns only its requested page')
+const streamSearch = (await db.query(
+  'select preview_year_rollover($1,$2,null,1,25) as result', [campus, 'Stream B'],
+)).rows[0].result
+assert.equal(streamSearch.total_count, 1, 'rollover preview search filters by recorded learner information')
+assert.equal(streamSearch.rows[0].class_stream, 'B', 'recorded stream is displayed without allocating a new stream')
+assert.deepEqual((await db.query(
+  'select id, class_level, class_stream, enrollment_status from profiles where id=$1', [ids.stranger],
+)).rows[0], rolloverBefore, 'rollover readiness preview does not alter the roster')
+await correctLearner(ids.stranger, 'Unassigned Learner', 'U001', '', '', 'active')
+const incompleteLearnerPreview = (await db.query(
+  'select preview_year_rollover($1,$2,null,1,25) as result', [campus, 'Unassigned Learner'],
+)).rows[0].result
+assert.equal(incompleteLearnerPreview.rows[0].readiness, 'needs_review', 'missing current class is flagged for review')
+assert.ok(incompleteLearnerPreview.rows[0].review_reasons.includes('Class / form is not recorded.'),
+  'rollover preview explains the missing class reason')
+await correctLearner(ids.stranger, 'Unassigned Learner', 'U001', 'Form 2', '', 'inactive')
+const inactiveLearnerPreview = (await db.query(
+  'select preview_year_rollover($1,$2,null,1,25) as result', [campus, 'Unassigned Learner'],
+)).rows[0].result
+assert.equal(inactiveLearnerPreview.rows[0].readiness, 'not_currently_active', 'inactive learners are not included as active rollover candidates')
+assert.ok(inactiveLearnerPreview.rows[0].review_reasons.some(reason => reason.includes('marked inactive')),
+  'inactive learner status is explained in the preview')
+await correctLearner(ids.stranger, 'Unassigned Learner', 'U001', 'Form 2', '', 'active')
+await as('teacher')
+await rejects(
+  () => db.query('select preview_year_rollover($1,null,null,1,25)', [campus]),
+  /Main administrator access required/,
+)
+await as('admin')
+assert.equal((await db.query("select has_function_privilege('anon','public.preview_year_rollover(uuid,text,text,integer,integer)','EXECUTE') as allowed")).rows[0].allowed,
+  false, 'anonymous callers cannot access the rollover readiness preview')
 await db.query('select admin_update_profile($1,$2,$3,$4,$5,$6,$7)', [ids.stream_teacher, 'Stream Teacher', campus, null, null, null, null])
 await db.query('select admin_update_profile($1,$2,$3,$4,$5,$6,$7)', [ids.subject_teacher, 'Subject Teacher', campus, null, null, null, null])
 await db.query(

@@ -150,6 +150,37 @@ async function pageFor(
         }])
       return send([])
     }
+    if (path.endsWith('/rpc/preview_year_rollover'))
+      return send({
+        rows: [{
+          id: 'rollover-active',
+          full_name: 'Ready Learner',
+          admission_number: 'R001',
+          campus_id: 'campus',
+          campus_name: 'Junior School',
+          class_level: 'Form 1',
+          class_stream: null,
+          enrollment_status: 'active',
+          readiness: 'ready_for_decision',
+          review_reasons: [],
+        }, {
+          id: 'rollover-review',
+          full_name: 'Learner Needs Review',
+          admission_number: 'R002',
+          campus_id: null,
+          campus_name: null,
+          class_level: null,
+          class_stream: null,
+          enrollment_status: null,
+          readiness: 'needs_review',
+          review_reasons: ['Enrolment status is not recorded.', 'Campus is not recorded.', 'Class / form is not recorded.'],
+        }],
+        total_count: 2,
+        page: body.p_page,
+        page_size: 25,
+        total_pages: 1,
+        summary: { ready_for_decision: 1, needs_review: 1, not_currently_active: 0 },
+      })
     if (path.endsWith('/audit_trail')) {
       activityAttempts += 1
       if (!activityCanSucceed)
@@ -717,6 +748,14 @@ try {
     })
     await card.getByText(status, { exact: true }).waitFor()
   }
+  await page.goto('http://127.0.0.1:5179/portal/year-rollover-readiness')
+  await page.getByRole('heading', { name: 'Year rollover readiness' }).waitFor()
+  await page.getByText('Ready Learner', { exact: true }).waitFor()
+  assert.equal(await page.getByRole('cell', { name: 'Not set', exact: true }).count(), 2,
+    'the preview displays both unallocated streams as unset')
+  await page.getByText('Learner Needs Review', { exact: true }).waitFor()
+  await page.getByText('Campus is not recorded.', { exact: false }).waitFor()
+  await page.getByText('This preview does not change learner profiles, promote learners, or assign streams.', { exact: false }).waitFor()
   await page.goto('http://127.0.0.1:5179/portal/report-verification')
   await page.getByRole('heading', { name: 'Report verification' }).waitFor()
   await page.getByLabel('Integrity hash').fill('a'.repeat(32))
@@ -857,7 +896,7 @@ try {
   await parent.waitForURL('http://127.0.0.1:5179/portal')
   assert.deepEqual(errors, [])
   console.log(
-    'PASS: profile editing, account creation, Reliance grade-band boundary preview and audited scale save, report readiness and release attribution, report integrity verified/mismatch/not-found flows, historical release-time learner/class/stream/campus identity and legacy-context disclosure, Junior/Senior/Sixth Form report variants, A4 print context/title/width and hidden portal controls, coursework exclusion from averages, reporting-period registration and reviewed close, publishing, records, timetable, payment retry, teacher sign-in and Coursework access, parent route guards, linked-account directory/search, credential-free audited recovery guidance, mobile layout; no uncaught browser errors. All backend requests were mocked.',
+    'PASS: profile editing, account creation, Reliance grade-band boundary preview and audited scale save, read-only rollover readiness and review reasons, report readiness and release attribution, report integrity verified/mismatch/not-found flows, historical release-time learner/class/stream/campus identity and legacy-context disclosure, Junior/Senior/Sixth Form report variants, A4 print context/title/width and hidden portal controls, coursework exclusion from averages, reporting-period registration and reviewed close, publishing, records, timetable, payment retry, teacher sign-in and Coursework access, parent route guards, linked-account directory/search, credential-free audited recovery guidance, mobile layout; no uncaught browser errors. All backend requests were mocked.',
   )
 } catch (error) {
   const p = browser.contexts()[0]?.pages()[0]

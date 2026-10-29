@@ -40,6 +40,7 @@ import ReportApprovalRegister from './ReportApprovalRegister'
 import ReportReleaseMetrics from './ReportReleaseMetrics'
 import ReportVerification from './ReportVerification'
 import ReportingPeriods from './ReportingPeriods'
+import YearRolloverReadiness from './YearRolloverReadiness'
 import { withPortalTimeout, workflowError } from './workflow'
 import { canOpenTeacherMyClass } from './teacher-workspace'
 import { getFinanceNavigation } from './navigation'
@@ -241,6 +242,7 @@ export default function PortalDashboard() {
     (view === 'report-approvals' && !admin) ||
     (view === 'report-dashboard' && !admin) ||
     (view === 'report-verification' && !admin) ||
+    (view === 'year-rollover-readiness' && !admin) ||
     (view === 'assignments' && !admin) ||
     (view === 'my-class' && !teacherMyClass) ||
     (view === 'subject-allocations' && !assignments) ||
@@ -271,6 +273,7 @@ export default function PortalDashboard() {
       'report-approvals',
       'report-dashboard',
       'report-verification',
+      'year-rollover-readiness',
       'assignments',
       'my-class',
       'subject-allocations',
@@ -357,6 +360,7 @@ export default function PortalDashboard() {
           {admin && nav('/portal/import-learners', 'Bulk learner import', '⇧')}
           {admin && <span className="portal-nav-label portal-nav-label-secondary">Academic services</span>}
           {admin && nav('/portal/classes', 'Classes', '▦')}
+          {admin && nav('/portal/year-rollover-readiness', 'Year rollover readiness', '↗')}
           {admin && nav('/portal/report-settings', 'Report settings', '▣')}
           {admin && nav('/portal/report-periods', 'Reporting periods', '◷')}
           {admin && nav('/portal/grade-bands', 'Grade bands', 'A')}
@@ -493,6 +497,8 @@ export default function PortalDashboard() {
           <ReportReleaseMetrics />
         ) : view === 'report-verification' ? (
           <ReportVerification />
+        ) : view === 'year-rollover-readiness' ? (
+          <YearRolloverReadiness />
         ) : view === 'records' ? (
           <LearnerRecords profile={profile} user={user} />
         ) : view === 'reports' ? (
