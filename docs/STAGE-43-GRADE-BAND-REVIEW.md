@@ -38,4 +38,4 @@ Each band has an inclusive integer range, points, and descriptor stored in the m
 
 ## Release state and next stage
 
-Migration `20261029140000_level_grade_bands.sql` has not been applied to production. The frontend has not been deployed. Production database changes and hosted deployment remain subject to the separate approval gate. Stage 44 (Progress report variants) is next in roadmap order after this stage's code and documentation checkpoint is pushed.
+Migration `20261029140000_level_grade_bands.sql` has not been applied to production. The frontend has not been deployed. Production database changes and hosted deployment remain subject to the separate approval gate. Stage 44's level-aware report variants are recorded in [Stage 44](STAGE-44-PROGRESS-REPORT-VARIANTS.md); Stage 45 (printed report layout) is next in roadmap order.
