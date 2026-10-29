@@ -275,8 +275,13 @@ const pay = (amount, method = 'cash', key = request) =>
     'test',
     key,
   ])
-await pay(40)
-await pay(40)
+const firstPayment = (await pay(40)).rows[0]
+const retryPayment = (await pay(40)).rows[0]
+assert.equal(
+  retryPayment.id,
+  firstPayment.id,
+  'retry returns the original ledger transaction for its request ID',
+)
 assert.equal(
   Number(
     (await db.query('select paid_amount from fee_records where id=$1', [fee]))

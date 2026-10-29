@@ -16,3 +16,16 @@
 .fees-reconciliation-count{margin:0;padding:14px 16px;color:#56657c;font-weight:700}
 .fees-reconciliation-subheading{padding:14px 16px 0}
 @media(max-width:700px){.fees-currency-summary{grid-template-columns:1fr}.fees-reconciliation-heading{flex-direction:column}.fees-reconciliation-heading .fees-refresh{width:100%}}
+
+/* Stage 58: receipts display the exact ledger transaction returned by the payment RPC. */
+.fees-receipt{max-width:760px;margin:0 0 22px;padding:24px;border:1px solid #d9e0e9;border-top:4px solid #6B1220;background:#fff;box-shadow:0 8px 28px rgba(16,38,74,.08)}
+.fees-receipt-actions{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.fees-receipt h2{margin:4px 0 8px;font:700 1.8rem 'Playfair Display',serif;color:#10264a}
+.fees-receipt-lead,.fees-receipt-note{color:#65738a}
+.fees-receipt dl{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:0 24px;margin:20px 0}
+.fees-receipt dl>div{padding:12px 0;border-bottom:1px solid #edf0f4;min-width:0}
+.fees-receipt dt{color:#65738a;font-size:.75rem;font-weight:700;text-transform:uppercase;letter-spacing:.05em}
+.fees-receipt dd{margin:5px 0 0;color:#10264a;font-weight:700;overflow-wrap:anywhere}
+.fees-receipt-id{font-family:ui-monospace,SFMono-Regular,Consolas,monospace;font-size:.8rem}
+@media(max-width:600px){.fees-receipt{padding:18px}.fees-receipt dl{grid-template-columns:1fr}.fees-receipt-actions{align-items:flex-start}}
+@media print{body *{visibility:hidden!important}.fees-receipt,.fees-receipt *{visibility:visible!important}.fees-receipt{position:fixed;inset:0 auto auto 0;width:100%;max-width:none;margin:0;padding:28px;border:0;box-shadow:none;background:#fff}.fees-receipt-actions .fees-refresh{display:none!important}}

@@ -68,6 +68,7 @@ export default function FeesDashboard({ profile, user }) {
     [createOpen, setCreateOpen] = useState(false),
     [settingsOpen, setSettingsOpen] = useState(false),
     [draft, setDraft] = useState(newFee)
+  const [receipt, setReceipt] = useState(null)
   const loadRecords = useCallback(async () => {
     if (!supabase) return
     setLoading(true)
@@ -246,6 +247,17 @@ export default function FeesDashboard({ profile, user }) {
           paymentRequest.current = null
         throw result.error
       }
+      const transaction = result.data
+      setReceipt({
+        transactionId: transaction.id,
+        feeRecordId: transaction.fee_record_id,
+        amount: Number(transaction.amount),
+        currency: selected.currency || 'USD',
+        method: transaction.payment_method,
+        reference: transaction.reference,
+        recordedAt: transaction.created_at,
+        learnerName: selected.student?.full_name || 'Learner record',
+      })
       paymentRequest.current = null
       setSelected(null)
       await loadRecords()
@@ -374,6 +386,21 @@ export default function FeesDashboard({ profile, user }) {
           </div>) : <p className="fees-message">No fee balances to summarize.</p>}
         </div>
       )}
+      {receipt && <section className="fees-receipt" aria-labelledby="fees-receipt-heading">
+        <div className="fees-receipt-actions"><span className="fees-status paid">Recorded</span><button type="button" className="fees-refresh" onClick={() => window.print()}>Print receipt</button></div>
+        <p className="fees-eyebrow">Fordridge Schools · Finance</p>
+        <h2 id="fees-receipt-heading">Payment receipt</h2>
+        <p className="fees-receipt-lead">Payment recorded for {receipt.learnerName}.</p>
+        <dl>
+          <div><dt>Amount received</dt><dd>{money(receipt.amount, receipt.currency)}</dd></div>
+          <div><dt>Payment method</dt><dd>{title(receipt.method?.replaceAll('_', ' '))}</dd></div>
+          <div><dt>Recorded at</dt><dd>{receipt.recordedAt ? new Date(receipt.recordedAt).toLocaleString('en-ZW') : 'Time not returned'}</dd></div>
+          <div><dt>Reference</dt><dd>{receipt.reference || 'Not provided'}</dd></div>
+          <div><dt>Fee record</dt><dd>{receipt.feeRecordId}</dd></div>
+          <div><dt>Ledger transaction ID</dt><dd className="fees-receipt-id">{receipt.transactionId}</dd></div>
+        </dl>
+        <p className="fees-receipt-note">This receipt is linked to the recorded payment transaction. Keep the transaction ID for finance enquiries.</p>
+      </section>}
       {canReviewFinance && <section className="fees-card fees-reconciliation" aria-labelledby="fees-reconciliation-heading">
         <header className="fees-reconciliation-heading">
           <div><h2 id="fees-reconciliation-heading">Balance &amp; currency reconciliation</h2><p>Read-only comparison of fee-record balances with recorded payment transactions. Totals stay grouped by campus, academic period, and the linked fee currency; payment rows do not store a separate currency. No exchange rate is assumed.</p></div>
@@ -538,6 +565,7 @@ export default function FeesDashboard({ profile, user }) {
                             className="fees-collect"
                             disabled={!r.balance}
                             onClick={() => {
+                              setReceipt(null)
                               setSelected(r)
                               setPayment({
                                 amount: String(r.balance),

@@ -347,7 +347,14 @@ async function pageFor(
         return route.abort('failed')
       }
       paid = Number(body.p_amount)
-      return send({ id: 'transaction', amount: paid })
+      return send({
+        id: 'transaction',
+        fee_record_id: 'fee',
+        amount: paid,
+        payment_method: body.p_method,
+        reference: body.p_reference,
+        created_at: '2026-10-29T12:00:00.000Z',
+      })
     }
     if (path.endsWith('/functions/v1/create-portal-account'))
       return send({ id: 'new-account' })
@@ -661,6 +668,11 @@ try {
   const payments = writes.filter((w) => w.path.endsWith('record_fee_payment'))
   assert.equal(payments.length, 2)
   assert.deepEqual(payments[0].body, payments[1].body)
+  await page.getByRole('heading', { name: 'Payment receipt' }).waitFor()
+  await page.getByText('Ledger transaction ID', { exact: true }).waitFor()
+  await page.getByText('transaction', { exact: true }).waitFor()
+  await page.getByText('Fee record', { exact: true }).waitFor()
+  await page.getByText('fee', { exact: true }).waitFor()
   await page.getByText('USD totals', { exact: true }).waitFor()
   await page.getByText('ZiG totals', { exact: true }).waitFor()
   await page.getByRole('heading', { name: 'Balance & currency reconciliation' }).waitFor()
