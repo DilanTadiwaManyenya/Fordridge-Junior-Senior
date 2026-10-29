@@ -4,6 +4,7 @@ import { workflowError } from './workflow'
 
 const saleStorageKey = (userId) => `fordridge-pos-sale-v1-${userId}`
 const priceStorageKey = (userId) => `fordridge-pos-price-v1-${userId}`
+const returnStorageKey = (userId) => `fordridge-pos-return-v1-${userId}`
 
 function readStored(key) {
   try { return JSON.parse(sessionStorage.getItem(key) || 'null') } catch { return { invalid: true } }
@@ -13,6 +14,7 @@ export default function InventoryPointOfSale({ profile, user, products, variants
   const userId = user?.id || 'current-user'
   const [salePending, setSalePending] = useState(() => readStored(saleStorageKey(userId)))
   const [pricePending, setPricePending] = useState(() => readStored(priceStorageKey(userId)))
+  const [returnPending, setReturnPending] = useState(() => readStored(returnStorageKey(userId)))
   const [priceDrafts, setPriceDrafts] = useState({})
   const [cart, setCart] = useState([])
   const [selectedProductId, setSelectedProductId] = useState('')
@@ -24,6 +26,8 @@ export default function InventoryPointOfSale({ profile, user, products, variants
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
   const [receipt, setReceipt] = useState(null)
+  const [returnDraft, setReturnDraft] = useState(null)
+  const [returnReceipt, setReturnReceipt] = useState(null)
   const running = useRef(false)
   const isMainAdmin = profile?.role === 'admin'
 
@@ -39,12 +43,23 @@ export default function InventoryPointOfSale({ profile, user, products, variants
     if (salesError) { setError(workflowError(salesError)); return }
     if (!sales?.length) { setHistory([]); return }
     const saleIds = sales.map((sale) => sale.id)
-    const [{ data: lines, error: linesError }, { data: payments, error: paymentsError }] = await Promise.all([
+    const [{ data: lines, error: linesError }, { data: payments, error: paymentsError }, { data: returns, error: returnsError }] = await Promise.all([
       supabase.from('inventory_sale_lines').select('*').in('sale_id', saleIds),
       supabase.from('inventory_sale_payments').select('*').in('sale_id', saleIds),
+      supabase.from('inventory_sale_returns').select('*').in('sale_id', saleIds).order('created_at', { ascending: false }),
     ])
-    if (linesError || paymentsError) { setError(workflowError(linesError || paymentsError)); return }
-    setHistory(sales.map((sale) => ({ ...sale, lines: (lines || []).filter((line) => line.sale_id === sale.id), payment: (payments || []).find((payment) => payment.sale_id === sale.id) })))
+    if (linesError || paymentsError || returnsError) { setError(workflowError(linesError || paymentsError || returnsError)); return }
+    const returnIds = (returns || []).map((entry) => entry.id)
+    const [{ data: returnedLines, error: returnLinesError }, { data: refunds, error: refundsError }] = returnIds.length ? await Promise.all([
+      supabase.from('inventory_sale_return_lines').select('*').in('return_id', returnIds),
+      supabase.from('inventory_sale_refunds').select('*').in('return_id', returnIds),
+    ]) : [{ data: [], error: null }, { data: [], error: null }]
+    if (returnLinesError || refundsError) { setError(workflowError(returnLinesError || refundsError)); return }
+    setHistory(sales.map((sale) => ({ ...sale, lines: (lines || []).filter((line) => line.sale_id === sale.id), payment: (payments || []).find((payment) => payment.sale_id === sale.id),
+      returns: (returns || []).filter((entry) => entry.sale_id === sale.id).map((entry) => ({ ...entry,
+        lines: (returnedLines || []).filter((line) => line.return_id === entry.id),
+        refund: (refunds || []).find((refund) => refund.return_id === entry.id),
+      })) })))
   }, [isMainAdmin])
 
   useEffect(() => { loadHistory() }, [loadHistory])
@@ -129,6 +144,73 @@ export default function InventoryPointOfSale({ profile, user, products, variants
     setPricePending(null)
   }
 
+  function startReturn(sale) {
+    const previouslyReturned = new Map()
+    sale.returns.forEach((entry) => entry.lines.forEach((line) => previouslyReturned.set(line.sale_line_id, (previouslyReturned.get(line.sale_line_id) || 0) + Number(line.quantity))))
+    const items = sale.lines.map((line) => ({
+      sale_line_id: line.id,
+      product_name_snapshot: line.product_name_snapshot,
+      variant_label_snapshot: line.variant_label_snapshot,
+      stock_unit_snapshot: line.stock_unit_snapshot,
+      unit_price: Number(line.unit_price),
+      currency: line.currency,
+      remaining: Number(line.quantity) - (previouslyReturned.get(line.id) || 0),
+      quantity: '0',
+      restock: false,
+    })).filter((line) => line.remaining > 0)
+    setReturnDraft({ sale_id: sale.id, currency: sale.currency, reason: '', reported_method: '', items })
+    setReturnReceipt(null)
+    setError('')
+    setNotice('')
+  }
+
+  function clearReturn() {
+    try { sessionStorage.removeItem(returnStorageKey(userId)) } catch { /* Database state remains authoritative. */ }
+    setReturnPending(null)
+  }
+
+  async function runReturn(request) {
+    if (running.current || request?.invalid) return
+    running.current = true
+    setBusy(true)
+    setError('')
+    setNotice('')
+    try {
+      const { data, error: rpcError } = await supabase.rpc('record_inventory_sale_return', request)
+      if (rpcError) {
+        if (['22023', '42501', 'P0001', '23505'].includes(rpcError.code)) clearReturn()
+        throw rpcError
+      }
+      clearReturn()
+      setReturnDraft(null)
+      setReturnReceipt(data)
+      setNotice('Return and operator-reported refund were recorded. Only items marked for restocking were added back to stock.')
+      await Promise.all([onRefresh(), loadHistory()])
+    } catch (cause) { setError(workflowError(cause)) }
+    finally { running.current = false; setBusy(false) }
+  }
+
+  async function submitReturn(event) {
+    event.preventDefault()
+    if (!returnDraft || busy || returnPending) return
+    const items = returnDraft.items.filter((item) => Number(item.quantity) > 0).map((item) => ({
+      sale_line_id: item.sale_line_id,
+      quantity: Number(item.quantity),
+      restock: item.restock,
+    }))
+    if (!items.length) { setError('Enter a quantity for at least one returned item.'); return }
+    const request = {
+      p_request_id: crypto.randomUUID(),
+      p_sale_id: returnDraft.sale_id,
+      p_items: items,
+      p_reason: returnDraft.reason.trim(),
+      p_reported_refund_method: returnDraft.reported_method.trim(),
+    }
+    try { sessionStorage.setItem(returnStorageKey(userId), JSON.stringify(request)); setReturnPending(request) }
+    catch { setError('Enable browser session storage before submitting this return.'); return }
+    await runReturn(request)
+  }
+
   function addToCart() {
     if (!selectedProduct || (selectedProduct.tracks_variants && !selectedVariantId)) return
     const count = Number(quantity)
@@ -152,6 +234,13 @@ export default function InventoryPointOfSale({ profile, user, products, variants
   const currency = currencies[0] || ''
   const cartTotal = cartLines.reduce((sum, line) => sum + line.lineTotal, 0)
   const invalidCart = cartLines.some((line) => !line.product?.unit_price || Number(line.quantity) > line.balance || !line.product.active) || currencies.length !== 1
+  const reconciliation = [...new Set(history.map((sale) => sale.currency))].map((saleCurrency) => {
+    const currencySales = history.filter((sale) => sale.currency === saleCurrency)
+    const gross = currencySales.reduce((sum, sale) => sum + Number(sale.total), 0)
+    const refunds = currencySales.reduce((sum, sale) => sum + sale.returns.reduce((returnSum, entry) => returnSum + Number(entry.refund_total), 0), 0)
+    return { currency: saleCurrency, gross, refunds, net: gross - refunds }
+  })
+  const returnEstimate = returnDraft?.items.reduce((sum, item) => sum + Number(item.quantity || 0) * item.unit_price, 0) || 0
 
   if (!isMainAdmin) return <section className="workflow-panel inventory-pos"><h2>Point of sale</h2><p role="alert">Main Admin access is required for checkout until the school approves and configures a cashier role.</p></section>
 
@@ -160,6 +249,7 @@ export default function InventoryPointOfSale({ profile, user, products, variants
     {notice && <p className="workflow-success" role="status">{notice}</p>}{error && <p className="workflow-error" role="alert">{error}</p>}
     {pricePending && <div className="inventory-pos-recovery"><span>{pricePending.invalid ? 'Saved price request needs review.' : 'A price update is awaiting confirmation.'}</span>{!pricePending.invalid && <button type="button" disabled={busy} onClick={() => runPrice(pricePending)}>Retry saved price</button>}</div>}
     {salePending && <div className="inventory-pos-recovery"><span>{salePending.invalid ? 'Saved checkout needs review before another sale.' : 'A checkout is awaiting confirmation. Retry the same request to avoid a duplicate sale.'}</span>{!salePending.invalid && <button type="button" disabled={busy} onClick={() => runSale(salePending)}>Retry checkout</button>}</div>}
+    {returnPending && <div className="inventory-pos-recovery"><span>{returnPending.invalid ? 'Saved return request needs review.' : 'A return is awaiting confirmation. Retry it to avoid a duplicate refund or stock restoration.'}</span>{!returnPending.invalid && <button type="button" disabled={busy} onClick={() => runReturn(returnPending)}>Retry return</button>}</div>}
     <div className="inventory-pos-prices"><h3>Current selling prices</h3><p>Prices are not preloaded. Set the price and currency Fordridge has confirmed. Variant options inherit the product price.</p>
       {activeProducts.length ? activeProducts.map((product) => {
         const draft = priceDrafts[product.id] || { unit_price: product.unit_price ?? '', currency: product.price_currency || 'USD' }
@@ -186,7 +276,25 @@ export default function InventoryPointOfSale({ profile, user, products, variants
       <p>Payment is recorded as reported. Fordridge does not process or verify settlement in this checkout.</p>
       <button className="primary-action" disabled={busy || Boolean(salePending) || !cartLines.length || invalidCart || !reportedMethod.trim()}>{busy ? 'Recording sale…' : `Complete checkout · ${currency} ${cartTotal.toFixed(2)}`}</button>
     </form>
+    {returnDraft && <form className="inventory-pos-return" onSubmit={submitReturn}>
+      <h3>Return items from sale</h3><p>Sale <code>{returnDraft.sale_id}</code>. Refund is calculated from the original sale-line prices. Choose whether each item is fit to return to stock.</p>
+      <div className="workflow-scroll"><table className="workflow-table"><thead><tr><th>Item</th><th>Still returnable</th><th>Return quantity</th><th>Restock</th><th>Refund</th></tr></thead><tbody>{returnDraft.items.map((item) => <tr key={item.sale_line_id}><td>{item.product_name_snapshot}{item.variant_label_snapshot ? <small>{item.variant_label_snapshot}</small> : null}</td><td>{item.remaining} {item.stock_unit_snapshot}</td><td><input aria-label={`Return quantity for ${item.product_name_snapshot}`} type="number" min="0" max={item.remaining} step="1" value={item.quantity} onChange={(event) => setReturnDraft((current) => ({ ...current, items: current.items.map((line) => line.sale_line_id === item.sale_line_id ? { ...line, quantity: event.target.value } : line) }))} /></td><td><label className="inventory-pos-restock"><input type="checkbox" checked={item.restock} disabled={Number(item.quantity) < 1} onChange={(event) => setReturnDraft((current) => ({ ...current, items: current.items.map((line) => line.sale_line_id === item.sale_line_id ? { ...line, restock: event.target.checked } : line) }))} /> Saleable</label></td><td>{item.currency} {(Number(item.quantity || 0) * item.unit_price).toFixed(2)}</td></tr>)}</tbody></table></div>
+      <label>Reason for return<textarea required minLength="5" maxLength="1000" value={returnDraft.reason} onChange={(event) => setReturnDraft((current) => ({ ...current, reason: event.target.value }))} /></label>
+      <label>Refund method reported by operator<input required maxLength="60" value={returnDraft.reported_method} onChange={(event) => setReturnDraft((current) => ({ ...current, reported_method: event.target.value }))} placeholder="For example, cash or bank transfer" /></label>
+      <p>Reported refund total: {returnDraft.currency} {returnEstimate.toFixed(2)}. No external payment processor is called.</p>
+      <div className="workflow-actions"><button className="primary-action" disabled={busy || Boolean(returnPending) || !returnDraft.items.some((item) => Number(item.quantity) > 0) || returnDraft.reason.trim().length < 5 || !returnDraft.reported_method.trim()}>{busy ? 'Recording return…' : 'Record return and reported refund'}</button><button type="button" onClick={() => setReturnDraft(null)} disabled={busy}>Cancel</button></div>
+    </form>}
     {receipt && <article className="inventory-pos-receipt" aria-label="Sale receipt"><h3>Sale receipt</h3><p>Sale <code>{receipt.id}</code></p>{receipt.lines?.map((line, index) => <p key={`${line.product}-${line.variant}-${index}`}>{line.quantity} {line.unit} · {line.product}{line.variant ? ` · ${line.variant}` : ''} — {line.currency} {Number(line.line_total).toFixed(2)}</p>)}<strong>Total: {receipt.currency} {Number(receipt.total).toFixed(2)}</strong></article>}
-    <div className="inventory-pos-history"><h3>Recent sales</h3>{history.length ? <div className="workflow-scroll"><table className="workflow-table"><thead><tr><th>Date</th><th>Sale</th><th>Items</th><th>Paid record</th><th>Recorded by</th></tr></thead><tbody>{history.map((sale) => <tr key={sale.id}><td>{new Date(sale.created_at).toLocaleString('en-ZW')}</td><td><code>{sale.id}</code><small>{sale.currency} {Number(sale.total).toFixed(2)}</small></td><td><ul>{sale.lines.map((line) => <li key={line.id}>{line.quantity} × {line.product_name_snapshot}{line.variant_label_snapshot ? ` · ${line.variant_label_snapshot}` : ''}</li>)}</ul></td><td>{sale.payment?.reported_method || '—'}<small>{sale.payment ? `${sale.payment.currency} ${Number(sale.payment.amount).toFixed(2)} · operator reported` : 'No payment record'}</small></td><td>{sale.sold_by}</td></tr>)}</tbody></table></div> : <p className="portal-empty-copy">No sales have been recorded.</p>}</div>
+    {returnReceipt && <article className="inventory-pos-receipt" aria-label="Return receipt"><h3>Return receipt</h3><p>Return <code>{returnReceipt.id}</code> · Sale <code>{returnReceipt.sale_id}</code></p>{returnReceipt.lines?.map((line, index) => <p key={`${line.product}-${line.variant}-${index}`}>{line.quantity} {line.unit} · {line.product}{line.variant ? ` · ${line.variant}` : ''} · {line.restocked ? 'restocked' : 'not restocked'} — {line.currency} {Number(line.line_refund).toFixed(2)}</p>)}<strong>Reported refund: {returnReceipt.currency} {Number(returnReceipt.refund_total).toFixed(2)}</strong></article>}
+    <div className="inventory-pos-history"><h3>Sales and return reconciliation</h3>
+      {reconciliation.length > 0 && <div className="inventory-pos-reconciliation">{reconciliation.map((totals) => <article key={totals.currency}><span>{totals.currency} · recent sales</span><dl><dt>Gross sales</dt><dd>{totals.gross.toFixed(2)}</dd><dt>Reported refunds</dt><dd>− {totals.refunds.toFixed(2)}</dd><dt>Net after returns</dt><dd>{totals.net.toFixed(2)}</dd></dl></article>)}</div>}
+      {history.length ? <div className="workflow-scroll"><table className="workflow-table"><thead><tr><th>Date</th><th>Sale</th><th>Items</th><th>Payment / returns</th><th>Actions</th></tr></thead><tbody>{history.map((sale) => {
+        const returnedQuantities = new Map()
+        sale.returns.forEach((entry) => entry.lines.forEach((line) => returnedQuantities.set(line.sale_line_id, (returnedQuantities.get(line.sale_line_id) || 0) + Number(line.quantity))))
+        const grossRefund = sale.returns.reduce((sum, entry) => sum + Number(entry.refund_total), 0)
+        const canReturn = sale.lines.some((line) => Number(line.quantity) > (returnedQuantities.get(line.id) || 0))
+        return <tr key={sale.id}><td>{new Date(sale.created_at).toLocaleString('en-ZW')}</td><td><code>{sale.id}</code><small>Gross {sale.currency} {Number(sale.total).toFixed(2)}</small><small>Net {sale.currency} {(Number(sale.total) - grossRefund).toFixed(2)}</small></td><td><ul>{sale.lines.map((line) => <li key={line.id}>{line.quantity} × {line.product_name_snapshot}{line.variant_label_snapshot ? ` · ${line.variant_label_snapshot}` : ''}<small>Returned {returnedQuantities.get(line.id) || 0} / {line.quantity}{sale.returns.some((entry) => entry.lines.some((returned) => returned.sale_line_id === line.id && returned.restocked)) ? ' · restock recorded' : ''}</small></li>)}</ul></td><td>{sale.payment?.reported_method || '—'}<small>{sale.payment ? `${sale.payment.currency} ${Number(sale.payment.amount).toFixed(2)} · operator reported` : 'No payment record'}</small><small>Refunds reported: {sale.currency} {grossRefund.toFixed(2)}</small>{sale.returns.map((entry) => <small key={entry.id}>{new Date(entry.created_at).toLocaleDateString('en-ZW')} · {entry.reason} · {entry.refund?.reported_method || 'refund pending'}{entry.lines.some((line) => !line.restocked) ? ' · some items not restocked' : ''}</small>)}</td><td>{canReturn && <button type="button" onClick={() => startReturn(sale)} disabled={busy || Boolean(returnPending)}>Start return</button>}</td></tr>
+      })}</tbody></table></div> : <p className="portal-empty-copy">No sales have been recorded.</p>}
+    </div>
   </section>
 }

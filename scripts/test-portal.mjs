@@ -500,6 +500,32 @@ assert.deepEqual((await db.query('select product_name_snapshot,variant_label_sna
   ['Test exercise book', null, 'each', 2, '1.25', '2.50'],
   ['Test school shirt', 'Size 10', 'each', 1, '20.00', '20.00'],
 ])
+const saleLineIds = (await db.query('select id,product_id from inventory_sale_lines where sale_id=$1', [saleResult.id])).rows
+const bookSaleLineId = saleLineIds.find((line) => line.product_id === simpleProduct.id).id
+const shirtSaleLineId = saleLineIds.find((line) => line.product_id === variantProduct.id).id
+const firstReturnItems = [{ sale_line_id: bookSaleLineId, quantity: 1, restock: true }]
+const firstReturnRequest = '68000000-0000-4000-8000-000000000001'
+const firstReturn = (await db.query('select record_inventory_sale_return($1,$2,$3::jsonb,$4,$5) as result', [firstReturnRequest, saleResult.id, JSON.stringify(firstReturnItems), 'One unopened book returned to stock', 'Cash reported by operator'])).rows[0].result
+assert.equal(Number(firstReturn.refund_total), 1.25)
+assert.equal(firstReturn.lines[0].restocked, true)
+assert.equal((await db.query('select record_inventory_sale_return($1,$2,$3::jsonb,$4,$5) as result', [firstReturnRequest, saleResult.id, JSON.stringify(firstReturnItems), 'One unopened book returned to stock', 'Cash reported by operator'])).rows[0].result.id, firstReturn.id, 'return retry reuses one refund and one stock restoration')
+await rejects(
+  () => db.query('select record_inventory_sale_return($1,$2,$3::jsonb,$4,$5)', [firstReturnRequest, saleResult.id, JSON.stringify([{ ...firstReturnItems[0], restock: false }]), 'Changed return request', 'Cash reported by operator']),
+  /already used/,
+)
+assert.equal(Number((await db.query('select sum(quantity_delta) from inventory_stock_movements where product_id=$1', [simpleProduct.id])).rows[0].sum), 14)
+const secondReturnItems = [{ sale_line_id: bookSaleLineId, quantity: 1, restock: false }]
+await db.query('select record_inventory_sale_return($1,$2,$3::jsonb,$4,$5)', ['68000000-0000-4000-8000-000000000002', saleResult.id, JSON.stringify(secondReturnItems), 'Second book was damaged and not restockable', 'Cash reported by operator'])
+await rejects(
+  () => db.query('select record_inventory_sale_return($1,$2,$3::jsonb,$4,$5)', ['68000000-0000-4000-8000-000000000003', saleResult.id, JSON.stringify(secondReturnItems), 'Attempt to return more books than sold', 'Cash']),
+  /exceeds the remaining sold quantity/,
+)
+const shirtReturnItems = [{ sale_line_id: shirtSaleLineId, quantity: 1, restock: true }]
+await db.query('select record_inventory_sale_return($1,$2,$3::jsonb,$4,$5)', ['68000000-0000-4000-8000-000000000004', saleResult.id, JSON.stringify(shirtReturnItems), 'Size was exchanged and item is saleable', 'Bank transfer reported by operator'])
+assert.equal(Number((await db.query('select sum(amount) from inventory_sale_refunds')).rows[0].sum), 22.5, 'refund total reconciles exactly to the returned sold quantities')
+assert.equal(Number((await db.query('select sum(quantity_delta) from inventory_stock_movements where product_id=$1 and variant_id=$2', [variantProduct.id, shirtVariant.id])).rows[0].sum), 4, 'only the return explicitly marked for restocking restores inventory')
+assert.equal(Number((await db.query('select sum(quantity) from inventory_sale_return_lines where sale_line_id=$1 and restocked=false', [bookSaleLineId])).rows[0].sum), 1)
+assert.equal(Number((await db.query("select count(*) from audit_trail where entity_type='inventory_sale_return' and action='returned'")).rows[0].count), 3)
 await rejects(
   () => db.query('select record_inventory_sale($1,$2::jsonb,$3)', ['67000000-0000-4000-8000-000000000005', JSON.stringify([{ ...saleLines[0], quantity: 999 }]), 'Cash']),
   /Not enough stock/,
@@ -528,6 +554,14 @@ await rejects(
   /permission denied/,
 )
 await rejects(
+  () => db.query('delete from inventory_sale_returns where id=$1', [firstReturn.id]),
+  /permission denied/,
+)
+await rejects(
+  () => db.query('delete from inventory_sale_refunds where return_id=$1', [firstReturn.id]),
+  /permission denied/,
+)
+await rejects(
   () => db.query('update inventory_products set unit_price=0 where id=$1', [simpleProduct.id]),
   /permission denied/,
 )
@@ -540,6 +574,11 @@ await rejects(
   /permission denied/,
 )
 await as('teacher')
+await rejects(
+  () => db.query('select record_inventory_sale_return($1,$2,$3::jsonb,$4,$5)', ['68000000-0000-4000-8000-000000000005', saleResult.id, JSON.stringify(firstReturnItems), 'Unauthorized return', 'Cash']),
+  /Main Admin access required/,
+)
+assert.equal(Number((await db.query('select count(*) from inventory_sale_returns')).rows[0].count), 0, 'other roles cannot read return and refund history')
 await rejects(
   () => db.query('select record_inventory_sale($1,$2::jsonb,$3)', ['67000000-0000-4000-8000-000000000010', JSON.stringify(saleLines), 'Cash']),
   /Main Admin access required/,

@@ -66,6 +66,23 @@
 .inventory-pos-history{padding-bottom:18px}
 .inventory-pos-history ul{min-width:220px;margin:0;padding-left:18px;font-size:.77rem}
 .inventory-pos-history .workflow-table{min-width:900px}
+.inventory-pos-return{display:grid;gap:12px;padding:16px 20px;border-top:1px solid #e1e8f0;background:#fffdf8}
+.inventory-pos-return h3{margin:0;color:#10264a;font-size:.98rem}
+.inventory-pos-return>p{margin:0;color:#65738a;font-size:.82rem;line-height:1.5}
+.inventory-pos-return .workflow-table{min-width:760px}
+.inventory-pos-return td small{display:block;margin-top:4px;color:#65738a}
+.inventory-pos-return td input[type=number]{box-sizing:border-box;width:100px;min-height:38px;padding:7px;border:1px solid #cbd3df;border-radius:5px;font:inherit}
+.inventory-pos-return>label{display:grid;gap:6px;max-width:500px;color:#334863;font-size:.77rem;font-weight:800}
+.inventory-pos-return>label input,.inventory-pos-return>label textarea{box-sizing:border-box;width:100%;min-height:40px;padding:8px;border:1px solid #cbd3df;border-radius:6px;font:inherit;font-size:.87rem}
+.inventory-pos-return>label textarea{min-height:74px;resize:vertical}
+.inventory-pos-restock{display:flex;align-items:center;gap:6px;font-size:.76rem}
+.inventory-pos-return .workflow-actions{display:flex;gap:10px}
+.inventory-pos-reconciliation{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px}
+.inventory-pos-reconciliation article{padding:13px;border:1px solid #e1e8f0;border-radius:8px;background:#f8faff}
+.inventory-pos-reconciliation span{color:#65738a;font-size:.76rem;font-weight:800}
+.inventory-pos-reconciliation dl{display:grid;grid-template-columns:1fr auto;gap:5px;margin:9px 0 0;font-size:.79rem}
+.inventory-pos-reconciliation dt{color:#52647c}
+.inventory-pos-reconciliation dd{margin:0;color:#10264a;font-weight:800}
 @media(max-width:900px){.inventory-pos-price-row{grid-template-columns:repeat(2,minmax(0,1fr))}.inventory-pos-price-row>strong,.inventory-pos-price-row>span{grid-column:1/-1}.inventory-pos-build{grid-template-columns:1fr 1fr}.inventory-pos-build h3,.inventory-pos-available{grid-column:1/-1}}
 @media(max-width:560px){.inventory-pos>header{align-items:flex-start;flex-direction:column}.inventory-pos>header button{width:100%}.inventory-pos-prices,.inventory-pos-build,.inventory-pos-cart,.inventory-pos-history{padding-right:14px;padding-left:14px}.inventory-pos-price-row,.inventory-pos-build{grid-template-columns:1fr}.inventory-pos-build h3,.inventory-pos-available{grid-column:auto}.inventory-pos-recovery{align-items:flex-start;flex-direction:column;margin-right:14px;margin-left:14px}.inventory-pos-recovery button{width:100%}.inventory-pos-cart>button{width:100%}.inventory-pos-receipt{margin-right:14px;margin-left:14px}}
 .inventory-add-variant{display:flex;gap:6px;min-width:190px}
