@@ -647,6 +647,19 @@ try {
     p_reason: 'Owner approved provisional Reliance scale',
     p_expected_updated_at: '2026-10-29T10:00:00.000Z',
   })
+  await page.goto('http://127.0.0.1:5179/portal/report-readiness')
+  await page.getByRole('heading', { name: 'Report readiness' }).waitFor()
+  for (const [name, status] of [
+    ['Academic records', 'Ready'],
+    ['Grade bands', 'Ready'],
+    ['Approvals', 'Action needed'],
+    ['Release state', 'Action needed'],
+  ]) {
+    const card = page.locator('.report-readiness-grid article').filter({
+      has: page.getByRole('heading', { name, exact: true }),
+    })
+    await card.getByText(status, { exact: true }).waitFor()
+  }
   await page.goto('http://127.0.0.1:5179/portal/reports')
   await page.getByRole('heading', { name: 'Senior progress report' }).waitFor()
   await page.locator('.report-summary article').first().locator('strong').filter({ hasText: '74.0%' }).waitFor()
@@ -754,7 +767,7 @@ try {
   await parent.waitForURL('http://127.0.0.1:5179/portal')
   assert.deepEqual(errors, [])
   console.log(
-    'PASS: profile editing, account creation, Reliance grade-band boundary preview and audited scale save, Junior/Senior/Sixth Form report variants, A4 print context/title/width and hidden portal controls, coursework exclusion from averages, reporting-period registration and reviewed close, publishing, records, timetable, payment retry, teacher sign-in and Coursework access, parent route guards, linked-account directory/search, credential-free audited recovery guidance, mobile layout; no uncaught browser errors. All backend requests were mocked.',
+    'PASS: profile editing, account creation, Reliance grade-band boundary preview and audited scale save, report readiness states, Junior/Senior/Sixth Form report variants, A4 print context/title/width and hidden portal controls, coursework exclusion from averages, reporting-period registration and reviewed close, publishing, records, timetable, payment retry, teacher sign-in and Coursework access, parent route guards, linked-account directory/search, credential-free audited recovery guidance, mobile layout; no uncaught browser errors. All backend requests were mocked.',
   )
 } catch (error) {
   const p = browser.contexts()[0]?.pages()[0]

@@ -907,9 +907,43 @@ assert.equal(
   reopenedPeriodRevision + 1,
   'period can be closed again after review changes',
 )
+await as('admin')
+await rejects(
+  () => db.query(
+    "insert into report_publications(campus_id,academic_year,academic_term,published_at,published_by) values($1,2099,'Term 1',now(),$2)",
+    [campus, ids.admin],
+  ),
+  /Every learner must have at least one academic mark before publishing reports/,
+)
+assert.equal(
+  (await db.query("select count(*) from report_publications where campus_id=$1 and academic_year=2099 and academic_term='Term 1'", [campus])).rows[0].count,
+  0,
+  'a report release with no period marks leaves no publication row behind',
+)
+await rejects(
+  () => db.query(
+    "insert into report_publications(campus_id,academic_year,academic_term,published_at,published_by) values($1,2026,'Term 1',now(),$2)",
+    [campus, ids.admin],
+  ),
+  /Set class teacher and head of school approval names before publishing reports/,
+)
 await db.query(
   "insert into report_term_settings(campus_id,academic_year,academic_term,class_teacher_name,head_of_school_name,updated_by) values($1,2026,'Term 1','Class Teacher','Head of School',$2)",
   [campus, ids.admin],
+)
+await db.exec('reset role; begin; delete from report_grade_bands where campus_id is null and band_group=\'olevel\'')
+await rejects(
+  () => db.query(
+    "insert into report_publications(campus_id,academic_year,academic_term,published_at,published_by) values($1,2026,'Term 1',now(),$2)",
+    [campus, ids.admin],
+  ),
+  /Configure grade bands for every class level before publishing reports/,
+)
+await db.exec('rollback; set role authenticated')
+assert.equal(
+  (await db.query("select count(*) from report_grade_bands where campus_id is null and band_group='olevel'", [])).rows[0].count,
+  5,
+  'the isolated grade-band failure fixture rolls back before the valid release test',
 )
 const publicationId = (await db.query(
   "insert into report_publications(campus_id,academic_year,academic_term,published_at,published_by) values($1,2026,'Term 1',now(),$2) returning id",
