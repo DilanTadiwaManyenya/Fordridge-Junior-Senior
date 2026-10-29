@@ -1,7 +1,7 @@
 # Fordridge portal roadmap inspired by Reliance
 
 Updated: 29 October 2026
-Current checkpoint: Stages 1–42 implemented and validated locally; Stage 42 GitHub checkpoint is in progress; Stage 43 is next. Database/frontend deployment is pending approval and release.
+Current checkpoint: Stages 1–42 implemented and validated locally. Stage 43 review is recorded and awaits approved Fordridge Junior/Senior grading scales; Stage 44 remains queued to preserve roadmap order. Database/frontend deployment is pending approval and release.
 
 ## Purpose
 
@@ -138,4 +138,4 @@ Stages 7–20 establish access and class foundations. Do not roll out a new admi
 
 ## Current checkpoint
 
-Stage 42 adds reasoned administrator reopening and current-period selection. Current-period handoff locks the campus row, checks both the requested revision and the displayed current-period revision, and records an event and Activity Log audit entry for each affected period. No dates or calendar rules are assumed. Isolated PGlite, lint, build, and mocked Chrome browser checks pass. See [the Stage 42 record](STAGE-42-REVIEWED-REOPEN-CURRENT.md) and [the stage tracker](STAGE-TRACKER.md). Migrations `20261029110000_reporting_period_registry.sql`, `20261029120000_close_reporting_period.sql`, and `20261029130000_review_reporting_period_state.sql` and their frontend changes are not deployed. Earlier migrations/frontend releases remain pending production deployment/approval.
+Stage 42 adds reasoned administrator reopening and current-period selection. Current-period handoff locks the campus row, checks both the requested revision and the displayed current-period revision, and records an event and Activity Log audit entry for each affected period. No dates or calendar rules are assumed. Isolated PGlite, lint, build, and mocked Chrome browser checks pass. Stage 43 review found that Fordridge currently has campus-wide grade ranges with inclusive boundaries and no separate Junior/Senior scale field. The repository contains no approved Junior/Senior grading matrix; level-specific boundary verification is pending that school policy. No grade values or calculation behavior were changed. See the [Stage 43 review](STAGE-43-GRADE-BAND-REVIEW.md) and [stage tracker](STAGE-TRACKER.md). Stage 44 remains queued until Stage 43's school-rule acceptance criteria can be verified. Migrations `20261029110000_reporting_period_registry.sql`, `20261029120000_close_reporting_period.sql`, and `20261029130000_review_reporting_period_state.sql` and their frontend changes are not deployed. Earlier migrations/frontend releases remain pending production deployment/approval.
