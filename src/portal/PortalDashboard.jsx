@@ -45,6 +45,7 @@ import ReportingPeriods from './ReportingPeriods'
 import YearRolloverReadiness from './YearRolloverReadiness'
 import TeacherLearningLibrary from './TeacherLearningLibrary'
 import ParentLearningLibrary from './ParentLearningLibrary'
+import LibraryOversight from './LibraryOversight'
 import { withPortalTimeout, workflowError } from './workflow'
 import { canOpenTeacherMyClass } from './teacher-workspace'
 import { canReviewIncomeExpenses, getFinanceNavigation } from './navigation'
@@ -251,6 +252,7 @@ export default function PortalDashboard() {
     (view === 'assignments' && !admin) ||
     (view === 'my-class' && !teacherMyClass) ||
     (view === 'learning-library' && !['teacher', 'parent'].includes(profile.role)) ||
+    (view === 'library-oversight' && !admin) ||
     (view === 'subject-allocations' && !assignments) ||
     (view === 'cashbook' && !admin) ||
     (view === 'inventory-stock' && !admin) ||
@@ -285,6 +287,7 @@ export default function PortalDashboard() {
       'assignments',
       'my-class',
       'learning-library',
+      'library-oversight',
       'subject-allocations',
       'cashbook',
       'inventory-stock',
@@ -427,6 +430,7 @@ export default function PortalDashboard() {
           )}
           {admin && <span className="portal-nav-label portal-nav-label-secondary">Administration</span>}
           {admin && nav('/portal/activity', 'Activity Log', '◫')}
+          {admin && nav('/portal/library-oversight', 'Library oversight', '▤')}
           {admin && nav('/portal/parent-accounts', 'Parent accounts', '♧')}
           {admin && nav('/portal/staff', 'Staff', '♙')}
         </nav>
@@ -534,6 +538,8 @@ export default function PortalDashboard() {
           profile.role === 'parent'
             ? <ParentLearningLibrary user={user} />
             : <TeacherLearningLibrary profile={profile} />
+        ) : view === 'library-oversight' ? (
+          <LibraryOversight />
         ) : view === 'subject-allocations' ? (
           <SubjectAllocations profile={profile} />
         ) : view === 'cashbook' ? (

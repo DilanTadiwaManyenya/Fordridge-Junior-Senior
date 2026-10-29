@@ -295,6 +295,31 @@ async function pageFor(
     if (path.endsWith('/rpc/admin_update_profile')) return send(null)
     if (path.endsWith('/rpc/admin_correct_learner_profile')) return send(null)
     if (path.endsWith('/rpc/admin_record_parent_recovery_support')) return send(null)
+    if (path.endsWith('/rpc/admin_learning_library_oversight')) return send([{
+      total_count: 1,
+      resource_id: 'resource-1',
+      title: 'Science revision',
+      state: 'published',
+      campus_id: 'campus',
+      campus_name: 'Junior School',
+      teacher_name: 'Test Teacher',
+      class_level: 'Form 1',
+      class_stream: null,
+      subject: 'Science',
+      academic_year: 2026,
+      academic_term: 'Term 3',
+      published_at: '2026-10-29T10:00:00Z',
+      created_at: '2026-10-28T10:00:00Z',
+      updated_at: '2026-10-29T10:00:00Z',
+      audience_label: 'Junior School · Form 1 · All streams',
+      file_readiness: 'ready',
+      active_file_name: 'science.pdf',
+      active_file_size_bytes: 2048,
+      pending_upload_count: 0,
+      finalized_file_count: 1,
+      file_history: [{ name: 'science.pdf', extension: 'pdf', size_bytes: 2048, ready: true, active: true, created_at: '2026-10-29T10:00:00Z' }],
+      activity_history: [{ action: 'published', actor_name: 'Test Teacher', created_at: '2026-10-29T10:00:00Z', summary: 'published' }],
+    }])
     if (path.endsWith('/rpc/register_reporting_period')) {
       reportingPeriods.push({
         id: 'period-registered', campus_id: body.p_campus_id, academic_year: body.p_academic_year,
@@ -819,6 +844,13 @@ try {
   await parent.waitForURL('http://127.0.0.1:5179/portal')
   await parent.goto('http://127.0.0.1:5179/portal/coursework')
   await parent.waitForURL('http://127.0.0.1:5179/portal')
+  await parent.goto('http://127.0.0.1:5179/portal/library-oversight')
+  await parent.waitForURL('http://127.0.0.1:5179/portal')
+  await page.getByRole('button', { name: 'Open portal navigation' }).click()
+  await page.getByRole('link', { name: 'Library oversight', exact: true }).click()
+  await page.getByRole('heading', { name: 'Library oversight', exact: true }).waitFor()
+  await page.getByText('Science revision', { exact: true }).waitFor()
+  await page.getByText('File history (1)', { exact: false }).waitFor()
   await page.getByRole('button', { name: 'Open portal navigation' }).click()
   await page.getByRole('link', { name: 'Parent accounts', exact: true }).click()
   await page.getByRole('heading', { name: 'Parent accounts' }).waitFor()

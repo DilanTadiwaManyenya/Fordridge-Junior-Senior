@@ -1539,6 +1539,30 @@ await rejects(
   ]),
   /current teaching allocation/,
 )
+await rejects(
+  () => db.query('select * from admin_learning_library_oversight(null,$1,null,25,0)', ['all']),
+  /Main Admin access required/,
+)
+await as('admin')
+const libraryOversightRows = (await db.query(
+  'select * from admin_learning_library_oversight(null,$1,null,25,0)', ['all'],
+)).rows
+assert.equal(libraryOversightRows.length, 2, 'Main Admin can review library records without direct table grants')
+const reviewedPublishedResource = libraryOversightRows.find((row) => row.resource_id === learningResourceId)
+assert.equal(reviewedPublishedResource.state, 'published')
+assert.equal(reviewedPublishedResource.audience_label, 'Fordridge Junior School · Form 1 · All streams')
+assert.equal(reviewedPublishedResource.file_readiness, 'ready')
+assert.equal(reviewedPublishedResource.active_file_name, 'topic slides.pptx')
+assert.equal(reviewedPublishedResource.finalized_file_count, 2)
+assert.equal(reviewedPublishedResource.file_history.length, 2)
+assert.ok(reviewedPublishedResource.activity_history.some((event) => event.action === 'file_replaced'),
+  'oversight includes audited replacement history without exposing private object paths')
+assert.equal((await db.query('select * from admin_learning_library_oversight(null,$1,$2,25,0)', ['draft', 'Edited period draft'])).rows.length, 1,
+  'oversight filters by state and title search')
+await rejects(
+  () => db.query('select * from admin_learning_library_oversight(null,$1,null,0,0)', ['all']),
+  /page size/,
+)
 await as('student')
 assert.equal((await db.query('select count(*)::integer as count from learning_resources')).rows[0].count, 0,
   'student accounts cannot read teacher learning resources')
@@ -2717,5 +2741,5 @@ assert.ok((await db.query('select preview_fee_reconciliation(null,2026,$1) as re
 await db.exec('rollback')
 await db.close()
 console.log(
-  'PASS: migrations, Stages 70–74 teacher/parent learning-library allocation, enrollment, campus, stream, Storage and file lifecycle boundaries, newsletter publication/audience/expiry and user-bound acknowledgement, report readiness/release attribution/announcement/audit, atomic payments/retries/rollback, class and subject scope, role membership isolation/grants/revocation/provisioning, active-role parent/child boundaries, teacher profile/record/RPC scope, guardian access, private records and teacher login.',
+  'PASS: migrations, Stages 70–75 teacher/parent learning-library allocation, enrollment, campus, stream, Storage and file lifecycle boundaries, admin-only read-only library oversight, newsletter publication/audience/expiry and user-bound acknowledgement, report readiness/release attribution/announcement/audit, atomic payments/retries/rollback, class and subject scope, role membership isolation/grants/revocation/provisioning, active-role parent/child boundaries, teacher profile/record/RPC scope, guardian access, private records and teacher login.',
 )
