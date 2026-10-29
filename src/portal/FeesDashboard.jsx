@@ -4,10 +4,14 @@ import { isSupabaseConfigured, supabase } from '../lib/supabase'
 import './fordridge-fees-dashboard.css'
 import { workflowError } from './workflow'
 
-const money = (value, currency = 'USD') =>
-  new Intl.NumberFormat('en-US', { style: 'currency', currency }).format(
-    Number(value || 0),
-  )
+const money = (value, currency = 'USD') => {
+  const amount = Number(value || 0)
+  try {
+    return new Intl.NumberFormat('en-US', { style: 'currency', currency }).format(amount)
+  } catch {
+    return `${currency || 'Currency not set'} ${amount.toFixed(2)}`
+  }
+}
 const title = (value) =>
   value ? value[0].toUpperCase() + value.slice(1) : 'Pending'
 const feeKeys = [
@@ -46,6 +50,10 @@ export default function FeesDashboard({ profile, user }) {
     [students, setStudents] = useState([]),
     [settings, setSettings] = useState([]),
     [transactions, setTransactions] = useState([])
+  const [reconciliation, setReconciliation] = useState(null)
+  const [reconciliationLoading, setReconciliationLoading] = useState(true)
+  const [reconciliationError, setReconciliationError] = useState('')
+  const [reconciliationFilters, setReconciliationFilters] = useState({ campusId: '', year: '', term: '' })
   const [loading, setLoading] = useState(true),
     [error, setError] = useState(''),
     [query, setQuery] = useState(''),
@@ -137,10 +145,29 @@ export default function FeesDashboard({ profile, user }) {
       setError(workflowError(err))
     }
   }, [isAdmin, isPrincipal, isAccountant])
+  const loadReconciliation = useCallback(async () => {
+    if (!supabase || !canReviewFinance) return
+    setReconciliationLoading(true)
+    setReconciliationError('')
+    try {
+      const { data, error: queryError } = await supabase.rpc('preview_fee_reconciliation', {
+        p_campus_id: isAdmin ? reconciliationFilters.campusId || null : null,
+        p_academic_year: reconciliationFilters.year ? Number(reconciliationFilters.year) : null,
+        p_academic_term: reconciliationFilters.term || null,
+      })
+      if (queryError) setReconciliationError(workflowError(queryError))
+      else setReconciliation(data)
+    } catch (err) {
+      setReconciliationError(workflowError(err))
+    } finally {
+      setReconciliationLoading(false)
+    }
+  }, [canReviewFinance, isAdmin, reconciliationFilters])
   useEffect(() => {
     loadRecords()
     loadAdmin()
   }, [loadRecords, loadAdmin])
+  useEffect(() => { loadReconciliation() }, [loadReconciliation])
   const rows = useMemo(
     () =>
       records.map((r) => {
@@ -171,14 +198,21 @@ export default function FeesDashboard({ profile, user }) {
         .toLowerCase()
         .includes(query.toLowerCase()),
   )
-  const totals = rows.reduce(
-    (a, r) => ({
-      due: a.due + r.due,
-      paid: a.paid + r.paid,
-      outstanding: a.outstanding + r.balance,
-    }),
-    { due: 0, paid: 0, outstanding: 0 },
-  )
+  const totalsByCurrency = useMemo(() => {
+    const totals = new Map()
+    for (const row of rows) {
+      const currency = row.currency || 'Unknown'
+      const total = totals.get(currency) || { currency, due: 0, paid: 0, outstanding: 0 }
+      total.due += row.due
+      total.paid += row.paid
+      total.outstanding += row.balance
+      totals.set(currency, total)
+    }
+    return [...totals.values()].sort((left, right) => left.currency.localeCompare(right.currency))
+  }, [rows])
+  const reconciliationCampuses = [...new Map(rows.filter(row => row.campus_id).map(row => [row.campus_id, { id: row.campus_id, name: row.campus?.name || 'Campus' }])).values()]
+  const reconciliationYears = [...new Set(rows.map(row => row.academic_year).filter(Boolean))].sort((left, right) => right - left)
+  const reconciliationTerms = [...new Set(rows.filter(row => !reconciliationFilters.year || String(row.academic_year) === reconciliationFilters.year).map(row => row.academic_term).filter(Boolean))].sort()
   async function recordPayment(e) {
     e.preventDefault()
     if (paymentLock.current) return
@@ -332,20 +366,74 @@ export default function FeesDashboard({ profile, user }) {
       </header>
       {canReviewFinance && (
         <div className="fees-summary">
-          <article>
-            <span>Fees billed</span>
-            <strong>{money(totals.due)}</strong>
-          </article>
-          <article>
-            <span>Payments received</span>
-            <strong>{money(totals.paid)}</strong>
-          </article>
-          <article className="fees-outstanding">
-            <span>Outstanding</span>
-            <strong>{money(totals.outstanding)}</strong>
-          </article>
+          {totalsByCurrency.length ? totalsByCurrency.map(total => <div className="fees-currency-summary" key={total.currency}>
+            <h2>{total.currency} totals</h2>
+            <article><span>Fees billed ({total.currency})</span><strong>{money(total.due, total.currency)}</strong></article>
+            <article><span>Payments received ({total.currency})</span><strong>{money(total.paid, total.currency)}</strong></article>
+            <article className="fees-outstanding"><span>Outstanding ({total.currency})</span><strong>{money(total.outstanding, total.currency)}</strong></article>
+          </div>) : <p className="fees-message">No fee balances to summarize.</p>}
         </div>
       )}
+      {canReviewFinance && <section className="fees-card fees-reconciliation" aria-labelledby="fees-reconciliation-heading">
+        <header className="fees-reconciliation-heading">
+          <div><h2 id="fees-reconciliation-heading">Balance &amp; currency reconciliation</h2><p>Read-only comparison of fee-record balances with recorded payment transactions. Totals stay grouped by campus, academic period, and the linked fee currency; payment rows do not store a separate currency. No exchange rate is assumed.</p></div>
+          <button type="button" className="fees-refresh" onClick={loadReconciliation} disabled={reconciliationLoading}>{reconciliationLoading ? 'Checking…' : 'Refresh reconciliation'}</button>
+        </header>
+        <div className="fees-controls" aria-label="Reconciliation filters">
+          {isAdmin && <label>Campus
+            <select value={reconciliationFilters.campusId} onChange={event => setReconciliationFilters(value => ({ ...value, campusId: event.target.value }))}>
+              <option value="">All campuses</option>
+              {reconciliationCampuses.map(campus => <option key={campus.id} value={campus.id}>{campus.name}</option>)}
+            </select>
+          </label>}
+          <label>Academic year
+            <select value={reconciliationFilters.year} onChange={event => setReconciliationFilters(value => ({ ...value, year: event.target.value, term: '' }))}>
+              <option value="">All years</option>
+              {reconciliationYears.map(year => <option key={year} value={year}>{year}</option>)}
+            </select>
+          </label>
+          <label>Academic term
+            <select value={reconciliationFilters.term} onChange={event => setReconciliationFilters(value => ({ ...value, term: event.target.value }))}>
+              <option value="">All terms</option>
+              {reconciliationTerms.map(term => <option key={term} value={term}>{term}</option>)}
+            </select>
+          </label>
+        </div>
+        {reconciliationError && <p className="fees-error" role="alert">{reconciliationError}</p>}
+        {reconciliationLoading ? <p className="fees-message" role="status">Checking fee and payment totals…</p> : !reconciliationError && <>
+          <p className="fees-reconciliation-count" role="status">{reconciliation?.record_count || 0} fee record(s) checked · {reconciliation?.anomaly_count || 0} reconciliation exception(s)</p>
+          <div className="fees-table-wrap"><table>
+            <thead><tr><th>Campus</th><th>Period</th><th>Currency</th><th>Records</th><th>Charges</th><th>Paid on fee records</th><th>Payments in ledger</th><th>Outstanding</th><th>Exceptions</th></tr></thead>
+            <tbody>{(reconciliation?.periods || []).map((period, index) => <tr key={`${period.campus_id}-${period.academic_year}-${period.academic_term}-${period.currency}-${index}`}>
+              <td>{period.campus_name}</td>
+              <td>{period.academic_year && period.academic_term ? `${period.academic_term} ${period.academic_year}` : 'Period not assigned'}</td>
+              <td>{period.currency || 'Not recorded'}</td>
+              <td>{period.fee_record_count}</td>
+              <td>{money(period.charges, period.currency || 'USD')}</td>
+              <td>{money(period.paid_on_fee_records, period.currency || 'USD')}</td>
+              <td>{money(period.payments_in_ledger, period.currency || 'USD')}</td>
+              <td>{money(period.outstanding, period.currency || 'USD')}</td>
+              <td>{period.exception_count}</td>
+            </tr>)}</tbody>
+          </table></div>
+          {!reconciliation?.periods?.length && <p className="fees-message">No fee records match these filters.</p>}
+          {reconciliation?.anomaly_count > 0 && <>
+            <h3 className="fees-reconciliation-subheading">Records needing review{reconciliation.anomalies_truncated ? ' · first 200 shown' : ''}</h3>
+            <div className="fees-table-wrap"><table>
+              <thead><tr><th>Learner</th><th>Campus / period</th><th>Currency</th><th>Fee record</th><th>Paid on record</th><th>Payments in ledger</th><th>Issue</th></tr></thead>
+              <tbody>{reconciliation.anomalies.map(item => <tr key={item.fee_record_id}>
+                <td>{item.student_name || 'Learner record'}</td>
+                <td>{item.campus_name} · {item.academic_year && item.academic_term ? `${item.academic_term} ${item.academic_year}` : 'Period not assigned'}</td>
+                <td>{item.currency || 'Not recorded'}</td>
+                <td>{item.fee_record_id}</td>
+                <td>{money(item.paid_on_fee_record, item.currency || 'USD')}</td>
+                <td>{money(item.payments_in_ledger, item.currency || 'USD')}</td>
+                <td>{item.anomaly_types.map(issue => issue.replaceAll('_', ' ')).join(', ')}</td>
+              </tr>)}</tbody>
+            </table></div>
+          </>}
+        </>}
+      </section>}
       {canViewCampusLedger && (
         <section className="fees-card" aria-label="Read-only fee schedule">
           <h2>School fee schedule</h2>

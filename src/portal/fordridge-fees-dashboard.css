@@ -2,3 +2,17 @@
 
 /* Finance workspace refinements */
 .fees-header>div:last-child{display:flex;flex-wrap:wrap;gap:8px;justify-content:flex-end}.fees-summary article{border-top:3px solid var(--navy)}.fees-summary .fees-outstanding{border-top-color:var(--maroon)}.fees-controls{background:#fbfcfd}.fees-controls input,.fees-controls select,.fees-modal input,.fees-modal select{border-radius:6px}.fees-controls input:focus,.fees-controls select:focus,.fees-modal input:focus,.fees-modal select:focus{border-color:var(--maroon);outline:none;box-shadow:0 0 0 4px rgba(107,9,41,.09)}.fees-status{padding:5px 9px}.fees-modal-backdrop{backdrop-filter:blur(3px)}.fees-modal{border-radius:12px;box-shadow:0 20px 60px rgba(6,29,58,.28)}.fees-close{border-radius:50%;width:32px;height:32px;line-height:1}.fees-close:hover{background:#eef2f6}.fees-table-wrap{background:#fff}@media(max-width:700px){.fees-header>div:last-child{justify-content:flex-start}.fees-refresh{flex:1}.admin-overview,.fordridge-fees-dashboard{padding-left:20px;padding-right:20px}}
+
+/* Stage 57 keeps finance totals grouped by the recorded currency. */
+.fees-summary{display:block}
+.fees-currency-summary{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;margin-bottom:16px}
+.fees-currency-summary h2{grid-column:1/-1;margin:0;font-size:1rem;color:#10264a}
+.fees-reconciliation{margin:0 0 20px}
+.fees-reconciliation-heading{display:flex;align-items:flex-start;justify-content:space-between;gap:18px;padding:18px;border-bottom:1px solid #e0e5ed}
+.fees-reconciliation-heading h2,.fees-reconciliation-subheading{margin:0 0 7px;color:#10264a;font-size:1.1rem}
+.fees-reconciliation-heading p{margin:0;color:#65738a;max-width:780px}
+.fees-reconciliation .fees-controls label{display:grid;gap:5px;color:#56657c;font-size:.78rem;font-weight:700}
+.fees-reconciliation .fees-controls select{border:1px solid #cbd3df;border-radius:6px;background:#fff;padding:10px;color:#10264a}
+.fees-reconciliation-count{margin:0;padding:14px 16px;color:#56657c;font-weight:700}
+.fees-reconciliation-subheading{padding:14px 16px 0}
+@media(max-width:700px){.fees-currency-summary{grid-template-columns:1fr}.fees-reconciliation-heading{flex-direction:column}.fees-reconciliation-heading .fees-refresh{width:100%}}

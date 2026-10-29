@@ -153,6 +153,16 @@ async function pageFor(
         }])
       return send([])
     }
+    if (path.endsWith('/rpc/preview_fee_reconciliation')) return send({
+      record_count: 2,
+      anomaly_count: 1,
+      anomalies_truncated: false,
+      periods: [
+        { campus_id: 'campus', campus_name: 'Junior School', campus_code: 'junior', academic_year: 2026, academic_term: 'Term 3', currency: 'USD', fee_record_count: 1, charges: 100, paid_on_fee_records: 20, payments_in_ledger: 20, outstanding: 80, exception_count: 0 },
+        { campus_id: 'campus', campus_name: 'Junior School', campus_code: 'junior', academic_year: 2026, academic_term: 'Term 3', currency: 'ZiG', fee_record_count: 1, charges: 50, paid_on_fee_records: 10, payments_in_ledger: 5, outstanding: 40, exception_count: 1 },
+      ],
+      anomalies: [{ fee_record_id: 'fee-zig', student_name: 'Test Learner', campus_name: 'Junior School', academic_year: 2026, academic_term: 'Term 3', currency: 'ZiG', paid_on_fee_record: 10, payments_in_ledger: 5, anomaly_types: ['payment_total_mismatch'] }],
+    })
     if (path.endsWith('/rpc/preview_year_rollover'))
       return send({
         rows: [{
@@ -423,6 +433,9 @@ async function pageFor(
           campus: { name: 'Junior School' },
           academic_year: 2026,
           academic_term: 'Term 3',
+        }, {
+          id: 'fee-zig', campus_id: 'campus', amount: 50, paid_amount: 10, currency: 'ZiG', status: 'pending',
+          student: { full_name: 'Test Learner' }, campus: { name: 'Junior School' }, academic_year: 2026, academic_term: 'Term 3',
         },
       ])
     if (path.endsWith('/fee_settings')) return send([])
@@ -648,6 +661,17 @@ try {
   const payments = writes.filter((w) => w.path.endsWith('record_fee_payment'))
   assert.equal(payments.length, 2)
   assert.deepEqual(payments[0].body, payments[1].body)
+  await page.getByText('USD totals', { exact: true }).waitFor()
+  await page.getByText('ZiG totals', { exact: true }).waitFor()
+  await page.getByRole('heading', { name: 'Balance & currency reconciliation' }).waitFor()
+  await page.getByText('2 fee record(s) checked · 1 reconciliation exception(s)', { exact: true }).waitFor()
+  await page.getByText('payment total mismatch', { exact: true }).waitFor()
+  const reconciliationRequest = writes.find(write => write.path.endsWith('/rpc/preview_fee_reconciliation'))
+  assert.deepEqual(reconciliationRequest.body, {
+    p_campus_id: null,
+    p_academic_year: null,
+    p_academic_term: null,
+  })
   await page.getByRole('link', { name: 'Learners', exact: true }).click()
   await page
     .getByRole('button', { name: 'View or edit Test Learner' })

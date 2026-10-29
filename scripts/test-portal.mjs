@@ -1957,6 +1957,69 @@ const snapshotAfterLaterMark = (await db.query(
   [publicationId, ids.stream_student],
 )).rows[0]
 assert.deepEqual(snapshotAfterLaterMark, frozen, 'later marks and profile corrections leave the complete issued snapshot unchanged')
+await db.exec('begin')
+await as('admin')
+const reconcileUsdFee = (await db.query(
+  "insert into fee_records(campus_id,student_id,amount,currency,paid_amount,academic_year,academic_term,status) values($1,$2,100,'USD',0,2026,'Term 2','pending') returning id",
+  [campus, ids.student],
+)).rows[0].id
+await db.query('select record_fee_payment($1,20,$2,$3,$4)', [
+  reconcileUsdFee, 'cash', 'reconciliation USD example', '50000000-0000-4000-8000-000000000001',
+])
+const reconcileZigFee = (await db.query(
+  "insert into fee_records(campus_id,student_id,amount,currency,paid_amount,academic_year,academic_term,status) values($1,$2,50,'ZiG',0,2026,'Term 2','pending') returning id",
+  [campus, ids.other_student],
+)).rows[0].id
+await db.query('select record_fee_payment($1,10,$2,$3,$4)', [
+  reconcileZigFee, 'cash', 'reconciliation ZiG example', '50000000-0000-4000-8000-000000000002',
+])
+const reconcileMismatchFee = (await db.query(
+  "insert into fee_records(campus_id,student_id,amount,currency,paid_amount,academic_year,academic_term,status) values($1,$2,40,'ZiG',5,2026,'Term 2','pending') returning id",
+  [campus, ids.stranger],
+)).rows[0].id
+const _reconcileSeniorFee = (await db.query(
+  "insert into fee_records(campus_id,student_id,amount,currency,paid_amount,academic_year,academic_term,status) values($1,$2,70,'USD',0,2025,'Term 2','pending') returning id",
+  [seniorCampus, ids.stranger],
+)).rows[0].id
+const allCampusReconciliation = (await db.query(
+  'select preview_fee_reconciliation(null,null,null) as result',
+)).rows[0].result
+const juniorPeriodReconciliation = (await db.query(
+  'select preview_fee_reconciliation($1,$2,$3) as result', [campus, 2026, 'Term 2'],
+)).rows[0].result
+assert.equal(juniorPeriodReconciliation.record_count, 3, 'reconciliation filters by selected campus and academic period')
+assert.deepEqual(juniorPeriodReconciliation.periods.map(period => period.currency).sort(), ['USD', 'ZiG'],
+  'finance totals remain separated by their recorded currency')
+assert.equal(juniorPeriodReconciliation.periods.find(period => period.currency === 'USD').charges, 100,
+  'USD charges are totaled without adding ZiG records')
+assert.equal(juniorPeriodReconciliation.periods.find(period => period.currency === 'ZiG').charges, 90,
+  'ZiG charges include only ZiG-denominated fees')
+assert.ok(juniorPeriodReconciliation.anomalies.some(item => item.fee_record_id === reconcileMismatchFee && item.anomaly_types.includes('payment_total_mismatch')),
+  'a fee-record/transaction total mismatch is listed for review')
+assert.ok(allCampusReconciliation.record_count >= juniorPeriodReconciliation.record_count + 1,
+  'Main Admin can reconcile all campuses when no campus is selected')
+assert.ok(allCampusReconciliation.periods.some(period => period.campus_id === seniorCampus),
+  'all-campus summaries retain the campus grouping')
+await as('teacher')
+await rolloverRejectsInSavepoint(
+  () => db.query('select preview_fee_reconciliation(null,null,null)'),
+  /Finance reconciliation access required/,
+)
+await as('admin')
+await db.query("select grant_portal_role($1,'accountant',$2,'Synthetic reconciliation scope test')", [unlinkedParentId, campus])
+const reconciliationSession = '10000000-0000-4000-8000-000000000003'
+await db.exec('reset role')
+await db.query("select set_config('request.jwt.claim.sub',$1,false)", [unlinkedParentId])
+await db.query("select set_config('request.jwt.claims',$1,false)", [JSON.stringify({ session_id: reconciliationSession })])
+await db.exec('set role authenticated')
+await db.query("select switch_active_portal_role('accountant',$1)", [campus])
+await rolloverRejectsInSavepoint(
+  () => db.query('select preview_fee_reconciliation($1,null,null)', [seniorCampus]),
+  /limited to your assigned campus/,
+)
+assert.ok((await db.query('select preview_fee_reconciliation(null,2026,$1) as result', ['Term 2'])).rows[0].result.periods.every(period => period.campus_id === campus),
+  'Accountant reconciliation always stays within the assigned campus')
+await db.exec('rollback')
 await db.close()
 console.log(
   'PASS: migrations, report readiness/release attribution/announcement/audit, atomic payments/retries/rollback, class and subject scope, role membership isolation/grants/revocation/provisioning, active-role parent/child boundaries, teacher profile/record/RPC scope, guardian access, private records and teacher login.',
