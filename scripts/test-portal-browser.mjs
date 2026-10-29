@@ -129,6 +129,27 @@ async function pageFor(
       return send({ active_role: body.p_role, active_campus_id: body.p_campus_id })
     if (path.endsWith('/rpc/learner_portal_access_status'))
       return send({ allowed: learnerAccess, status: learnerAccess ? 'active' : 'inactive' })
+    if (path.endsWith('/rpc/verify_report_snapshot_integrity')) {
+      if (body.p_integrity_hash === 'a'.repeat(32))
+        return send([{
+          integrity_valid: true,
+          academic_year: 2026,
+          academic_term: 'Term 1',
+          campus_name: 'Junior School',
+          released_at: '2026-10-29T12:00:00.000Z',
+          calculated_hash: 'a'.repeat(32),
+        }])
+      if (body.p_integrity_hash === 'b'.repeat(32))
+        return send([{
+          integrity_valid: false,
+          academic_year: 2026,
+          academic_term: 'Term 1',
+          campus_name: 'Junior School',
+          released_at: '2026-10-29T12:00:00.000Z',
+          calculated_hash: 'c'.repeat(32),
+        }])
+      return send([])
+    }
     if (path.endsWith('/audit_trail')) {
       activityAttempts += 1
       if (!activityCanSucceed)
@@ -660,6 +681,21 @@ try {
     })
     await card.getByText(status, { exact: true }).waitFor()
   }
+  await page.goto('http://127.0.0.1:5179/portal/report-verification')
+  await page.getByRole('heading', { name: 'Report verification' }).waitFor()
+  await page.getByLabel('Integrity hash').fill('a'.repeat(32))
+  await page.getByRole('button', { name: 'Verify report' }).click()
+  await page.getByText('Verified release', { exact: true }).waitFor()
+  await page.getByRole('heading', { name: 'Junior School · 2026 · Term 1' }).waitFor()
+  await page.getByLabel('Integrity hash').fill('b'.repeat(32))
+  await page.getByRole('button', { name: 'Verify report' }).click()
+  await page.getByText('Integrity mismatch', { exact: true }).waitFor()
+  await page.getByText(/recorded in Activity Log/).waitFor()
+  await page.getByLabel('Integrity hash').fill('d'.repeat(32))
+  await page.getByRole('button', { name: 'Verify report' }).click()
+  await page.getByText('No released report matches that fingerprint.').waitFor()
+  const verificationWrites = writes.filter(write => write.path.endsWith('/rpc/verify_report_snapshot_integrity'))
+  assert.deepEqual(verificationWrites.map(write => write.body.p_integrity_hash), ['a'.repeat(32), 'b'.repeat(32), 'd'.repeat(32)])
   await page.goto('http://127.0.0.1:5179/portal/report-release')
   await page.getByRole('heading', { name: 'Report release' }).waitFor()
   await page.getByLabel('Campus').selectOption('campus')
@@ -775,7 +811,7 @@ try {
   await parent.waitForURL('http://127.0.0.1:5179/portal')
   assert.deepEqual(errors, [])
   console.log(
-    'PASS: profile editing, account creation, Reliance grade-band boundary preview and audited scale save, report readiness and release attribution, Junior/Senior/Sixth Form report variants, A4 print context/title/width and hidden portal controls, coursework exclusion from averages, reporting-period registration and reviewed close, publishing, records, timetable, payment retry, teacher sign-in and Coursework access, parent route guards, linked-account directory/search, credential-free audited recovery guidance, mobile layout; no uncaught browser errors. All backend requests were mocked.',
+    'PASS: profile editing, account creation, Reliance grade-band boundary preview and audited scale save, report readiness and release attribution, report integrity verified/mismatch/not-found flows, Junior/Senior/Sixth Form report variants, A4 print context/title/width and hidden portal controls, coursework exclusion from averages, reporting-period registration and reviewed close, publishing, records, timetable, payment retry, teacher sign-in and Coursework access, parent route guards, linked-account directory/search, credential-free audited recovery guidance, mobile layout; no uncaught browser errors. All backend requests were mocked.',
   )
 } catch (error) {
   const p = browser.contexts()[0]?.pages()[0]

@@ -1002,6 +1002,52 @@ const frozen = (await db.query(
   'select * from report_release_snapshots where publication_id=$1 and student_id=$2',
   [publicationId, ids.stream_student],
 )).rows[0]
+const verification = (await db.query(
+  'select * from verify_report_snapshot_integrity($1)',
+  [frozen.integrity_hash],
+)).rows[0]
+assert.equal(verification.integrity_valid, true, 'a released snapshot verifies against its calculated fingerprint')
+assert.equal(verification.academic_year, frozen.academic_year, 'verification returns the report year')
+assert.equal(verification.academic_term, frozen.academic_term, 'verification returns the report term')
+assert.equal(verification.campus_name, 'Fordridge Junior School', 'verification returns the report campus without learner data')
+assert.equal((await db.query('select * from verify_report_snapshot_integrity($1)', ['a'.repeat(32)])).rows.length, 0,
+  'an unknown fingerprint is reported as not found')
+await as('teacher')
+await rejects(
+  () => db.query('select * from verify_report_snapshot_integrity($1)', [frozen.integrity_hash]),
+  /Administrator access required/,
+)
+await as('admin')
+await db.query('reset role')
+await db.query('update report_release_snapshots set average_percent=average_percent+1 where id=$1', [frozen.id])
+await as('admin')
+const mismatch = (await db.query(
+  'select * from verify_report_snapshot_integrity($1)',
+  [frozen.integrity_hash],
+)).rows[0]
+assert.equal(mismatch.integrity_valid, false, 'changed snapshot content fails fingerprint verification')
+assert.notEqual(mismatch.calculated_hash, frozen.integrity_hash, 'the verifier returns the recalculated fingerprint')
+assert.equal((await db.query(
+  "select count(*) from audit_trail where actor_id=$1 and entity_type='report_snapshot' and entity_id=$2 and action='integrity_mismatch'",
+  [ids.admin, frozen.id],
+)).rows[0].count, 1, 'a mismatch is recorded in Activity Log')
+await db.query('reset role')
+await db.query('update report_release_snapshots set average_percent=$2 where id=$1', [frozen.id, frozen.average_percent])
+await as('admin')
+await db.query('reset role')
+await db.query('update report_release_snapshots set integrity_hash=$2 where id=$1', [frozen.id, 'c'.repeat(32)])
+await as('admin')
+assert.equal((await db.query('select * from verify_report_snapshot_integrity($1)', [frozen.integrity_hash])).rows[0].integrity_valid, false,
+  'a changed stored fingerprint is detected even when snapshot contents remain unchanged')
+assert.equal((await db.query(
+  "select count(*) from audit_trail where actor_id=$1 and entity_type='report_snapshot' and entity_id=$2 and action='integrity_mismatch'",
+  [ids.admin, frozen.id],
+)).rows[0].count, 2, 'each integrity mismatch is recorded in Activity Log')
+await db.query('reset role')
+await db.query('update report_release_snapshots set integrity_hash=$2 where id=$1', [frozen.id, frozen.integrity_hash])
+await as('admin')
+assert.equal((await db.query('select * from verify_report_snapshot_integrity($1)', [frozen.integrity_hash])).rows[0].integrity_valid, true,
+  'restoring the original snapshot values restores successful verification')
 assert.ok(frozen.assessments.some(item => item.title === 'Quiz 1' && item.subject === 'Science'), 'official snapshots preserve the allocated subject')
 assert.ok(frozen.assessments.some(item => item.title === 'Quiz 1' && item.assessment_type === 'coursework'), 'official snapshots retain the separate Coursework classification')
 assert.equal(frozen.average_percent, markbookAverage, 'coursework remains visible but does not affect an unapproved report average')
