@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { workflowError } from './workflow'
+import { gradeForPercent } from './grade-band-rules'
 
 export default function ProgressReports({ profile }) {
   const [records, setRecords] = useState([])
@@ -31,7 +32,7 @@ export default function ProgressReports({ profile }) {
   const report = records.filter(record => record.student_id === learnerId && (!year || String(record.academic_year || '') === year) && (!term || record.academic_term === term))
   const markbookReport = report.filter(record => record.assessment_type !== 'coursework')
   const average = markbookReport.length ? markbookReport.reduce((sum, record) => sum + (Number(record.score) / Number(record.max_score)) * 100, 0) / markbookReport.length : null
-  const gradeBand = average === null ? null : bands.find(band => band.campus_id === selected?.campus_id && average >= Number(band.minimum_percent) && average <= Number(band.maximum_percent))
+  const gradeBand = average === null ? null : gradeForPercent(average, selected?.class_level, bands, selected?.campus_id)
   const activeSettings = reportSettings.find(setting => setting.campus_id === selected?.campus_id && String(setting.academic_year) === year && setting.academic_term === term)
   useEffect(() => {
     let active = true

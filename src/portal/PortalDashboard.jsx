@@ -478,7 +478,7 @@ export default function PortalDashboard() {
         ) : view === 'report-periods' ? (
           <ReportingPeriods profile={profile} />
         ) : view === 'grade-bands' ? (
-          <GradeBands />
+          <GradeBands profile={profile} />
         ) : view === 'report-release' ? (
           <ReportPublication />
         ) : view === 'report-readiness' ? (

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { workflowError } from './workflow'
+import { gradeBandGroupForLevel, validateGradeScale } from './grade-band-rules'
 
 export default function ReportReadiness() {
   const [campuses, setCampuses] = useState([]), [records, setRecords] = useState([]), [bands, setBands] = useState([]), [settings, setSettings] = useState([]), [publications, setPublications] = useState([]), [error, setError] = useState('')
@@ -8,8 +9,8 @@ export default function ReportReadiness() {
   const load = useCallback(async () => {
     const [campusResult, recordResult, bandResult, settingsResult, publicationResult] = await Promise.all([
       supabase.from('campuses').select('id,name').order('name'),
-      supabase.from('learner_records').select('student_id,academic_year,academic_term,student:profiles!learner_records_student_id_fkey(campus_id)').eq('kind', 'academic'),
-      supabase.from('report_grade_bands').select('campus_id'),
+      supabase.from('learner_records').select('student_id,academic_year,academic_term,student:profiles!learner_records_student_id_fkey(campus_id,class_level)').eq('kind', 'academic'),
+      supabase.from('report_grade_bands').select('campus_id,band_group,minimum_percent,maximum_percent,grade,points,descriptor'),
       supabase.from('report_term_settings').select('campus_id,academic_year,academic_term,class_teacher_name,head_of_school_name'),
       supabase.from('report_publications').select('campus_id,academic_year,academic_term,published_at'),
     ])
@@ -23,9 +24,18 @@ export default function ReportReadiness() {
     const learnerCount = new Set(marks.map(item => item.student_id)).size
     const setup = settings.find(period)
     const publication = publications.find(period)
+    const levelGroups = [...new Set(marks.map(item => gradeBandGroupForLevel(item.student?.class_level)))]
+    const gradeScalesReady = levelGroups.length > 0 && levelGroups.every(group => {
+      const applicable = group == null
+        ? bands.filter(item => item.campus_id === filters.campus_id && item.band_group == null)
+        : bands.filter(item => item.band_group === group && item.campus_id === filters.campus_id).length
+          ? bands.filter(item => item.band_group === group && item.campus_id === filters.campus_id)
+          : bands.filter(item => item.band_group === group && item.campus_id == null)
+      return group == null ? applicable.length > 0 : !validateGradeScale(applicable)
+    })
     return [
       { label: 'Academic records', ready: marks.length > 0, detail: marks.length ? `${marks.length} marks for ${learnerCount} learner${learnerCount === 1 ? '' : 's'}` : 'No academic marks entered' },
-      { label: 'Grade bands', ready: bands.some(item => item.campus_id === filters.campus_id), detail: bands.some(item => item.campus_id === filters.campus_id) ? 'Configured for this campus' : 'Grade bands still need setup' },
+      { label: 'Grade bands', ready: gradeScalesReady, detail: gradeScalesReady ? 'Complete scales cover the class levels with academic records' : 'Complete the grade scale for each class level with academic records' },
       { label: 'Approvals', ready: Boolean(setup?.class_teacher_name && setup?.head_of_school_name), detail: setup?.class_teacher_name && setup?.head_of_school_name ? 'Class teacher and head of school set' : 'Approval names still required' },
       { label: 'Release state', ready: Boolean(publication?.published_at), detail: publication?.published_at ? `Published ${new Date(publication.published_at).toLocaleString()}` : 'Draft — not yet released' },
     ]

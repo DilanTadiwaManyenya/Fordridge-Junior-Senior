@@ -4,6 +4,7 @@ import { PGlite } from '../.portal-test-tools/node_modules/@electric-sql/pglite/
 import { canEnterPortal, withPortalTimeout } from '../src/portal/workflow.js'
 import { buildTeacherClassScopes, canOpenTeacherMyClass } from '../src/portal/teacher-workspace.js'
 import { getFinanceNavigation } from '../src/portal/navigation.js'
+import { referenceBandsFor } from '../src/portal/grade-band-rules.js'
 
 assert.deepEqual(
   getFinanceNavigation('accountant'),
@@ -193,6 +194,39 @@ assert.deepEqual(
   [{ active_role: 'admin', active_campus_id: null }],
   'a new Supabase session starts with its primary role and campus',
 )
+assert.deepEqual(
+  (await db.query("select band_group,count(*)::integer as count from report_grade_bands where campus_id is null group by band_group order by band_group")).rows,
+  [{ band_group: 'alevel', count: 7 }, { band_group: 'olevel', count: 5 }, { band_group: 'primary', count: 9 }],
+  'the temporary Reliance reference scales are seeded as complete global level groups',
+)
+assert.deepEqual(
+  (await db.query("select report_grade_band_group('ECD A') as junior, report_grade_band_group('Form 4') as olevel, report_grade_band_group('Lower Six') as alevel")).rows[0],
+  { junior: 'primary', olevel: 'olevel', alevel: 'alevel' },
+  'class levels map to the Junior, O Level and A Level grading groups',
+)
+assert.deepEqual(
+  (await db.query("select report_grade_for_class_percent($1,'Grade 4',84.99) as junior_below, report_grade_for_class_percent($1,'Form 4',74.99) as olevel_below, report_grade_for_class_percent($1,'Upper Six',79.99) as alevel_below", [campus])).rows[0],
+  { junior_below: 'Unit 2', olevel_below: 'B', alevel_below: 'B' },
+  'database report grading floors fractional averages at each Reliance minimum threshold',
+)
+const globalPrimaryUpdatedAt = (await db.query("select max(updated_at) as value from report_grade_bands where campus_id is null and band_group='primary'")).rows[0].value
+assert.equal(
+  (await db.query("select save_report_grade_scale(null,'primary',$1::jsonb,'Review provisional Junior scale',$2) as count", [JSON.stringify(referenceBandsFor('primary')), globalPrimaryUpdatedAt])).rows[0].count,
+  9,
+  'Main Admin can atomically save a complete reference scale with a review reason',
+)
+const savedPrimaryUpdatedAt = (await db.query("select max(updated_at) as value from report_grade_bands where campus_id is null and band_group='primary'")).rows[0].value
+await rejects(
+  () => db.query("select save_report_grade_scale(null,'primary',$1::jsonb,'Try stale scale write',null)", [JSON.stringify(referenceBandsFor('primary'))]),
+  /scale changed/,
+)
+const incompletePrimary = referenceBandsFor('primary').map(band => band.minimum_percent === 77
+  ? { ...band, minimum_percent: 78 }
+  : band)
+await rejects(
+  () => db.query("select save_report_grade_scale(null,'primary',$1::jsonb,'Try incomplete scale',$2)", [JSON.stringify(incompletePrimary), savedPrimaryUpdatedAt]),
+  /gap or overlap/,
+)
 const registeredPeriodId = (await db.query(
   "select register_reporting_period($1,2026,'Term 1') as id",
   [campus],
@@ -256,7 +290,7 @@ assert.equal(
   1,
 )
 assert.equal(
-  (await db.query('select count(*) from audit_trail')).rows[0].count,
+  (await db.query("select count(*) from audit_trail where entity_type='fee_transaction'")).rows[0].count,
   1,
 )
 await db.query(
@@ -872,10 +906,6 @@ assert.equal(
   (await db.query("select close_reporting_period($1,$2,'Final close after reviewed term transition') as revision", [registeredPeriodId, reopenedPeriodRevision])).rows[0].revision,
   reopenedPeriodRevision + 1,
   'period can be closed again after review changes',
-)
-await db.query(
-  "insert into report_grade_bands(campus_id,minimum_percent,maximum_percent,grade,descriptor) values($1,0,100,'A','Excellent')",
-  [campus],
 )
 await db.query(
   "insert into report_term_settings(campus_id,academic_year,academic_term,class_teacher_name,head_of_school_name,updated_by) values($1,2026,'Term 1','Class Teacher','Head of School',$2)",

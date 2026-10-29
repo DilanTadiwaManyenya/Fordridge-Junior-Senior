@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict'
 import { chromium } from '../.portal-test-tools/node_modules/playwright/index.mjs'
+import { referenceBandsFor } from '../src/portal/grade-band-rules.js'
 
 const launchOptions = { headless: true }
 if (process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH)
@@ -77,6 +78,13 @@ async function pageFor(
     id: 'period-current', campus_id: 'campus', academic_year: 2026, academic_term: 'Term 3',
     period_status: 'open', is_current: true, revision: 2, campus: { name: 'Junior School' },
   }]
+  let gradeBands = ['primary', 'olevel', 'alevel'].flatMap(group => referenceBandsFor(group).map((band, index) => ({
+    ...band,
+    id: `${group}-${index}`,
+    campus_id: null,
+    updated_at: '2026-10-29T10:00:00.000Z',
+    campus: null,
+  })))
   await page.exposeFunction('allowActivitySuccess', () => {
     activityCanSucceed = true
   })
@@ -155,6 +163,18 @@ async function pageFor(
         period.revision += 1
       }
       return send(period?.revision ?? null)
+    }
+    if (path.endsWith('/rpc/save_report_grade_scale')) {
+      gradeBands = gradeBands.filter(item => !(item.campus_id === body.p_campus_id && item.band_group === body.p_band_group))
+        .concat(body.p_bands.map((band, index) => ({
+          ...band,
+          id: `${body.p_band_group}-${index}`,
+          campus_id: body.p_campus_id,
+          band_group: body.p_band_group,
+          updated_at: '2026-10-29T11:00:00.000Z',
+          campus: null,
+        })))
+      return send(body.p_bands.length)
     }
     if (path.endsWith('/rpc/record_fee_payment')) {
       if (failPayment) {
@@ -270,6 +290,7 @@ async function pageFor(
         method === 'GET' ? [] : single ? { id: 'saved' } : [{ id: 'saved' }],
       )
     if (path.endsWith('/reporting_periods')) return send(reportingPeriods)
+    if (path.endsWith('/report_grade_bands')) return send(gradeBands)
     if (['reporting_period_events', 'report_publications'].some(table => path.endsWith('/' + table)))
       return send([])
     throw new Error(`Unmocked request: ${method} ${path}`)
@@ -588,6 +609,23 @@ try {
   await recoveryDialog.getByRole('status').filter({ hasText: 'recorded in the activity log' }).waitFor()
   const recoveryWrite = writes.filter((write) => write.path.endsWith('admin_record_parent_recovery_support')).at(-1)
   assert.deepEqual(recoveryWrite.body, { p_parent_id: 'parent', p_identity_verified: true })
+  await page.goto('http://127.0.0.1:5179/portal/grade-bands')
+  await page.getByRole('heading', { name: 'Grade bands' }).waitFor()
+  await page.getByLabel('Percentage', { exact: true }).fill('84.99')
+  await page.getByRole('status').filter({ hasText: '84.99% → Unit 2' }).waitFor()
+  await page.getByLabel('Reason for saving this scale').fill('Owner approved provisional Reliance scale')
+  await page.getByRole('button', { name: 'Save grade scale' }).click()
+  await page.getByRole('status').filter({ hasText: 'scale saved' }).waitFor()
+  const gradeScaleWrite = writes.filter(write => write.path.endsWith('save_report_grade_scale')).at(-1)
+  assert.deepEqual(gradeScaleWrite.body, {
+    p_campus_id: null,
+    p_band_group: 'primary',
+    p_bands: referenceBandsFor('primary').map(({ minimum_percent, maximum_percent, grade, points, descriptor }) => ({
+      minimum_percent, maximum_percent, grade, points, descriptor,
+    })),
+    p_reason: 'Owner approved provisional Reliance scale',
+    p_expected_updated_at: '2026-10-29T10:00:00.000Z',
+  })
   await page.goto('http://127.0.0.1:5179/portal/report-periods')
   await page.getByRole('heading', { name: 'Reporting periods' }).waitFor()
   await page.getByLabel('Campus').selectOption('campus')
@@ -608,7 +646,9 @@ try {
     p_expected_revision: 4,
     p_reason: 'Reviewed marks and verified term results',
   })
-  assert.equal(await page.getByRole('row').filter({ hasText: 'Term 1' }).getByText('Closed').count(), 1)
+  const newlyClosedPeriodRow = page.getByRole('row').filter({ hasText: 'Term 1' })
+  await newlyClosedPeriodRow.getByText('Closed', { exact: true }).waitFor()
+  assert.equal(await newlyClosedPeriodRow.getByText('Closed', { exact: true }).count(), 1)
   const closedPeriodRow = page.getByRole('row').filter({ hasText: 'Term 1' })
   await closedPeriodRow.getByRole('button', { name: 'Reopen' }).click()
   await page.getByLabel('Reason for reopening this period').fill('Verified corrections are required')
@@ -637,13 +677,15 @@ try {
     p_expected_current_revision: 2,
     p_reason: 'School leadership approved term transition',
   })
-  assert.equal(await page.getByRole('row').filter({ hasText: 'Term 1' }).getByText('Current').count(), 1)
+  const newlyCurrentPeriodRow = page.getByRole('row').filter({ hasText: 'Term 1' })
+  await newlyCurrentPeriodRow.getByText('Current', { exact: true }).waitFor()
+  assert.equal(await newlyCurrentPeriodRow.getByText('Current', { exact: true }).count(), 1)
   assert.equal(await page.getByRole('row').filter({ hasText: 'Term 3' }).getByRole('cell').nth(4).innerText(), 'Not set')
   await parent.goto('http://127.0.0.1:5179/portal/report-periods')
   await parent.waitForURL('http://127.0.0.1:5179/portal')
   assert.deepEqual(errors, [])
   console.log(
-    'PASS: profile editing, account creation, reporting-period registration and reviewed close, publishing, records, timetable, payment retry, teacher sign-in and Coursework access, parent route guards, linked-account directory/search, credential-free audited recovery guidance, mobile layout; no uncaught browser errors. All backend requests were mocked.',
+    'PASS: profile editing, account creation, Reliance grade-band boundary preview and audited scale save, reporting-period registration and reviewed close, publishing, records, timetable, payment retry, teacher sign-in and Coursework access, parent route guards, linked-account directory/search, credential-free audited recovery guidance, mobile layout; no uncaught browser errors. All backend requests were mocked.',
   )
 } catch (error) {
   const p = browser.contexts()[0]?.pages()[0]
