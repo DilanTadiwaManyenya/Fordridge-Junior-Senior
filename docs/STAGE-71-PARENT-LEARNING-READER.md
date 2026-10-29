@@ -4,6 +4,8 @@
 
 Implemented and locally verified. The production migration and hosted frontend release remain pending. No production database, Storage bucket, or Reliance repository was changed.
 
+Source commit: [`814fdca`](https://github.com/DilanTadiwaManyenya/Fordridge-Junior-Senior/commit/814fdca).
+
 ## Delivered
 
 - Added the parent Learning library route and Workspace navigation. The route remains unavailable to students, staff, administrators, and other roles.
