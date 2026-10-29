@@ -375,14 +375,53 @@
 
 @media print {
   @page { size: A4 portrait; margin: 12mm; }
-  .progress-report-sheet { min-height: 260mm; }
-  .progress-report-heading { break-inside: avoid; }
-  .report-summary, .report-approvals, .progress-report-total { break-inside: avoid; }
-  .workflow-table { width: 100%; border-collapse: collapse; }
-  .workflow-table th, .workflow-table td { padding: 8px 6px; }
+  html, body, #root { width: 100%; min-height: 0; margin: 0; background: #fff !important; }
+  body { color: #111827 !important; print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+  .portal-sidebar, .portal-topbar, .progress-reports > .workflow-heading,
+  .progress-report-controls, .progress-reports > .workflow-error,
+  .progress-reports > [role="status"] { display: none !important; }
+  .dashboard { display: block !important; width: auto; min-height: 0; background: #fff !important; }
+  .dashboard-main { display: block; width: auto; min-width: 0; margin: 0 !important; padding: 0 !important; }
+  .progress-reports { display: block; width: 100%; max-width: none; margin: 0; color: #111827; }
+  .progress-report-sheet {
+    box-sizing: border-box; width: 100%; min-height: 0 !important; margin: 0 !important;
+    padding: 0 0 6mm !important; border: 0 !important; border-top: 3px solid #6b0929 !important;
+    box-shadow: none !important; background: #fff !important;
+  }
+  .progress-report-heading { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 42%); align-items: start; gap: 8mm; padding: 0 0 5mm; margin: 0 0 4mm; break-inside: avoid; }
+  .progress-report-heading > div:first-child { min-width: 0; }
+  .progress-report-heading h2 { color: #092d59 !important; font-size: 19pt; line-height: 1.15; }
+  .progress-report-heading .eyebrow { margin-bottom: 2mm; color: #6b0929 !important; font-size: 8pt; }
+  .progress-report-heading p, .progress-report-heading small { color: #475569 !important; font-size: 8pt; }
+  .progress-report-heading > div:last-child { min-width: 0; max-width: 100%; text-align: right; overflow-wrap: anywhere; }
+  .progress-report-heading strong, .progress-report-heading small { overflow-wrap: anywhere; }
+  .progress-report-heading strong { color: #111827 !important; font-size: 11pt; }
+  .progress-report-note { max-width: none; margin: 0 0 4mm; color: #334155 !important; font-size: 8pt; line-height: 1.35; }
+  .report-summary { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 3mm; margin: 0 0 5mm; break-inside: avoid; }
+  .report-summary article { padding: 3mm; border: 1px solid #dbe2ea; border-top: 2px solid #092d59; background: #f8fafc !important; }
+  .report-summary article:nth-child(2) { border-top-color: #6b0929; }
+  .report-summary span, .report-summary small { color: #475569 !important; font-size: 7pt; }
+  .report-summary strong { margin: 1.5mm 0 .5mm; color: #111827 !important; font-size: 14pt; }
+  .workflow-table { width: 100%; min-width: 0 !important; table-layout: fixed; border-collapse: collapse; font-size: 7.5pt; line-height: 1.25; }
+  .workflow-table th, .workflow-table td { padding: 2mm 1.4mm !important; border-bottom: 1px solid #dbe2ea; color: #111827 !important; vertical-align: top; overflow-wrap: anywhere; }
+  .workflow-table th { background: #eef2f7 !important; font-size: 7pt; }
+  .workflow-table th:nth-child(1) { width: 11%; }
+  .workflow-table th:nth-child(2) { width: 27%; }
+  .workflow-table th:nth-child(3) { width: 12%; }
+  .workflow-table th:nth-child(4) { width: 14%; }
+  .workflow-table th:nth-child(5) { width: 14%; }
+  .workflow-table th:nth-child(6) { width: 22%; }
+  .workflow-table small { margin-top: .7mm; color: #475569 !important; font-size: 6.8pt; }
   .workflow-table thead { display: table-header-group; }
   .workflow-table tr { break-inside: avoid; }
   .report-sign-cell { color: #6b0929 !important; }
+  .progress-report-total, .report-approvals { break-inside: avoid; }
+  .progress-report-total { padding-top: 3mm; margin-top: 3mm; border-color: #cbd5e1; }
+  .progress-report-total strong { color: #111827 !important; font-size: 9pt; }
+  .progress-report-total b { color: #6b0929 !important; font-size: 13pt; }
+  .report-approvals { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6mm; margin-top: 6mm; padding-top: 4mm; border-color: #cbd5e1; }
+  .report-approvals span { margin-bottom: 10mm; color: #475569 !important; font-size: 7pt; }
+  .report-approvals strong { border-color: #334155; color: #111827 !important; font-size: 8pt; }
 }
 
 .portal-class-stream-list{display:grid;gap:8px;margin:16px 0;padding:0;list-style:none}.portal-class-stream-list li{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 12px;border:1px solid var(--line);border-radius:8px;background:#f8fafc;color:var(--ink);font-size:.84rem}.portal-class-stream-form{grid-template-columns:minmax(0,1fr) auto;align-items:end;margin-top:16px}.portal-class-stream-form label{display:grid;gap:7px;font-size:.82rem;font-weight:800}.portal-class-stream-form input{padding:10px;border:1px solid var(--line);border-radius:7px;background:#fff;color:var(--ink);font:inherit}@media(max-width:640px){.portal-class-stream-form{grid-template-columns:1fr}.portal-class-stream-list li{align-items:flex-start;flex-direction:column}}

@@ -658,6 +658,43 @@ try {
   await page.getByRole('heading', { name: 'Sixth Form progress report' }).waitFor()
   await page.getByText('B', { exact: true }).waitFor()
   await page.getByText('no subject weighting or aggregate points are assumed.', { exact: false }).waitFor()
+  const learnerContext = await page.locator('.progress-report-heading > div:last-child').innerText()
+  assert.match(learnerContext, /Sixth Form Learner[\s\S]*S001[\s\S]*Senior School[\s\S]*Lower Six[\s\S]*Arts/)
+  await page.evaluate(() => {
+    window.print = () => {
+      window.__printedReportTitle = document.title
+      window.dispatchEvent(new Event('afterprint'))
+    }
+  })
+  await page.getByRole('button', { name: 'Print report' }).click()
+  assert.match(await page.evaluate(() => window.__printedReportTitle), /Sixth Form Learner - Sixth Form progress report - Term 1 2026/)
+  await page.setViewportSize({ width: 794, height: 1123 })
+  await page.emulateMedia({ media: 'print' })
+  const printLayout = await page.evaluate(() => {
+    const sheet = document.querySelector('.progress-report-sheet')
+    return {
+      width: sheet.getBoundingClientRect().width,
+      viewportWidth: document.documentElement.clientWidth,
+      minHeight: getComputedStyle(sheet).minHeight,
+      learnerDetailsRight: document.querySelector('.progress-report-heading > div:last-child').getBoundingClientRect().right,
+      headingRight: document.querySelector('.progress-report-heading').getBoundingClientRect().right,
+      sheetRight: sheet.getBoundingClientRect().right,
+      learnerDetailsOverflow: document.querySelector('.progress-report-heading > div:last-child').scrollWidth > document.querySelector('.progress-report-heading > div:last-child').clientWidth,
+      sidebar: getComputedStyle(document.querySelector('.portal-sidebar')).display,
+      topbar: getComputedStyle(document.querySelector('.portal-topbar')).display,
+      controls: getComputedStyle(document.querySelector('.progress-report-controls')).display,
+      pageHeading: getComputedStyle(document.querySelector('.progress-reports > .workflow-heading')).display,
+    }
+  })
+  assert.ok(printLayout.width <= printLayout.viewportWidth, 'print report fits the available A4 content width')
+  assert.ok(printLayout.learnerDetailsRight <= printLayout.headingRight + 1, 'learner details stay inside the report heading')
+  assert.ok(printLayout.headingRight <= printLayout.sheetRight + 1, 'report heading stays inside the printable sheet')
+  assert.equal(printLayout.learnerDetailsOverflow, false, 'learner context wraps instead of clipping')
+  assert.equal(printLayout.minHeight, '0px', 'print report does not force a blank overflow page')
+  assert.deepEqual([printLayout.sidebar, printLayout.topbar, printLayout.controls, printLayout.pageHeading], ['none', 'none', 'none', 'none'])
+  await page.screenshot({ path: '.portal-test-tools/stage45-progress-report-print.png', fullPage: true })
+  await page.emulateMedia({ media: 'screen' })
+  await page.setViewportSize({ width: 1365, height: 900 })
   await page.goto('http://127.0.0.1:5179/portal/report-periods')
   await page.getByRole('heading', { name: 'Reporting periods' }).waitFor()
   await page.getByLabel('Campus').selectOption('campus')
@@ -717,7 +754,7 @@ try {
   await parent.waitForURL('http://127.0.0.1:5179/portal')
   assert.deepEqual(errors, [])
   console.log(
-    'PASS: profile editing, account creation, Reliance grade-band boundary preview and audited scale save, Junior/Senior/Sixth Form progress report variants, coursework exclusion from averages, reporting-period registration and reviewed close, publishing, records, timetable, payment retry, teacher sign-in and Coursework access, parent route guards, linked-account directory/search, credential-free audited recovery guidance, mobile layout; no uncaught browser errors. All backend requests were mocked.',
+    'PASS: profile editing, account creation, Reliance grade-band boundary preview and audited scale save, Junior/Senior/Sixth Form report variants, A4 print context/title/width and hidden portal controls, coursework exclusion from averages, reporting-period registration and reviewed close, publishing, records, timetable, payment retry, teacher sign-in and Coursework access, parent route guards, linked-account directory/search, credential-free audited recovery guidance, mobile layout; no uncaught browser errors. All backend requests were mocked.',
   )
 } catch (error) {
   const p = browser.contexts()[0]?.pages()[0]
