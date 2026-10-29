@@ -1,7 +1,7 @@
 # Fordridge portal roadmap inspired by Reliance
 
 Updated: 29 October 2026
-Current checkpoint: Stages 1–51 implemented and locally validated. Stage 43 provides provisional, editable Reliance grade sequences; Stage 44 adds class-level live report variants using only Fordridge's recorded fields and current calculation rules; Stage 45 improves A4 print layout, learner context, and print naming; Stage 46 regression-checks report readiness; Stage 47 secures release attribution and audit; Stage 48 makes issued report snapshots read-only, protects them from cascade deletion, and blocks republishing over an existing issue; Stage 49 recalculates snapshot fingerprints, enforces administrator-only verification, and records integrity mismatches in Activity Log; Stage 50 captures learner and campus identity on future report snapshots and clearly flags legacy reports without release-time class context; Stage 51 adds a Main Admin-only, read-only rollover readiness preview with explicit profile review reasons and no roster or stream allocation writes. Production migrations and frontend deployment remain pending. Stage 52 is next.
+Current checkpoint: Stages 1–52 implemented and locally validated. Stage 43 provides provisional, editable Reliance grade sequences; Stage 44 adds class-level live report variants using only Fordridge's recorded fields and current calculation rules; Stage 45 improves A4 print layout, learner context, and print naming; Stage 46 regression-checks report readiness; Stage 47 secures release attribution and audit; Stage 48 makes issued report snapshots read-only, protects them from cascade deletion, and blocks republishing over an existing issue; Stage 49 recalculates snapshot fingerprints, enforces administrator-only verification, and records integrity mismatches in Activity Log; Stage 50 captures learner and campus identity on future report snapshots and clearly flags legacy reports without release-time class context; Stage 51 adds a Main Admin-only, read-only rollover readiness preview with explicit profile review reasons and no roster or stream allocation writes; Stage 52 adds a Main Admin-only destination-capacity what-if preview over configured classes and streams, preserving unset capacity and unknown allocations without roster writes. Production migrations and frontend deployment remain pending. Stage 53 is next.
 
 ## Purpose
 
@@ -92,7 +92,7 @@ Stages 1–17 are completed foundation, catalogue, teacher-scope, role-membershi
 | 49 | Verify snapshot integrity | Hash verification catches changes and records actionable mismatches. |
 | 50 | Add historical class context | Old reports retain the learner's original year/class/campus identity. |
 | 51 | Add rollover readiness preview | Read-only preview lists eligibility and review reasons with no roster writes. |
-| 52 | Add rollover destination validation | Destination classes exist and capacities are checked with proposed totals. |
+| 52 | Add rollover destination validation | Configured destination classes/streams are compared with proposed totals; unset capacity or stream allocation is left unknown. |
 | 53 | Add reviewed learner decisions | Promote, retain, transfer or complete is explicit per learner. |
 | 54 | Add rollover batch preview | Reason and all placements are reviewed before execution. |
 | 55 | Apply rollover transactionally | Batch is idempotent and preserves admission IDs, fees, marks and history. |
