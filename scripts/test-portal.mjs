@@ -138,6 +138,11 @@ assert.equal(
 const db = new PGlite()
 await db.exec(`create role authenticated; create role anon; create schema auth;
 create table auth.users(id uuid primary key,raw_user_meta_data jsonb default '{}'::jsonb);
+create schema storage;
+create table storage.buckets(id text primary key,name text not null,public boolean not null,file_size_limit bigint,allowed_mime_types text[]);
+create table storage.objects(bucket_id text not null,name text not null,metadata jsonb not null default '{}'::jsonb,primary key(bucket_id,name));
+alter table storage.objects enable row level security;
+create policy "synthetic legacy storage policy" on storage.objects for all to authenticated using(true) with check(true);
 create function auth.uid() returns uuid language sql stable as $$select nullif(current_setting('request.jwt.claim.sub',true),'')::uuid$$;
 create function auth.jwt() returns jsonb language sql stable as $$select coalesce(nullif(current_setting('request.jwt.claims',true),'')::jsonb,'{}'::jsonb)$$;
 grant usage on schema public,auth to authenticated,anon;
@@ -1348,6 +1353,153 @@ await db.query(
   "select grant_portal_role($1,'teacher',$2,'Approved second campus teaching assignment')",
   [ids.teacher, seniorCampus],
 )
+await db.exec('reset role')
+const libraryPeriod = (await db.query(
+  "insert into reporting_periods(campus_id,academic_year,academic_term,period_status,is_current) values($1,2099,'Term 1','open',true) returning id",
+  [campus],
+)).rows[0].id
+await as('teacher')
+const teacherScienceAllocation = (await db.query(
+  "select id from teacher_class_assignments where teacher_id=$1 and campus_id=$2 and subject='Science'",
+  [ids.teacher, campus],
+)).rows[0].id
+assert.deepEqual(
+  (await db.query('select teacher_learning_current_period($1) as period', [campus])).rows[0].period,
+  { id: libraryPeriod, campus_id: campus, academic_year: 2099, academic_term: 'Term 1' },
+  'teacher current-period lookup exposes only the active campus reporting-period identity',
+)
+const learningResourceId = (await db.query(
+  "select create_teacher_learning_resource($1,'Science revision','Revision notes for the current topic') as id",
+  [teacherScienceAllocation],
+)).rows[0].id
+assert.equal((await db.query('select state,academic_year,academic_term,class_stream from learning_resources where id=$1', [learningResourceId])).rows[0].state, 'draft')
+assert.equal((await db.query('select class_stream from learning_resources where id=$1', [learningResourceId])).rows[0].class_stream, null,
+  'a whole-class allocation snapshots null stream without inventing a stream')
+await db.exec('reset role')
+const unscopedTeacherAllocation = (await db.query(
+  "select id from teacher_class_assignments where teacher_id=$1 and subject is null limit 1", [ids.stream_teacher],
+)).rows[0].id
+await as('teacher')
+await rejects(
+  () => db.query("select create_teacher_learning_resource($1,'Wrong scope','')", [unscopedTeacherAllocation]),
+  /current subject allocation/,
+)
+await db.exec('reset role')
+const otherCampusAllocation = (await db.query(
+  "select id from teacher_class_assignments where teacher_id=$1 and campus_id=$2 and subject='Biology'",
+  [ids.teacher, seniorCampus],
+)).rows[0].id
+await as('teacher')
+await rejects(
+  () => db.query("select create_teacher_learning_resource($1,'Wrong campus','')", [otherCampusAllocation]),
+  /current subject allocation/,
+)
+const reservedLibraryFile = (await db.query(
+  "select reserve_teacher_learning_file($1,$2,'topic notes.pdf','pdf','application/pdf',2048) as result",
+  ['70000000-0000-4000-8000-000000000001', learningResourceId],
+)).rows[0].result
+assert.equal((await db.query(
+  "select reserve_teacher_learning_file($1,$2,'topic notes.pdf','pdf','application/pdf',2048) as result",
+  ['70000000-0000-4000-8000-000000000001', learningResourceId],
+)).rows[0].result.id, reservedLibraryFile.id, 'repeating the same file reservation returns its original immutable path')
+await rejects(
+  () => db.query("select reserve_teacher_learning_file($1,$2,'changed.pdf','pdf','application/pdf',2048)", [
+    '70000000-0000-4000-8000-000000000001', learningResourceId,
+  ]),
+  /already used/,
+)
+await rejects(
+  () => db.query("select reserve_teacher_learning_file($1,$2,'archive.zip','zip','application/zip',2048)", [
+    '70000000-0000-4000-8000-000000000002', learningResourceId,
+  ]),
+  /check constraint/,
+)
+await rejects(
+  () => db.query("select set_teacher_learning_resource_state($1,'published')", [learningResourceId]),
+  /Upload and finalize/,
+)
+await rejects(
+  () => db.query("insert into storage.objects(bucket_id,name,metadata) values('learning-library',$1,$2::jsonb)", [
+    'unreserved/forbidden.pdf',
+    JSON.stringify({ size: 4096, mimetype: 'application/pdf' }),
+  ]),
+  /row-level security/,
+)
+await db.query(
+  "insert into storage.objects(bucket_id,name,metadata) values('learning-library',$1,$2::jsonb)",
+  [reservedLibraryFile.object_path, JSON.stringify({ size: 4096, mimetype: 'application/pdf' })],
+)
+await rejects(
+  () => db.query('select finalize_teacher_learning_file($1)', [reservedLibraryFile.id]),
+  /does not match/,
+)
+await db.exec('reset role')
+await db.query("update storage.objects set metadata=$2::jsonb where bucket_id='learning-library' and name=$1", [
+  reservedLibraryFile.object_path,
+  JSON.stringify({ size: 2048, mimetype: 'application/pdf' }),
+])
+await as('teacher')
+assert.equal((await db.query('select finalize_teacher_learning_file($1) as result', [reservedLibraryFile.id])).rows[0].result.active, true)
+const replacementLibraryFile = (await db.query(
+  "select reserve_teacher_learning_file($1,$2,'topic slides.pptx','pptx','application/vnd.openxmlformats-officedocument.presentationml.presentation',4096) as result",
+  ['70000000-0000-4000-8000-000000000003', learningResourceId],
+)).rows[0].result
+await db.query(
+  "insert into storage.objects(bucket_id,name,metadata) values('learning-library',$1,$2::jsonb)",
+  [replacementLibraryFile.object_path, JSON.stringify({ size: 4096, mimetype: replacementLibraryFile.mime_type })],
+)
+assert.equal((await db.query('select finalize_teacher_learning_file($1) as result', [replacementLibraryFile.id])).rows[0].result.active, true)
+assert.equal((await db.query('select active from learning_resource_files where id=$1', [reservedLibraryFile.id])).rows[0].active, false,
+  'a replacement becomes active only after verification while the earlier finalized file remains in history')
+const closedPeriodDraftId = (await db.query(
+  "select create_teacher_learning_resource($1,'Period close draft','') as id", [teacherScienceAllocation],
+)).rows[0].id
+await db.query("select update_teacher_learning_resource($1,'Edited period draft','Teacher edit is recorded')", [closedPeriodDraftId])
+assert.equal((await db.query('select title from learning_resources where id=$1', [closedPeriodDraftId])).rows[0].title,
+  'Edited period draft', 'current allocations can edit a draft while its reporting period is open')
+await db.query("select set_teacher_learning_resource_state($1,'published')", [learningResourceId])
+assert.equal((await db.query('select state from learning_resources where id=$1', [learningResourceId])).rows[0].state, 'published')
+await rejects(
+  () => db.query('update learning_resources set title=$2 where id=$1', [learningResourceId, 'Direct write']),
+  /row-level security|permission denied/,
+)
+await rejects(
+  () => db.query("delete from storage.objects where bucket_id='learning-library' and name=$1", [reservedLibraryFile.object_path]),
+  /row-level security|permission denied/,
+)
+await rejects(
+  () => db.query('select update_teacher_learning_resource($1,$2,$3)', [learningResourceId, 'Published edits denied', '']),
+  /current teaching allocation/,
+)
+await rejects(
+  () => db.query("select reserve_teacher_learning_file($1,$2,'late.pdf','pdf','application/pdf',100)", [
+    '70000000-0000-4000-8000-000000000004', learningResourceId,
+  ]),
+  /current teaching allocation/,
+)
+await as('student')
+assert.equal((await db.query('select count(*)::integer as count from learning_resources')).rows[0].count, 0,
+  'student accounts cannot read teacher learning resources')
+assert.equal((await db.query("select count(*)::integer as count from storage.objects where bucket_id='learning-library'")).rows[0].count, 0,
+  'a legacy broad Storage policy cannot expose learning-library objects to students')
+await as('stream_teacher')
+assert.equal((await db.query('select count(*)::integer as count from learning_resources')).rows[0].count, 0,
+  'teachers cannot read another teacher’s library resources, even in the same campus')
+assert.equal((await db.query("select count(*)::integer as count from storage.objects where bucket_id='learning-library'")).rows[0].count, 0,
+  'a broad Storage policy cannot expose another teacher’s private files')
+await as('parent')
+assert.equal((await db.query('select count(*)::integer as count from learning_resources')).rows[0].count, 0,
+  'the Stage 70 teacher-only library does not enable parent reads before Stage 71')
+await as('teacher')
+await db.exec('reset role')
+await db.query("update reporting_periods set period_status='closed' where id=$1", [libraryPeriod])
+await as('teacher')
+await rejects(
+  () => db.query("select update_teacher_learning_resource($1,'Closed period edit','')", [closedPeriodDraftId]),
+  /reporting period is closed/,
+)
+await db.exec('reset role')
+await db.query("update reporting_periods set period_status='open' where id=$1", [libraryPeriod])
 await as('teacher')
 assert.equal(canEnterPortal('teacher', 'staff'), true)
 assert.equal(canEnterPortal('student', 'staff'), false)
@@ -2444,5 +2596,5 @@ assert.ok((await db.query('select preview_fee_reconciliation(null,2026,$1) as re
 await db.exec('rollback')
 await db.close()
 console.log(
-  'PASS: migrations, report readiness/release attribution/announcement/audit, atomic payments/retries/rollback, class and subject scope, role membership isolation/grants/revocation/provisioning, active-role parent/child boundaries, teacher profile/record/RPC scope, guardian access, private records and teacher login.',
+  'PASS: migrations, Stage 70 learning-library allocation/storage/file lifecycle and role boundaries, report readiness/release attribution/announcement/audit, atomic payments/retries/rollback, class and subject scope, role membership isolation/grants/revocation/provisioning, active-role parent/child boundaries, teacher profile/record/RPC scope, guardian access, private records and teacher login.',
 )

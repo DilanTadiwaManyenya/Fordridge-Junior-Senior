@@ -44,19 +44,12 @@ These are reference practices, not Fordridge-approved production settings.
 - Do not cascade-delete a learning resource, finalized file, or audit history. Do not install automated object cleanup until Fordridge approves the retention schedule and a reviewed race-safe job.
 - A short link expiry blocks new access after expiry; it cannot revoke already downloaded copies.
 
-## Owner decisions needed to complete Stage 69
+## Owner decision
 
-Please approve or revise the proposed defaults for:
-
-1. **Audience and roles:** teacher publishing, verified-parent reading, no student access, and the exact admin/principal/accountant oversight roles.
-2. **File policy:** the seven listed formats and 10 MiB maximum, with private storage and 60-second signed links.
-3. **Scope:** exact-campus/class targeting, null stream meaning every stream in that class only, and parent access limited to the learner's current enrollment.
-4. **Retention:** keep finalized versions/audits without automatic deletion until a written school retention period is approved; review unfinished uploads after seven days without automatic deletion.
-
-No feature work should treat these proposals as approved Fordridge policy until the owner confirms them.
+The owner approved the proposal as written before Stage 70. The active implementation scope is teacher publishing within the exact current campus/class/subject allocation, no student access, private files up to 10 MiB in the approved formats, 60-second signed links, and no automated deletion before a written retention schedule exists. Parent reading is a later Stage 71 deliverable and must require verified guardian linkage and current enrollment. Administrative oversight beyond the approved teacher scope is not enabled by Stage 70.
 
 ## Evidence and validation
 
 The Fordridge gap review covered local routes, migrations, access matrix, Reliance reference notes, and current feature search. Reliance file/reference evidence is in `docs/learning-library-stage1.md`, `docs/learning-library-stage2.md`, `docs/learning-library-stage4.md`, `docs/learning-library-retention.md`, and `docs/learning-library-user-guide.md` in the read-only Reliance repository. No Reliance files or school data were changed or copied.
 
-This is a documentation-only proposal. `git diff --check` is the applicable local validation. No app build, database migration, storage change, production change, or automated test was needed.
+This document records the approved policy boundary. Stage 70 implementation and validation are recorded in [Stage 70](STAGE-70-TEACHER-LEARNING-LIBRARY.md). No Reliance files, school records, or production services were changed as part of this decision.

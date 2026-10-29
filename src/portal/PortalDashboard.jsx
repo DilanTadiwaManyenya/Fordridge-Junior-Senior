@@ -43,6 +43,7 @@ import ReportReleaseMetrics from './ReportReleaseMetrics'
 import ReportVerification from './ReportVerification'
 import ReportingPeriods from './ReportingPeriods'
 import YearRolloverReadiness from './YearRolloverReadiness'
+import TeacherLearningLibrary from './TeacherLearningLibrary'
 import { withPortalTimeout, workflowError } from './workflow'
 import { canOpenTeacherMyClass } from './teacher-workspace'
 import { canReviewIncomeExpenses, getFinanceNavigation } from './navigation'
@@ -248,6 +249,7 @@ export default function PortalDashboard() {
     (view === 'year-rollover-readiness' && !admin) ||
     (view === 'assignments' && !admin) ||
     (view === 'my-class' && !teacherMyClass) ||
+    (view === 'learning-library' && profile.role !== 'teacher') ||
     (view === 'subject-allocations' && !assignments) ||
     (view === 'cashbook' && !admin) ||
     (view === 'inventory-stock' && !admin) ||
@@ -281,6 +283,7 @@ export default function PortalDashboard() {
       'year-rollover-readiness',
       'assignments',
       'my-class',
+      'learning-library',
       'subject-allocations',
       'cashbook',
       'inventory-stock',
@@ -386,6 +389,7 @@ export default function PortalDashboard() {
           {attendance && nav('/portal/coursework', 'Course Work', '▤')}
           {admin && nav('/portal/assignments', 'Class assignments', '⌘')}
           {teacherMyClass && nav('/portal/my-class', 'My class', '▦')}
+          {profile.role === 'teacher' && nav('/portal/learning-library', 'Learning library', '▤')}
           {assignments && nav('/portal/subject-allocations', 'Subject allocations', '▤')}
           {nav('/portal/announcements', 'Announcements', '✦')}
           {nav('/portal/notifications', 'Notifications', '●')}
@@ -525,6 +529,8 @@ export default function PortalDashboard() {
           <ClassAssignments profile={profile} />
         ) : view === 'my-class' ? (
           <MyClass profile={profile} />
+        ) : view === 'learning-library' ? (
+          <TeacherLearningLibrary profile={profile} />
         ) : view === 'subject-allocations' ? (
           <SubjectAllocations profile={profile} />
         ) : view === 'cashbook' ? (
