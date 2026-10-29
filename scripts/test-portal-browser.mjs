@@ -660,6 +660,14 @@ try {
     })
     await card.getByText(status, { exact: true }).waitFor()
   }
+  await page.goto('http://127.0.0.1:5179/portal/report-release')
+  await page.getByRole('heading', { name: 'Report release' }).waitFor()
+  await page.getByLabel('Campus').selectOption('campus')
+  await page.getByLabel('Academic year').fill('2026')
+  await page.getByRole('button', { name: 'Publish reports' }).click()
+  await page.getByRole('status').filter({ hasText: 'Reports are now marked as published' }).waitFor()
+  const publicationWrite = writes.find(write => write.path.endsWith('/report_publications'))
+  assert.equal(publicationWrite.body.published_by, user.id, 'the release page supplies the signed-in staff identity')
   await page.goto('http://127.0.0.1:5179/portal/reports')
   await page.getByRole('heading', { name: 'Senior progress report' }).waitFor()
   await page.locator('.report-summary article').first().locator('strong').filter({ hasText: '74.0%' }).waitFor()
@@ -767,7 +775,7 @@ try {
   await parent.waitForURL('http://127.0.0.1:5179/portal')
   assert.deepEqual(errors, [])
   console.log(
-    'PASS: profile editing, account creation, Reliance grade-band boundary preview and audited scale save, report readiness states, Junior/Senior/Sixth Form report variants, A4 print context/title/width and hidden portal controls, coursework exclusion from averages, reporting-period registration and reviewed close, publishing, records, timetable, payment retry, teacher sign-in and Coursework access, parent route guards, linked-account directory/search, credential-free audited recovery guidance, mobile layout; no uncaught browser errors. All backend requests were mocked.',
+    'PASS: profile editing, account creation, Reliance grade-band boundary preview and audited scale save, report readiness and release attribution, Junior/Senior/Sixth Form report variants, A4 print context/title/width and hidden portal controls, coursework exclusion from averages, reporting-period registration and reviewed close, publishing, records, timetable, payment retry, teacher sign-in and Coursework access, parent route guards, linked-account directory/search, credential-free audited recovery guidance, mobile layout; no uncaught browser errors. All backend requests were mocked.',
   )
 } catch (error) {
   const p = browser.contexts()[0]?.pages()[0]

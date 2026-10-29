@@ -945,10 +945,38 @@ assert.equal(
   5,
   'the isolated grade-band failure fixture rolls back before the valid release test',
 )
-const publicationId = (await db.query(
-  "insert into report_publications(campus_id,academic_year,academic_term,published_at,published_by) values($1,2026,'Term 1',now(),$2) returning id",
-  [campus, ids.admin],
-)).rows[0].id
+const published = (await db.query(
+  "insert into report_publications(campus_id,academic_year,academic_term,published_at,published_by) values($1,2026,'Term 1',now(),$2) returning id,published_by",
+  [campus, ids.parent],
+)).rows[0]
+const publicationId = published.id
+assert.equal(published.published_by, ids.admin, 'the database attributes release to the signed-in administrator, not the client-supplied author')
+const publicationAudit = (await db.query(
+  "select actor_id,action,detail from audit_trail where entity_type='report_publication' and entity_id=$1",
+  [publicationId],
+)).rows[0]
+assert.deepEqual(publicationAudit, {
+  actor_id: ids.admin,
+  action: 'published',
+  detail: { academic_year: 2026, academic_term: 'Term 1' },
+}, 'release audit records the actual publisher and exact academic period')
+const releaseAnnouncement = (await db.query(
+  "select campus_id,author_id,audience_roles,title from announcements where title='Academic reports published · 2026 · Term 1'",
+)).rows[0]
+assert.deepEqual(releaseAnnouncement, {
+  campus_id: campus,
+  author_id: ids.admin,
+  audience_roles: ['student', 'parent'],
+  title: 'Academic reports published · 2026 · Term 1',
+}, 'release announcement carries the same campus, publisher, period, and learner/parent audience')
+await rejects(
+  () => db.query('update report_publications set published_by=$2 where id=$1', [publicationId, ids.parent]),
+  /publisher cannot be changed while a report is published/,
+)
+await rejects(
+  () => db.query('update report_publications set academic_year=2027 where id=$1', [publicationId]),
+  /period cannot be changed on a published report/,
+)
 assert.equal(
   (await db.query('select period_status from reporting_periods where id=$1', [registeredPeriodId])).rows[0].period_status,
   'closed',
@@ -1437,7 +1465,23 @@ await rejects(
 )
 await as('')
 await rejects(() => pay(1), /Administrator/)
+await as('admin')
+await db.query('update report_publications set published_at=null,published_by=null where id=$1', [publicationId])
+const returnedToDraftAudit = (await db.query(
+  "select actor_id,action,detail from audit_trail where entity_type='report_publication' and entity_id=$1 and action='returned_to_draft'",
+  [publicationId],
+)).rows[0]
+assert.deepEqual(returnedToDraftAudit, {
+  actor_id: ids.admin,
+  action: 'returned_to_draft',
+  detail: { academic_year: 2026, academic_term: 'Term 1' },
+}, 'returning a report to draft records the administrator and period')
+assert.equal(
+  (await db.query("select count(*) from announcements where title='Academic reports published · 2026 · Term 1' and author_id=$1 and published_at is null", [ids.admin])).rows[0].count,
+  1,
+  'returning a report to draft hides its matching announcement while preserving the attributed record',
+)
 await db.close()
 console.log(
-  'PASS: migrations, atomic payments/retries/rollback, class and subject scope, role membership isolation/grants/revocation/provisioning, active-role parent/child boundaries, teacher profile/record/RPC scope, guardian access, private records and teacher login.',
+  'PASS: migrations, report readiness/release attribution/announcement/audit, atomic payments/retries/rollback, class and subject scope, role membership isolation/grants/revocation/provisioning, active-role parent/child boundaries, teacher profile/record/RPC scope, guardian access, private records and teacher login.',
 )
