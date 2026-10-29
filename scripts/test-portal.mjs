@@ -1487,9 +1487,68 @@ assert.equal((await db.query('select count(*)::integer as count from learning_re
   'teachers cannot read another teacher’s library resources, even in the same campus')
 assert.equal((await db.query("select count(*)::integer as count from storage.objects where bucket_id='learning-library'")).rows[0].count, 0,
   'a broad Storage policy cannot expose another teacher’s private files')
+await db.exec('reset role')
+await db.query("update profiles set role='student',campus_id=$2,class_level=$3,class_stream=$4,enrollment_status='active' where id=$1", [
+  ids.student, campus, 'Form 1', null,
+])
+await db.query("update profiles set role='student',campus_id=$2,class_level=$3,class_stream=$4,enrollment_status='active' where id=$1", [
+  ids.stream_student, campus, 'Form 1', 'B',
+])
+await db.query("insert into student_guardians(student_id,parent_id) values($1,$2) on conflict do nothing", [ids.stream_student, ids.parent])
+const englishAllocation = (await db.query(
+  "select id from teacher_class_assignments where teacher_id=$1 and campus_id=$2 and subject='English'",
+  [ids.subject_teacher, campus],
+)).rows[0].id
+await as('subject_teacher')
+const streamAResourceId = (await db.query(
+  "select create_teacher_learning_resource($1,'Stream A practice','For learners assigned to stream A') as id", [englishAllocation],
+)).rows[0].id
+const streamAFile = (await db.query(
+  "select reserve_teacher_learning_file($1,$2,'stream-a.png','png','image/png',512) as result",
+  ['80000000-0000-4000-8000-000000000001', streamAResourceId],
+)).rows[0].result
+await db.query(
+  "insert into storage.objects(bucket_id,name,metadata) values('learning-library',$1,$2::jsonb)",
+  [streamAFile.object_path, JSON.stringify({ size: 512, mimetype: 'image/png' })],
+)
+await db.query('select finalize_teacher_learning_file($1)', [streamAFile.id])
+await db.query("select set_teacher_learning_resource_state($1,'published')", [streamAResourceId])
 await as('parent')
-assert.equal((await db.query('select count(*)::integer as count from learning_resources')).rows[0].count, 0,
-  'the Stage 70 teacher-only library does not enable parent reads before Stage 71')
+assert.equal((await db.query('select count(*)::integer as count from learning_resources where id=$1', [learningResourceId])).rows[0].count, 1,
+  'a verified parent can read a published resource matching a currently enrolled linked learner')
+assert.equal((await db.query('select count(*)::integer as count from learning_resources where id=$1', [streamAResourceId])).rows[0].count, 0,
+  'parent access does not infer a subject allocation: a stream B or null-stream learner cannot read stream A resources')
+assert.equal((await db.query('select count(*)::integer as count from learning_resource_files where resource_id=$1', [learningResourceId])).rows[0].count, 1,
+  'parents see only the active finalized file metadata, not replaced file history')
+assert.equal((await db.query("select count(*)::integer as count from storage.objects where bucket_id='learning-library'")).rows[0].count, 1,
+  'parents can access only the active private object for their eligible published resources')
+await db.exec('reset role')
+await db.query('update profiles set campus_id=$1 where id in ($2,$3)', [seniorCampus, ids.student, ids.stream_student])
+await as('parent')
+assert.equal((await db.query('select count(*)::integer as count from learning_resources where id=$1', [learningResourceId])).rows[0].count, 0,
+  'matching class labels in another campus do not grant parent access')
+await db.exec('reset role')
+await db.query('update profiles set campus_id=$1 where id in ($2,$3)', [campus, ids.student, ids.stream_student])
+await db.query('update profiles set enrollment_status=\'inactive\' where id in ($1,$2)', [ids.student, ids.stream_student])
+await as('parent')
+assert.equal((await db.query('select count(*)::integer as count from learning_resources where id=$1', [learningResourceId])).rows[0].count, 0,
+  'ending all linked learners’ active enrollment immediately removes resource access')
+await db.exec('reset role')
+await db.query('update profiles set enrollment_status=\'active\' where id in ($1,$2)', [ids.student, ids.stream_student])
+await db.query('delete from student_guardians where parent_id=$1', [ids.parent])
+await as('parent')
+assert.equal((await db.query('select count(*)::integer as count from learning_resources where id=$1', [learningResourceId])).rows[0].count, 0,
+  'removing the verified guardian link immediately removes parent resource access')
+await db.exec('reset role')
+await db.query('insert into student_guardians(student_id,parent_id) values($1,$2),($3,$2)', [ids.student, ids.parent, ids.stream_student])
+await as('teacher')
+await db.query("select set_teacher_learning_resource_state($1,'archived')", [learningResourceId])
+await as('parent')
+assert.equal((await db.query('select count(*)::integer as count from learning_resources where id=$1', [learningResourceId])).rows[0].count, 0,
+  'archiving a teacher resource immediately removes it from parent reads')
+await db.exec('reset role')
+await db.query("update profiles set class_stream='A' where id=$1", [ids.student])
+await db.query('delete from student_guardians where student_id=$1 and parent_id=$2', [ids.stream_student, ids.parent])
 await as('teacher')
 await db.exec('reset role')
 await db.query("update reporting_periods set period_status='closed' where id=$1", [libraryPeriod])
@@ -2596,5 +2655,5 @@ assert.ok((await db.query('select preview_fee_reconciliation(null,2026,$1) as re
 await db.exec('rollback')
 await db.close()
 console.log(
-  'PASS: migrations, Stage 70 learning-library allocation/storage/file lifecycle and role boundaries, report readiness/release attribution/announcement/audit, atomic payments/retries/rollback, class and subject scope, role membership isolation/grants/revocation/provisioning, active-role parent/child boundaries, teacher profile/record/RPC scope, guardian access, private records and teacher login.',
+  'PASS: migrations, Stages 70–71 teacher/parent learning-library allocation, enrollment, campus, stream, Storage and file lifecycle boundaries, report readiness/release attribution/announcement/audit, atomic payments/retries/rollback, class and subject scope, role membership isolation/grants/revocation/provisioning, active-role parent/child boundaries, teacher profile/record/RPC scope, guardian access, private records and teacher login.',
 )
