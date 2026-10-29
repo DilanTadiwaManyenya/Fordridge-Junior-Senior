@@ -19,7 +19,7 @@ Main Admin can apply one reviewed year rollover for a selected campus. A success
 - `npm run lint`: exit 0; existing lint warnings remain elsewhere in the project.
 - `npm run build`: pass; existing large JavaScript chunk warning remains.
 - `git diff --check`: pass.
-- `node scripts/test-portal-browser.mjs` with installed Chrome: does not reach Stage 55. It stops at the existing tablet horizontal-overflow assertion at line 709 (`document.documentElement.scrollWidth <= window.innerWidth`). Browser validation for the new apply confirmation is therefore pending.
+- Mocked Chrome apply flow: pass for review gating, exact confirmation, and the single apply RPC request. The full suite continues afterward and stops at the tablet horizontal-overflow assertion at `scripts/test-portal-browser.mjs:754`.
 
 ## Deployment status
 

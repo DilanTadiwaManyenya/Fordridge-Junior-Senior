@@ -19,7 +19,7 @@ Main Admin can preview whether an applied campus/year rollover is safe to revers
 - `node --check scripts/test-portal-browser.mjs`: pass.
 - `npm run lint -- --quiet`: pass.
 - `npm run build`: pass; Vite reports the existing large JavaScript chunk warning.
-- Chrome browser suite: blocked before Stage 55/56 rollover screens by the tablet horizontal-overflow assertion at `scripts/test-portal-browser.mjs:709`; the Stage 56 browser interaction is added but not reached by the full suite.
+- Mocked Chrome apply/reversal flows: pass for review gating, exact confirmation, reason validation, and request payloads. The full suite later stops at the tablet horizontal-overflow assertion at `scripts/test-portal-browser.mjs:754`.
 - `git diff --check`: pass.
 
 ## Deployment status
