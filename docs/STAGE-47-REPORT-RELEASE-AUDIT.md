@@ -23,4 +23,4 @@ Status: Implemented and locally verified; production migration pending.
 
 ## Release state and next stage
 
-Migration `20261029150000_report_publication_actor.sql` has not been applied to production. The frontend has not been deployed. Stage 48 (protected report snapshots) follows next. Earlier migrations and frontend releases remain subject to the production deployment/approval process.
+Migration `20261029150000_report_publication_actor.sql` has not been applied to production. The frontend has not been deployed. Stage 48 snapshot protection is recorded in [the Stage 48 record](STAGE-48-PROTECTED-REPORT-SNAPSHOTS.md); Stage 49 (verify snapshot integrity) follows next. Earlier migrations and frontend releases remain subject to the production deployment/approval process.

@@ -970,6 +970,18 @@ assert.deepEqual(releaseAnnouncement, {
   title: 'Academic reports published · 2026 · Term 1',
 }, 'release announcement carries the same campus, publisher, period, and learner/parent audience')
 await rejects(
+  () => db.query('update report_release_snapshots set average_percent=0 where publication_id=$1 and student_id=$2', [publicationId, ids.stream_student]),
+  /permission denied/,
+)
+await rejects(
+  () => db.query('delete from report_release_snapshots where publication_id=$1 and student_id=$2', [publicationId, ids.stream_student]),
+  /permission denied/,
+)
+await rejects(
+  () => db.query('delete from report_publications where id=$1', [publicationId]),
+  /publication with issued learner snapshots cannot be deleted/,
+)
+await rejects(
   () => db.query('update report_publications set published_by=$2 where id=$1', [publicationId, ids.parent]),
   /publisher cannot be changed while a report is published/,
 )
@@ -987,7 +999,7 @@ const markbookAverage = (await db.query(
   [ids.stream_student],
 )).rows[0].value
 const frozen = (await db.query(
-  'select assessments,subject_signatories,average_percent from report_release_snapshots where publication_id=$1 and student_id=$2',
+  'select * from report_release_snapshots where publication_id=$1 and student_id=$2',
   [publicationId, ids.stream_student],
 )).rows[0]
 assert.ok(frozen.assessments.some(item => item.title === 'Quiz 1' && item.subject === 'Science'), 'official snapshots preserve the allocated subject')
@@ -1016,7 +1028,7 @@ await rejects(
 await as('admin')
 await correctLearner(ids.stream_student, 'Corrected After Publication', 'B001', 'Form 1', 'B')
 const frozenAfterCorrection = (await db.query(
-  'select assessments,subject_signatories,average_percent from report_release_snapshots where publication_id=$1 and student_id=$2',
+  'select * from report_release_snapshots where publication_id=$1 and student_id=$2',
   [publicationId, ids.stream_student],
 )).rows[0]
 assert.deepEqual(frozenAfterCorrection, frozen, 'correcting the current learner profile leaves the issued report snapshot unchanged')
@@ -1481,6 +1493,24 @@ assert.equal(
   1,
   'returning a report to draft hides its matching announcement while preserving the attributed record',
 )
+await rejects(
+  () => db.query('update report_publications set published_at=now(),published_by=$2 where id=$1', [publicationId, ids.admin]),
+  /already has issued report snapshots/,
+)
+const periodRevision = (await db.query('select revision from reporting_periods where id=$1', [registeredPeriodId])).rows[0].revision
+await db.query(
+  "select review_reporting_period($1,'reopen',$2,null,null,'Verified post-release mark correction')",
+  [registeredPeriodId, periodRevision],
+)
+await db.query(
+  "select record_bulk_marks('Post-release correction','Science',current_date,2026,'Term 1',100,$1::jsonb)",
+  [JSON.stringify([{ student_id: ids.stream_student, score: 15 }])],
+)
+const snapshotAfterLaterMark = (await db.query(
+  'select * from report_release_snapshots where publication_id=$1 and student_id=$2',
+  [publicationId, ids.stream_student],
+)).rows[0]
+assert.deepEqual(snapshotAfterLaterMark, frozen, 'later marks and profile corrections leave the complete issued snapshot unchanged')
 await db.close()
 console.log(
   'PASS: migrations, report readiness/release attribution/announcement/audit, atomic payments/retries/rollback, class and subject scope, role membership isolation/grants/revocation/provisioning, active-role parent/child boundaries, teacher profile/record/RPC scope, guardian access, private records and teacher login.',

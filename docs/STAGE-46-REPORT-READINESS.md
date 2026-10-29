@@ -20,4 +20,4 @@ Status: Implemented and locally verified; hosted frontend release pending.
 
 ## Release state and next stage
 
-No database migration is needed for Stage 46. No frontend behavior changed. The frontend has not been deployed. Stage 47 report attribution and audit checks are recorded in [the Stage 47 record](STAGE-47-REPORT-RELEASE-AUDIT.md); Stage 48 (protected report snapshots) follows next. Earlier pending migrations and frontend releases remain subject to the production deployment/approval process.
+No database migration is needed for Stage 46. No frontend behavior changed. The frontend has not been deployed. Stage 47 report attribution and audit checks are recorded in [the Stage 47 record](STAGE-47-REPORT-RELEASE-AUDIT.md), and Stage 48 snapshot protection in [the Stage 48 record](STAGE-48-PROTECTED-REPORT-SNAPSHOTS.md). Stage 49 (verify snapshot integrity) follows next. Earlier pending migrations and frontend releases remain subject to the production deployment/approval process.

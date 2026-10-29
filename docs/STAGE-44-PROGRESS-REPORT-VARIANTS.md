@@ -28,4 +28,4 @@ Reliance separates Junior reports, Senior reports, and Sixth Form reporting. For
 
 ## Release state and next stage
 
-No database migration is needed for Stage 44. The updated frontend has not been deployed. Stage 45 (printed report layout) is recorded in [the Stage 45 record](STAGE-45-PRINTED-REPORT-LAYOUT.md), Stage 46 report-readiness checks in [the Stage 46 record](STAGE-46-REPORT-READINESS.md), and Stage 47 release/audit checks in [the Stage 47 record](STAGE-47-REPORT-RELEASE-AUDIT.md). Stage 48 (protected report snapshots) follows next.
+No database migration is needed for Stage 44. The updated frontend has not been deployed. Stage 45 (printed report layout) is recorded in [the Stage 45 record](STAGE-45-PRINTED-REPORT-LAYOUT.md), Stage 46 report-readiness checks in [the Stage 46 record](STAGE-46-REPORT-READINESS.md), Stage 47 release/audit checks in [the Stage 47 record](STAGE-47-REPORT-RELEASE-AUDIT.md), and Stage 48 snapshot protection in [the Stage 48 record](STAGE-48-PROTECTED-REPORT-SNAPSHOTS.md). Stage 49 (verify snapshot integrity) follows next.
