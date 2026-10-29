@@ -4,6 +4,8 @@
 
 Implemented and locally verified. The production migration and hosted frontend release remain pending. No production database, Storage bucket, or Reliance repository was changed.
 
+Source commit: [`c63e813`](https://github.com/DilanTadiwaManyenya/Fordridge-Junior-Senior/commit/c63e813).
+
 ## Delivered
 
 - Added a teacher-only Learning library route and Workspace navigation item.
