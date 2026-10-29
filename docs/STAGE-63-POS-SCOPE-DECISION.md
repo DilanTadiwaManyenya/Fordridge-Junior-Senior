@@ -2,7 +2,7 @@
 
 ## Decision status
 
-**Recommendation prepared; owner confirmation is required before Stage 64.** Stage 62 found only a hardcoded Fordridge link to an external POS app. Its owner, API, authentication, data model, and security boundaries are unverified. Building an integration against an unknown service would make stock and payment records depend on an unverified data owner and access model.
+**Recommendation prepared; owner confirmation is required before catalogue schema or feature implementation.** Stage 62 found only a hardcoded Fordridge link to an external POS app. Its owner, API, authentication, data model, and security boundaries are unverified. Building an integration against an unknown service would make stock and payment records depend on an unverified data owner and access model.
 
 ## Recommended boundary
 
@@ -38,7 +38,7 @@ These are proposed capabilities and workflows. Fordridge-specific product catalo
 
 ## Requested owner confirmation
 
-Before Stage 64 begins, confirm one choice:
+Before catalogue schema or feature implementation begins, confirm one choice:
 
 1. **Fordridge-native (recommended):** proceed with a separate native catalogue/stock/POS ledger. Confirm which Fordridge roles may manage products and which may sell.
 2. **Connect the existing app:** provide its product and account owner, official API/security documentation, and an approved sandbox/test account. No production credentials should be posted in chat.
@@ -47,4 +47,4 @@ If neither choice is confirmed, leave the external link unchanged and keep produ
 
 ## Validation and deployment
 
-This is a documentation-only recommendation based on read-only Fordridge source review and Reliance workflow documentation/source. No database or application changes were made, and no external account was accessed. `git diff --check` is the documentation-stage validation. Stage 64 is blocked on owner confirmation.
+This is a documentation-only recommendation based on read-only Fordridge source review and Reliance workflow documentation/source. No database or application changes were made, and no external account was accessed. Stage 64 documents a conceptual catalogue design only. Catalogue schema and feature implementation remain blocked on owner confirmation.

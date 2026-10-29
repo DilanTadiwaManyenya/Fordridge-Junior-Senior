@@ -1,7 +1,7 @@
 # Fordridge portal roadmap inspired by Reliance
 
 Updated: 29 October 2026
-Current checkpoint: Stage 61 adds auditable cashbook expense submission, approval/rejection, reversal, and correction with legacy rows explicitly unreviewed; its migration and frontend are locally validated, but production migration, frontend release, and browser verification remain pending. Stage 62 found Fordridge's Inventory & POS menu is only an outbound link to an external service whose owner, authentication, API, data access, and security boundary could not be verified. Stage 63 records a recommendation to build the POS natively in Fordridge, based on that unknown external boundary and the Reliance workflow reference; this is pending owner confirmation before schema or payment-workflow implementation. See the Stage 61–63 records and tracker.
+Current checkpoint: Stage 61 adds auditable cashbook expense submission, approval/rejection, reversal, and correction with legacy rows explicitly unreviewed; its migration and frontend are locally validated, but production migration, frontend release, and browser verification remain pending. Stage 62 found Fordridge's Inventory & POS menu is only an outbound link to an external service whose owner, authentication, API, data access, and security boundary could not be verified. Stage 63 recommends a Fordridge-native POS, pending owner confirmation before schema or payment implementation. Stage 64 records a conceptual catalogue/variant/unit design only; campus allocation, real catalogue values, and permissions remain unset, and no migration was created. See the Stage 61–64 records and tracker.
 
 ## Purpose
 
@@ -106,7 +106,7 @@ Stages 1–17 are completed foundation, catalogue, teacher-scope, role-membershi
 | 61 | Add expense review/correction steps | Submit, approve/reject, reverse and correct with Main Admin authorization, idempotency and audit controls. |
 | 62 | Inspect external POS integration | Record verified ownership, access, supported API/data and security boundaries; keep unknowns explicit until the owner provides evidence. |
 | 63 | Decide POS connection or native scope | Prepare and confirm the system boundary, user/role scope, inventory, checkout, payment, order and reconciliation responsibilities before schema work. |
-| 64 | Design inventory catalogue | Variants and stock units work with the agreed system boundary. |
+| 64 | Design inventory catalogue | Define products, optional variants and stock units; leave unconfirmed Fordridge catalogue, campus and permission data unset. |
 | 65 | Add auditable stock receipts | Opening/received quantities have an actor, source and movement record. |
 | 66 | Add reasoned stock adjustments | Count corrections require authority and create immutable history. |
 | 67 | Implement safe POS checkout | Sale/payment/stock update commit together and retry safely. |
