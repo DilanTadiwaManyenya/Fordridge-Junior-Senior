@@ -39,6 +39,7 @@ import OfficialReports from './OfficialReports'
 import ReportApprovalRegister from './ReportApprovalRegister'
 import ReportReleaseMetrics from './ReportReleaseMetrics'
 import ReportVerification from './ReportVerification'
+import ReportingPeriods from './ReportingPeriods'
 import { withPortalTimeout, workflowError } from './workflow'
 import { canOpenTeacherMyClass } from './teacher-workspace'
 import { getFinanceNavigation } from './navigation'
@@ -231,6 +232,7 @@ export default function PortalDashboard() {
     (view === 'coursework' && !attendance) ||
     (view === 'import-learners' && !admin) ||
     (view === 'report-settings' && !admin) ||
+    (view === 'report-periods' && !admin) ||
     (view === 'grade-bands' && !admin) ||
     (view === 'report-release' && !admin) ||
     (view === 'report-readiness' && !admin) ||
@@ -260,6 +262,7 @@ export default function PortalDashboard() {
       'coursework',
       'import-learners',
       'report-settings',
+      'report-periods',
       'grade-bands',
       'report-release',
       'report-readiness',
@@ -355,6 +358,7 @@ export default function PortalDashboard() {
           {admin && <span className="portal-nav-label portal-nav-label-secondary">Academic services</span>}
           {admin && nav('/portal/classes', 'Classes', '▦')}
           {admin && nav('/portal/report-settings', 'Report settings', '▣')}
+          {admin && nav('/portal/report-periods', 'Reporting periods', '◷')}
           {admin && nav('/portal/grade-bands', 'Grade bands', 'A')}
           {admin && nav('/portal/report-release', 'Report release', '✓')}
           {admin && nav('/portal/report-readiness', 'Report readiness', '◷')}
@@ -471,6 +475,8 @@ export default function PortalDashboard() {
           <BulkLearnerImport />
         ) : view === 'report-settings' ? (
           <ReportSettings />
+        ) : view === 'report-periods' ? (
+          <ReportingPeriods profile={profile} />
         ) : view === 'grade-bands' ? (
           <GradeBands />
         ) : view === 'report-release' ? (

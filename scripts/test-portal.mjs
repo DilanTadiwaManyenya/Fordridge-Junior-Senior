@@ -193,6 +193,32 @@ assert.deepEqual(
   [{ active_role: 'admin', active_campus_id: null }],
   'a new Supabase session starts with its primary role and campus',
 )
+const registeredPeriodId = (await db.query(
+  "select register_reporting_period($1,2026,'Term 1') as id",
+  [campus],
+)).rows[0].id
+assert.deepEqual(
+  (await db.query('select period_status,is_current,revision from reporting_periods where id=$1', [registeredPeriodId])).rows[0],
+  { period_status: 'open', is_current: false, revision: 1 },
+  'new reporting periods start open with an explicit revision and no current-period assignment',
+)
+assert.equal(
+  (await db.query("select count(*) from reporting_period_events where period_id=$1 and revision=1 and action='registered'", [registeredPeriodId])).rows[0].count,
+  1,
+  'period registration creates its first audit event',
+)
+await rejects(
+  () => db.query("select register_reporting_period($1,2026,'Term 1')", [campus]),
+  /already registered/,
+)
+await as('teacher')
+assert.equal((await db.query('select count(*) from reporting_periods')).rows[0].count, 0,
+  'teachers cannot read the administrator period registry')
+await rejects(
+  () => db.query("select register_reporting_period($1,2027,'Term 1')", [campus]),
+  /Administrator access required/,
+)
+await as('admin')
 const term = await db.query(
   "select * from create_term_fee_record($1,'Form 1','ZIMSEC',1,2026,'Term 3',null)",
   [ids.student],
@@ -747,6 +773,11 @@ const publicationId = (await db.query(
   "insert into report_publications(campus_id,academic_year,academic_term,published_at,published_by) values($1,2026,'Term 1',now(),$2) returning id",
   [campus, ids.admin],
 )).rows[0].id
+assert.equal(
+  (await db.query('select period_status from reporting_periods where id=$1', [registeredPeriodId])).rows[0].period_status,
+  'open',
+  'publishing report snapshots does not change the separate period status',
+)
 const markbookAverage = (await db.query(
   "select round(avg(score / max_score * 100), 2) as value from learner_records where student_id=$1 and kind='academic' and assessment_type='markbook' and academic_year=2026 and academic_term='Term 1'",
   [ids.stream_student],

@@ -117,6 +117,7 @@ async function pageFor(
     if (path.endsWith('/rpc/admin_update_profile')) return send(null)
     if (path.endsWith('/rpc/admin_correct_learner_profile')) return send(null)
     if (path.endsWith('/rpc/admin_record_parent_recovery_support')) return send(null)
+    if (path.endsWith('/rpc/register_reporting_period')) return send('period-id')
     if (path.endsWith('/rpc/record_fee_payment')) {
       if (failPayment) {
         failPayment = false
@@ -230,6 +231,8 @@ async function pageFor(
       return send(
         method === 'GET' ? [] : single ? { id: 'saved' } : [{ id: 'saved' }],
       )
+    if (['reporting_periods', 'reporting_period_events', 'report_publications'].some(table => path.endsWith('/' + table)))
+      return send([])
     throw new Error(`Unmocked request: ${method} ${path}`)
   })
   return page
@@ -546,9 +549,20 @@ try {
   await recoveryDialog.getByRole('status').filter({ hasText: 'recorded in the activity log' }).waitFor()
   const recoveryWrite = writes.filter((write) => write.path.endsWith('admin_record_parent_recovery_support')).at(-1)
   assert.deepEqual(recoveryWrite.body, { p_parent_id: 'parent', p_identity_verified: true })
+  await page.goto('http://127.0.0.1:5179/portal/report-periods')
+  await page.getByRole('heading', { name: 'Reporting periods' }).waitFor()
+  await page.getByLabel('Campus').selectOption('campus')
+  await page.getByLabel('Academic year').fill('2027')
+  await page.getByLabel('Term').selectOption('Term 2')
+  await page.getByRole('button', { name: 'Register period' }).click()
+  await page.getByRole('status').filter({ hasText: 'registered as open' }).waitFor()
+  const periodWrite = writes.filter(write => write.path.endsWith('register_reporting_period')).at(-1)
+  assert.deepEqual(periodWrite.body, { p_campus_id: 'campus', p_academic_year: 2027, p_academic_term: 'Term 2' })
+  await parent.goto('http://127.0.0.1:5179/portal/report-periods')
+  await parent.waitForURL('http://127.0.0.1:5179/portal')
   assert.deepEqual(errors, [])
   console.log(
-    'PASS: profile editing, account creation, publishing, records, timetable, payment retry, teacher sign-in and Coursework access, parent route guards, linked-account directory/search, credential-free audited recovery guidance, mobile layout; no uncaught browser errors. All backend requests were mocked.',
+    'PASS: profile editing, account creation, reporting-period registration, publishing, records, timetable, payment retry, teacher sign-in and Coursework access, parent route guards, linked-account directory/search, credential-free audited recovery guidance, mobile layout; no uncaught browser errors. All backend requests were mocked.',
   )
 } catch (error) {
   const p = browser.contexts()[0]?.pages()[0]
