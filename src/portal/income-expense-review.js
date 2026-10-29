@@ -53,6 +53,14 @@ export function buildIncomeExpenseEntries({ payments = [], feeRecords = [], expe
   for (const expense of expenses) {
     const rawCategory = String(expense.category || '').trim()
     const referenceCategory = referenceExpenseCategories.find((category) => category === rawCategory)
+    const reviewStatus = expense.review_status || 'legacy_unreviewed'
+    const recordStatus = {
+      pending: 'Pending Main Admin review',
+      approved: 'Approved',
+      rejected: 'Rejected',
+      reversed: 'Reversed · no refund implied',
+      legacy_unreviewed: 'Legacy · approval status unknown',
+    }[reviewStatus] || 'Unknown review status'
     entries.push({
       id: `expense:${expense.id}`,
       sourceId: expense.id,
@@ -68,7 +76,8 @@ export function buildIncomeExpenseEntries({ payments = [], feeRecords = [], expe
       amount: Number(expense.amount),
       reference: expense.reference || '',
       description: expense.description || '',
-      recordStatus: 'Recorded; approval status not stored',
+      reviewStatus,
+      recordStatus,
     })
   }
 
@@ -101,9 +110,13 @@ export function filterIncomeExpenseEntries(entries, filters = {}) {
 export function summarizeIncomeExpenseEntries(entries) {
   return entries.reduce((totals, entry) => {
     const currency = entry.currency || 'Unknown'
-    const total = totals[currency] ||= { currency, income: 0, expenses: 0, net: 0 }
+    const total = totals[currency] ||= { currency, income: 0, expenses: 0, pendingExpenses: 0, legacyUnreviewedExpenses: 0, rejectedExpenses: 0, reversedExpenses: 0, net: 0 }
     if (entry.direction === 'income') total.income += entry.amount
-    if (entry.direction === 'expense') total.expenses += entry.amount
+    if (entry.direction === 'expense' && entry.reviewStatus === 'approved') total.expenses += entry.amount
+    if (entry.direction === 'expense' && entry.reviewStatus === 'pending') total.pendingExpenses += entry.amount
+    if (entry.direction === 'expense' && entry.reviewStatus === 'legacy_unreviewed') total.legacyUnreviewedExpenses += entry.amount
+    if (entry.direction === 'expense' && entry.reviewStatus === 'rejected') total.rejectedExpenses += entry.amount
+    if (entry.direction === 'expense' && entry.reviewStatus === 'reversed') total.reversedExpenses += entry.amount
     total.net = total.income - total.expenses
     return totals
   }, {})
@@ -122,11 +135,15 @@ export function buildIncomeExpenseCsv(entries) {
     ['Basis', 'Recorded fee transactions and cashbook rows; not bank or cash settlement confirmation'],
     ['Currency', 'Currencies are reported separately; no conversion is performed'],
     [],
-    ['Currency', 'Recorded collections', 'Recorded expenses', 'Net recorded movement'],
+    ['Currency', 'Recorded collections', 'Approved expenses', 'Pending expenses', 'Legacy unreviewed expenses', 'Rejected expenses', 'Reversed expenses', 'Net recorded movement'],
     ...Object.values(totals).sort((a, b) => a.currency.localeCompare(b.currency)).map((total) => [
       total.currency,
       total.income,
       total.expenses,
+      total.pendingExpenses,
+      total.legacyUnreviewedExpenses,
+      total.rejectedExpenses,
+      total.reversedExpenses,
       total.net,
     ]),
     [],

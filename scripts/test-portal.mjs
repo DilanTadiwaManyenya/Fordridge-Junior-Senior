@@ -49,30 +49,33 @@ const financeEntries = buildIncomeExpenseEntries({
     { id: 'fee-zig', campus_id: 'senior', currency: 'ZiG', academic_year: 2026, academic_term: 'Term 3' },
   ],
   expenses: [
-    { id: 'expense-fuel', expense_date: '2026-10-29', category: 'Fuel', description: 'Bus fuel', amount: 20, currency: 'USD', reference: 'INV-1' },
+    { id: 'expense-fuel', expense_date: '2026-10-29', category: 'Fuel', description: 'Bus fuel', amount: 20, currency: 'USD', reference: 'INV-1', review_status: 'approved' },
     { id: 'expense-legacy', expense_date: '2026-10-27', category: '=1+1', description: 'Historic row', amount: 5, currency: 'USD' },
+    { id: 'expense-pending', expense_date: '2026-10-28', category: 'Food', description: 'Lunch', amount: 4, currency: 'USD', review_status: 'pending' },
+    { id: 'expense-rejected', expense_date: '2026-10-26', category: 'Other', description: 'Rejected', amount: 2, currency: 'USD', review_status: 'rejected' },
+    { id: 'expense-reversed', expense_date: '2026-10-25', category: 'Repairs', description: 'Reversed', amount: 1, currency: 'USD', review_status: 'reversed' },
   ],
   campuses: [
     { id: 'junior', name: 'Junior School', code: 'JNR' },
     { id: 'senior', name: 'Senior School', code: 'SNR' },
   ],
 })
-assert.equal(financeEntries.length, 4)
+assert.equal(financeEntries.length, 7)
 assert.equal(financeEntries.find((entry) => entry.sourceId === 'payment-usd').date, '2026-10-29', 'transaction timestamps use the school-local date')
 assert.equal(financeEntries.find((entry) => entry.sourceId === 'expense-fuel').campusId, null, 'legacy expenses are not attributed to a campus')
 assert.equal(financeEntries.find((entry) => entry.sourceId === 'expense-legacy').categoryNeedsReview, true, 'unmapped legacy category text remains visible and is flagged')
 assert.deepEqual(
   summarizeIncomeExpenseEntries(financeEntries),
   {
-    USD: { currency: 'USD', income: 80, expenses: 25, net: 55 },
-    ZiG: { currency: 'ZiG', income: 100, expenses: 0, net: 100 },
+    USD: { currency: 'USD', income: 80, expenses: 20, pendingExpenses: 4, legacyUnreviewedExpenses: 5, rejectedExpenses: 2, reversedExpenses: 1, net: 60 },
+    ZiG: { currency: 'ZiG', income: 100, expenses: 0, pendingExpenses: 0, legacyUnreviewedExpenses: 0, rejectedExpenses: 0, reversedExpenses: 0, net: 100 },
   },
-  'income and expense totals remain separate by source currency',
+  'only approved expenses reduce net totals; pending, legacy, rejected and reversed amounts remain separately visible by currency',
 )
 const filteredFinanceRows = filterIncomeExpenseEntries(financeEntries, { currency: 'USD', direction: 'expense', category: 'Fuel', campusId: 'unassigned' })
 assert.deepEqual(filteredFinanceRows.map((entry) => entry.sourceId), ['expense-fuel'], 'filters include unassigned expenses and preserve the active currency/type/category')
 const filteredFinanceCsv = buildIncomeExpenseCsv(filteredFinanceRows)
-assert.match(filteredFinanceCsv, /"USD","0","20","-20"/, 'CSV totals match the filtered rows')
+assert.match(filteredFinanceCsv, /"USD","0","20","0","0","0","0","-20"/, 'CSV totals match the filtered rows and approved-only expense basis')
 assert.match(buildIncomeExpenseCsv(financeEntries), /"'=1\+1"/, 'CSV protects legacy text from spreadsheet formulas')
 
 assert.equal(canOpenTeacherMyClass('teacher', true), true)
@@ -239,6 +242,108 @@ assert.deepEqual(
   [{ active_role: 'admin', active_campus_id: null }],
   'a new Supabase session starts with its primary role and campus',
 )
+const cashbookExpensePayload = {
+  expense_date: '2026-10-29', category: 'Fuel', description: 'School bus fuel',
+  amount: 20, currency: 'USD', reference: 'FUEL-001',
+}
+const expenseSubmitRequest = '61000000-0000-4000-8000-000000000001'
+const submittedExpense = (await db.query(
+  'select * from submit_cashbook_expense($1,$2::jsonb)',
+  [expenseSubmitRequest, JSON.stringify(cashbookExpensePayload)],
+)).rows[0]
+assert.equal(submittedExpense.review_status, 'pending')
+assert.equal(submittedExpense.recorded_by, ids.admin)
+assert.equal(
+  (await db.query("select * from submit_cashbook_expense($1,$2::jsonb)", [expenseSubmitRequest, JSON.stringify(cashbookExpensePayload)])).rows[0].id,
+  submittedExpense.id,
+  'expense submission retry returns the original pending expense',
+)
+await rejects(
+  () => db.query("select * from submit_cashbook_expense($1,$2::jsonb)", [expenseSubmitRequest, JSON.stringify({ ...cashbookExpensePayload, amount: 25 })]),
+  /already used/,
+)
+await rejects(
+  () => db.query("select * from submit_cashbook_expense('61000000-0000-4000-8000-000000000009',$1::jsonb)", [JSON.stringify({ ...cashbookExpensePayload, category: 'Unapproved category' })]),
+  /recognized expense category/,
+)
+await rejects(
+  () => db.query("select review_cashbook_expense($1,'61000000-0000-4000-8000-000000000010','approved','no')", [submittedExpense.id]),
+  /review reason/,
+)
+const reviewRequestId = '61000000-0000-4000-8000-000000000002'
+const approvedExpense = (await db.query(
+  "select * from review_cashbook_expense($1,$2,'approved','Receipt and amount checked')",
+  [submittedExpense.id, reviewRequestId],
+)).rows[0]
+assert.equal(approvedExpense.review_status, 'approved')
+assert.equal(approvedExpense.reviewed_by, ids.admin)
+assert.equal(
+  (await db.query("select * from review_cashbook_expense($1,$2,'approved','Receipt and amount checked')", [submittedExpense.id, reviewRequestId])).rows[0].id,
+  submittedExpense.id,
+  'repeating a confirmed review request returns the same approved expense',
+)
+await rejects(
+  () => db.query("select review_cashbook_expense($1,$2,'rejected','Different decision')", [submittedExpense.id, reviewRequestId]),
+  /already used/,
+)
+const correctionPayload = { ...cashbookExpensePayload, category: 'Repairs', description: 'Corrected bus repair entry', amount: 18, reference: 'REPAIR-001' }
+const correctionRequestId = '61000000-0000-4000-8000-000000000003'
+const correctionResult = (await db.query(
+  'select correct_cashbook_expense($1,$2,$3::jsonb,$4) as result',
+  [submittedExpense.id, correctionRequestId, JSON.stringify(correctionPayload), 'Corrected after checking the supplier invoice'],
+)).rows[0].result
+assert.equal(correctionResult.original.review_status, 'reversed')
+assert.equal(correctionResult.original.reversal_reason, 'Corrected after checking the supplier invoice')
+assert.equal(correctionResult.replacement.review_status, 'pending')
+assert.equal(correctionResult.replacement.correction_of, submittedExpense.id)
+assert.equal(Number(correctionResult.replacement.amount), 18)
+const retriedCorrection = (await db.query(
+  'select correct_cashbook_expense($1,$2,$3::jsonb,$4) as result',
+  [submittedExpense.id, correctionRequestId, JSON.stringify(correctionPayload), 'Corrected after checking the supplier invoice'],
+)).rows[0].result
+assert.equal(retriedCorrection.replacement.id, correctionResult.replacement.id, 'correction retry returns the original replacement without duplicating it')
+assert.equal(Number((await db.query('select count(*) from cashbook_expenses where correction_of=$1', [submittedExpense.id])).rows[0].count), 1)
+assert.equal(Number((await db.query("select count(*) from cashbook_expense_events where action in ('submitted','approved','reversed_for_correction','correction_submitted') and expense_id in ($1,$2)", [submittedExpense.id, correctionResult.replacement.id])).rows[0].count), 4)
+await db.exec('reset role')
+const legacyExpenseId = (await db.query(
+  "insert into cashbook_expenses(expense_date,category,description,amount,recorded_by) values('2026-09-01','Transport','Legacy entry',12,$1) returning id",
+  [ids.admin],
+)).rows[0].id
+await as('admin')
+await rejects(
+  () => db.query("select reverse_cashbook_expense($1,'61000000-0000-4000-8000-000000000011','no')", [legacyExpenseId]),
+  /reversal reason/,
+)
+const reversalRequestId = '61000000-0000-4000-8000-000000000004'
+const reversedExpense = (await db.query(
+  'select * from reverse_cashbook_expense($1,$2,$3)',
+  [legacyExpenseId, reversalRequestId, 'Duplicate legacy entry; retained for audit'],
+)).rows[0]
+assert.equal(reversedExpense.review_status, 'reversed')
+assert.equal(reversedExpense.reversal_reason, 'Duplicate legacy entry; retained for audit')
+assert.equal((await db.query('select * from reverse_cashbook_expense($1,$2,$3)', [legacyExpenseId, reversalRequestId, 'Duplicate legacy entry; retained for audit'])).rows[0].id, legacyExpenseId)
+await rejects(
+  () => db.query("update cashbook_expenses set amount=1 where id=$1", [legacyExpenseId]),
+  /permission denied/,
+)
+await rejects(
+  () => db.query("delete from cashbook_expenses where id=$1", [legacyExpenseId]),
+  /permission denied/,
+)
+await rejects(
+  () => db.query("insert into cashbook_expense_events(expense_id,actor_id,action,after_state) values($1,$2,'submitted','{}'::jsonb)", [legacyExpenseId, ids.admin]),
+  /permission denied/,
+)
+await rejects(
+  () => db.query('select * from cashbook_expense_requests'),
+  /permission denied/,
+)
+await as('teacher')
+await rejects(
+  () => db.query("insert into cashbook_expenses(expense_date,category,description,amount) values(current_date,'Fuel','direct write',1)"),
+  /permission denied/,
+)
+await as('admin')
 assert.deepEqual(
   (await db.query("select band_group,count(*)::integer as count from report_grade_bands where campus_id is null group by band_group order by band_group")).rows,
   [{ band_group: 'alevel', count: 7 }, { band_group: 'olevel', count: 5 }, { band_group: 'primary', count: 9 }],
@@ -1762,7 +1867,11 @@ await rejects(
 )
 await rejects(
   () => db.query("insert into cashbook_expenses(expense_date,category,description,amount) values(current_date,'test','accountant write attempt',1)"),
-  /row-level security/,
+  /permission denied/,
+)
+await rejects(
+  () => db.query("select * from submit_cashbook_expense('61000000-0000-4000-8000-000000000020',$1::jsonb)", [JSON.stringify(cashbookExpensePayload)]),
+  /Main Admin access required/,
 )
 assert.equal(
   Number((await db.query('select count(*) from cashbook_expenses')).rows[0].count),
@@ -1838,7 +1947,11 @@ await rejects(
 )
 await rejects(
   () => db.query("insert into cashbook_expenses(expense_date,category,description,amount) values(current_date,'test','principal write attempt',1)"),
-  /row-level security/,
+  /permission denied/,
+)
+await rejects(
+  () => db.query("select * from submit_cashbook_expense('61000000-0000-4000-8000-000000000021',$1::jsonb)", [JSON.stringify(cashbookExpensePayload)]),
+  /Main Admin access required/,
 )
 assert.equal(
   Number((await db.query('select count(*) from cashbook_expenses')).rows[0].count),

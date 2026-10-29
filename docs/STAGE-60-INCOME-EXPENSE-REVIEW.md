@@ -25,4 +25,4 @@ The page provides text search, direction, category, currency, campus, and date f
 
 ## Deployment checkpoint
 
-No database migration was needed. The frontend release remains pending. Accountant/Principal cashbook scope, historical campus assignment, expense approval/correction fields, and external POS reconciliation remain later work and must not be inferred from this view.
+No database migration was needed. The frontend release remains pending. Stage 61 adds a separate reviewed cashbook workflow; the review totals now deduct only approved expenses and list pending, legacy-unreviewed, rejected, and reversed amounts separately. Accountant/Principal cashbook scope, historical campus assignment, and external POS reconciliation remain unverified and are not inferred from this view.

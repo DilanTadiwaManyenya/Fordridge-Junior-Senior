@@ -57,7 +57,7 @@ export default function IncomeExpenses({ profile }) {
         const [payments, feeRecords, expenses, campuses] = await Promise.all([
           readAllRows(() => supabase.from('fee_transactions').select('id,fee_record_id,campus_id,amount,reference,created_at').order('created_at', { ascending: false })),
           readAllRows(() => supabase.from('fee_records').select('id,campus_id,currency,academic_year,academic_term').order('id')),
-          readAllRows(() => supabase.from('cashbook_expenses').select('id,expense_date,category,description,amount,currency,reference').order('expense_date', { ascending: false })),
+          readAllRows(() => supabase.from('cashbook_expenses').select('id,expense_date,category,description,amount,currency,reference,review_status,correction_of,reversal_reason,review_reason').order('expense_date', { ascending: false })),
           readAllRows(() => supabase.from('campuses').select('id,name,code').order('name')),
         ])
         if (active) setEntries(buildIncomeExpenseEntries({ payments, feeRecords, expenses, campuses }))
@@ -88,7 +88,7 @@ export default function IncomeExpenses({ profile }) {
       <button type="button" onClick={() => setReload((value) => value + 1)} disabled={loading}>{loading ? 'Refreshing…' : 'Refresh'}</button>
     </header>
     <aside className="income-expenses-notice">
-      These are portal records, not confirmation of bank or cash settlement. Cashbook entries have no campus or approval status in Fordridge and are shown as unassigned recorded expenses. POS data is not connected to this view.
+      These are portal records, not confirmation of bank or cash settlement. Cashbook entries have no campus attribution and remain unassigned. Only approved expenses reduce net recorded movement; legacy, pending, rejected, and reversed amounts are shown separately. POS data is not connected to this view.
     </aside>
     {filters.campusId !== 'all' && filters.campusId !== 'unassigned' && <p className="income-expenses-scope-note" role="note">Campus filtering excludes legacy cashbook expenses because Fordridge has no campus attribution for those rows.</p>}
     <section className="income-expenses-filters" aria-label="Income and expense filters">
@@ -108,7 +108,7 @@ export default function IncomeExpenses({ profile }) {
     {loading ? <p className="income-expenses-state" role="status">Loading recorded finance entries…</p> : <>
       <div className="income-expenses-totals" aria-label="Filtered totals">
         {Object.values(totals).sort((a, b) => a.currency.localeCompare(b.currency)).map((total) => <article key={total.currency}>
-          <h2>{total.currency}</h2><dl><div><dt>Recorded collections</dt><dd>{money(total.income, total.currency)}</dd></div><div><dt>Recorded expenses</dt><dd>{money(total.expenses, total.currency)}</dd></div><div><dt>Net recorded movement</dt><dd>{money(total.net, total.currency)}</dd></div></dl>
+          <h2>{total.currency}</h2><dl><div><dt>Recorded collections</dt><dd>{money(total.income, total.currency)}</dd></div><div><dt>Approved expenses</dt><dd>{money(total.expenses, total.currency)}</dd></div><div><dt>Pending review</dt><dd>{money(total.pendingExpenses, total.currency)}</dd></div><div><dt>Legacy unreviewed</dt><dd>{money(total.legacyUnreviewedExpenses, total.currency)}</dd></div><div><dt>Rejected expenses</dt><dd>{money(total.rejectedExpenses, total.currency)}</dd></div><div><dt>Reversed expenses</dt><dd>{money(total.reversedExpenses, total.currency)}</dd></div><div><dt>Net recorded movement</dt><dd>{money(total.net, total.currency)}</dd></div></dl>
         </article>)}
         {!Object.keys(totals).length && <p>No totals match the selected filters.</p>}
       </div>

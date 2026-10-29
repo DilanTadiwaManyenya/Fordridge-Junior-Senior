@@ -1,0 +1,32 @@
+.cashbook-review-notice{margin:0 0 18px;padding:13px 16px;border-left:4px solid #bd922f;background:#fff8e6;color:#665626;font-size:.84rem;line-height:1.55}
+.cashbook-review-summary{grid-template-columns:repeat(3,minmax(0,1fr));margin:18px 0}
+.cashbook-recovery{display:flex;align-items:center;justify-content:space-between;gap:18px;margin:0 0 14px;padding:16px 18px;border:1px solid #e6c979;border-radius:9px;background:#fff9e9}
+.cashbook-recovery h2,.cashbook-ledger-heading h2,.cashbook-entry-form h2,.cashbook-decision-form h2,.cashbook-correction-form h2{margin:0;color:var(--navy,#10264a);font-size:1.1rem}
+.cashbook-recovery p,.cashbook-ledger-heading p,.cashbook-entry-form>p,.cashbook-decision-form>p,.cashbook-correction-form>p{margin:6px 0 0;color:var(--muted,#65738a);font-size:.84rem;line-height:1.5}
+.cashbook-recovery button,.cashbook-ledger-heading button,.cashbook-row-actions button{border:1px solid #cbd3df;border-radius:6px;padding:8px 11px;background:#fff;color:#10264a;font:inherit;font-size:.76rem;font-weight:800;cursor:pointer}
+.cashbook-recovery button:disabled,.cashbook-row-actions button:disabled{opacity:.55;cursor:not-allowed}
+.cashbook-entry-form,.cashbook-decision-form,.cashbook-correction-form{margin-bottom:18px}
+.cashbook-entry-form h2,.cashbook-correction-form h2{grid-column:1/-1}
+.cashbook-entry-form>p,.cashbook-correction-form>p{grid-column:1/-1}
+.cashbook-decision-form{display:grid;gap:12px}
+.cashbook-decision-form label{display:grid;gap:7px;font-size:.82rem;font-weight:800}
+.cashbook-decision-form textarea{min-height:90px;padding:10px;border:1px solid var(--line,#e1e8f0);border-radius:7px;font:inherit}
+.cashbook-ledger-panel{padding:0}
+.cashbook-ledger-heading{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;padding:18px 20px;border-bottom:1px solid var(--line,#e1e8f0)}
+.cashbook-ledger-heading p{max-width:720px}
+.cashbook-ledger-panel .workflow-scroll>p{padding:16px}
+.cashbook-status{display:inline-block;padding:5px 9px;border-radius:999px;background:#edf2f7;color:#42536b;font-size:.72rem;font-weight:800;white-space:nowrap}
+.cashbook-status.pending{background:#fff4d9;color:#8a5a00}
+.cashbook-status.approved{background:#e5f5eb;color:#18733a}
+.cashbook-status.rejected,.cashbook-status.reversed{background:#fbe8ea;color:#9a2333}
+.cashbook-status.legacy_unreviewed{background:#edf0f4;color:#59667a}
+.cashbook-ledger-panel .workflow-table{min-width:1000px}
+.cashbook-ledger-panel .workflow-table td small{display:block;max-width:280px;margin-top:5px;color:#65738a;overflow-wrap:anywhere}
+.cashbook-row-actions{min-width:210px}
+.cashbook-row-actions button{margin:2px}
+.cashbook-row-actions button:first-child{border-color:#b6d8c2;background:#f1fbf4;color:#176331}
+.cashbook-row-actions button:nth-child(2){border-color:#e3c1c7;background:#fff7f8;color:#861f35}
+.cashbook-correction-form.workflow-form{grid-template-columns:repeat(2,minmax(0,1fr))}
+.cashbook-correction-form .workflow-wide,.cashbook-correction-form .workflow-actions{grid-column:1/-1}
+.workflow-success{padding:12px 15px;border-left:4px solid #238443;background:#eef8f1;color:#176331}
+@media(max-width:700px){.cashbook-review-summary{grid-template-columns:1fr}.cashbook-recovery,.cashbook-ledger-heading{align-items:flex-start;flex-direction:column}.cashbook-recovery button,.cashbook-ledger-heading button{width:100%}.cashbook-correction-form.workflow-form{grid-template-columns:1fr}.cashbook-correction-form .workflow-wide,.cashbook-correction-form .workflow-actions{grid-column:auto}}

@@ -525,7 +525,7 @@ export default function PortalDashboard() {
         ) : view === 'subject-allocations' ? (
           <SubjectAllocations profile={profile} />
         ) : view === 'cashbook' ? (
-          <ExpenseCashbook />
+          <ExpenseCashbook profile={profile} user={user} />
         ) : view === 'activity' ? (
           <ActivityLog />
         ) : view === 'parent-accounts' ? (
