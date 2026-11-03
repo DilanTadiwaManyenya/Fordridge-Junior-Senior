@@ -4,6 +4,7 @@ import { PGlite } from '../.portal-test-tools/node_modules/@electric-sql/pglite/
 import { canEnterPortal, withPortalTimeout } from '../src/portal/workflow.js'
 import { buildTeacherClassScopes, canOpenTeacherMyClass } from '../src/portal/teacher-workspace.js'
 import { canReviewIncomeExpenses, getFinanceNavigation } from '../src/portal/navigation.js'
+import { submitEnquiry } from '../src/site/enquiry-workflow.js'
 import { referenceBandsFor } from '../src/portal/grade-band-rules.js'
 import { learningFileDetails, matchesLearningFileReservation, needsAbandonedUploadReview } from '../src/portal/learning-library-file-workflow.js'
 import {
@@ -39,6 +40,20 @@ assert.deepEqual(
 assert.equal(canReviewIncomeExpenses('admin'), true)
 assert.equal(canReviewIncomeExpenses('principal'), false)
 assert.equal(canReviewIncomeExpenses('accountant'), false)
+
+let enquiryInsertCalls = 0
+const fakeEnquiryClient = (result) => ({
+  from(table) {
+    assert.equal(table, 'enquiries')
+    return { async insert(payload) { enquiryInsertCalls += 1; return result(payload) } }
+  },
+})
+const sampleEnquiry = { name: 'Synthetic family', email: 'family@example.test', phone: null, message: 'Synthetic enquiry', enquiry_type: 'contact' }
+assert.deepEqual(await submitEnquiry(null, false, sampleEnquiry), { ok: false, reason: 'unavailable' }, 'missing backend configuration never reports a saved enquiry')
+assert.equal(enquiryInsertCalls, 0, 'missing backend configuration does not attempt a write')
+assert.deepEqual(await submitEnquiry(fakeEnquiryClient(async () => ({ error: { message: 'offline' } })), true, sampleEnquiry), { ok: false, reason: 'failed' }, 'backend rejection never reports enquiry success')
+assert.deepEqual(await submitEnquiry(fakeEnquiryClient(async (payload) => { assert.deepEqual(payload, sampleEnquiry); return { error: null } }), true, sampleEnquiry), { ok: true }, 'enquiry success follows a confirmed database insert')
+assert.deepEqual(await submitEnquiry(fakeEnquiryClient(async () => { throw new Error('network down') }), true, sampleEnquiry), { ok: false, reason: 'failed' }, 'network failures never report enquiry success')
 
 const financeEntries = buildIncomeExpenseEntries({
   payments: [
