@@ -54,6 +54,8 @@ assert.equal(enquiryInsertCalls, 0, 'missing backend configuration does not atte
 assert.deepEqual(await submitEnquiry(fakeEnquiryClient(async () => ({ error: { message: 'offline' } })), true, sampleEnquiry), { ok: false, reason: 'failed' }, 'backend rejection never reports enquiry success')
 assert.deepEqual(await submitEnquiry(fakeEnquiryClient(async (payload) => { assert.deepEqual(payload, sampleEnquiry); return { error: null } }), true, sampleEnquiry), { ok: true }, 'enquiry success follows a confirmed database insert')
 assert.deepEqual(await submitEnquiry(fakeEnquiryClient(async () => { throw new Error('network down') }), true, sampleEnquiry), { ok: false, reason: 'failed' }, 'network failures never report enquiry success')
+assert.doesNotMatch(await readFile('src/site/PublicSite.jsx', 'utf8'), /\[EDIT THIS\]/, 'public site pages do not display editing placeholders')
+assert.doesNotMatch(await readFile('src/data/schoolInfo.js', 'utf8'), /\[EDIT THIS\]/, 'shared school details do not contain editing placeholders')
 
 const financeEntries = buildIncomeExpenseEntries({
   payments: [
