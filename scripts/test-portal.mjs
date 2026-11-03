@@ -2752,8 +2752,43 @@ await rolloverRejectsInSavepoint(
 )
 assert.ok((await db.query('select preview_fee_reconciliation(null,2026,$1) as result', ['Term 2'])).rows[0].result.periods.every(period => period.campus_id === campus),
   'Accountant reconciliation always stays within the assigned campus')
+
+await db.exec('reset role')
+await db.query(
+  "insert into audit_trail(campus_id,actor_id,entity_type,entity_id,action,detail) values ($1,$2,'fee_transaction',$3,'recorded','{\"sensitive\":\"hidden\"}'),($1,$4,'learner_test',$5,'recorded','{\"learner_name\":\"Synthetic Student\"}'),($6,$2,'fee_transaction',$7,'recorded','{}')",
+  [campus, unlinkedParentId, ids.parent, ids.teacher, ids.student, seniorCampus, ids.admin],
+)
+await as('admin')
+const adminActivity = (await db.query('select * from read_activity_log()')).rows
+assert.ok(adminActivity.some(row => row.entity_type === 'learner_test'), 'Main Admin can read school-wide activity')
+assert.equal(Object.hasOwn(adminActivity[0], 'detail'), false, 'Activity Log never returns audit detail or sensitive payloads')
+await as('teacher')
+const teacherActivity = (await db.query('select * from read_activity_log()')).rows
+assert.ok(teacherActivity.length > 0 && teacherActivity.every(row => row.actor_name === 'teacher'), 'Teacher sees only events they submitted')
+await as('student')
+await rolloverRejectsInSavepoint(() => db.query('select * from read_activity_log()'), /Activity Log access required/)
+await as('admin')
+await db.query("select grant_portal_role($1,'staff',$2,'Synthetic Stage 77 scope check')", [unlinkedParentId, campus])
+await db.exec('reset role')
+await db.query("select set_config('request.jwt.claim.sub',$1,false)", [unlinkedParentId])
+await db.query("select set_config('request.jwt.claims',$1,false)", [JSON.stringify({ session_id: reconciliationSession })])
+await db.exec('set role authenticated')
+await db.query("select switch_active_portal_role('staff',$1)", [campus])
+await rolloverRejectsInSavepoint(() => db.query('select * from read_activity_log()'), /Activity Log access required/)
+await as('admin')
+await db.query("select grant_portal_role($1,'principal',$2,'Synthetic Stage 77 scope check')", [unlinkedParentId, campus])
+await db.exec('reset role')
+await db.query("select set_config('request.jwt.claim.sub',$1,false)", [unlinkedParentId])
+await db.query("select set_config('request.jwt.claims',$1,false)", [JSON.stringify({ session_id: reconciliationSession })])
+await db.exec('set role authenticated')
+await db.query("select switch_active_portal_role('principal',$1)", [campus])
+const principalActivity = (await db.query('select * from read_activity_log()')).rows
+assert.ok(principalActivity.length > 0 && principalActivity.every(row => row.campus_id === campus), 'Principal sees only assigned-campus events')
+await db.query("select switch_active_portal_role('accountant',$1)", [campus])
+const accountantActivity = (await db.query('select * from read_activity_log()')).rows
+assert.ok(accountantActivity.length > 0 && accountantActivity.every(row => row.entity_type === 'fee_transaction' && row.campus_id === campus), 'Accountant sees own finance events in the assigned campus only')
 await db.exec('rollback')
 await db.close()
 console.log(
-  'PASS: migrations, Stages 70–75 teacher/parent learning-library allocation, enrollment, campus, stream, Storage and file lifecycle boundaries, admin-only read-only library oversight, newsletter publication/audience/expiry and user-bound acknowledgement, report readiness/release attribution/announcement/audit, atomic payments/retries/rollback, class and subject scope, role membership isolation/grants/revocation/provisioning, active-role parent/child boundaries, teacher profile/record/RPC scope, guardian access, private records and teacher login.',
+  'PASS: migrations, Stages 70–77 Activity Log role scope/redaction, teacher/parent learning-library allocation, enrollment, campus, stream, Storage and file lifecycle boundaries, admin-only read-only library oversight, newsletter publication/audience/expiry and user-bound acknowledgement, report readiness/release attribution/announcement/audit, atomic payments/retries/rollback, class and subject scope, role membership isolation/grants/revocation/provisioning, active-role parent/child boundaries, teacher profile/record/RPC scope, guardian access, private records and teacher login.',
 )

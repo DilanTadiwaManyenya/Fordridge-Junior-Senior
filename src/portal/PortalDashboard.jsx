@@ -224,6 +224,7 @@ export default function PortalDashboard() {
     profile.has_class_assignment,
   )
   const analytics = ['teacher', 'admin'].includes(profile.role)
+  const activity = ['admin', 'principal', 'accountant', 'teacher'].includes(profile.role)
   const financeNavigation = getFinanceNavigation(profile.role)
   if (
     (['learners', 'staff', 'classes'].includes(view) && !admin) ||
@@ -256,7 +257,7 @@ export default function PortalDashboard() {
     (view === 'subject-allocations' && !assignments) ||
     (view === 'cashbook' && !admin) ||
     (view === 'inventory-stock' && !admin) ||
-    (view === 'activity' && !admin) ||
+    (view === 'activity' && !activity) ||
     ![
       'overview',
       'learners',
@@ -429,7 +430,7 @@ export default function PortalDashboard() {
             ),
           )}
           {admin && <span className="portal-nav-label portal-nav-label-secondary">Administration</span>}
-          {admin && nav('/portal/activity', 'Activity Log', '◫')}
+          {activity && nav('/portal/activity', 'Activity Log', '◫')}
           {admin && nav('/portal/library-oversight', 'Library oversight', '▤')}
           {admin && nav('/portal/parent-accounts', 'Parent accounts', '♧')}
           {admin && nav('/portal/staff', 'Staff', '♙')}
