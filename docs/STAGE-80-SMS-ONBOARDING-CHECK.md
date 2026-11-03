@@ -13,4 +13,4 @@
 - SMS provider delivery, OTP expiry/rate limits, and real account recovery were not verified against a live auth service.
 - Current administrator provisioning creates a confirmed phone account with a chosen initial password. This local review records the existing behavior; it does not claim SMS possession verification for staff accounts.
 
-Stage 80 remains open until an approved isolated test account and SMS delivery configuration can be used. Do not use a learner's or staff member's real account as a substitute.
+The owner confirmed SMS is not in use for now and asked to skip live SMS verification. The mocked local flows are verified; live SMS stays deferred until SMS is enabled and an isolated auth environment is available. Do not use a learner's or staff member's real account as a substitute.
