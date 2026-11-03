@@ -837,10 +837,20 @@ await db.query(
   [visibleNewsletterId, ids.student],
 )
 const serverStampedRead = (await db.query(
-  'select read_at > $2::timestamptz as stamped_by_server from announcement_reads where announcement_id=$1 and user_id=$3',
+  'select read_at, read_at > $2::timestamptz as stamped_by_server from announcement_reads where announcement_id=$1 and user_id=$3',
   [visibleNewsletterId, '2020-01-01T00:00:00Z', ids.student],
 )).rows[0]
 assert.equal(serverStampedRead.stamped_by_server, true, 'newsletter acknowledgement time is assigned by the database')
+await as('admin')
+const acknowledgementAudit = (await db.query(
+  "select actor_id, entity_type, entity_id, action, detail from audit_trail where entity_type='newsletter_acknowledgement' and entity_id=$1 and actor_id=$2 order by created_at desc limit 1",
+  [visibleNewsletterId, ids.student],
+)).rows[0]
+assert.ok(acknowledgementAudit, 'newsletter acknowledgement is attributable in the activity audit')
+assert.equal(acknowledgementAudit.action, 'acknowledged', 'newsletter acknowledgement audit has a clear action')
+assert.ok(Math.abs(Date.parse(acknowledgementAudit.detail.acknowledged_at) - Date.parse(serverStampedRead.read_at)) < 1000, 'newsletter acknowledgement audit uses the server-assigned time')
+assert.deepEqual(Object.keys(acknowledgementAudit.detail).sort(), ['acknowledged_at'], 'newsletter audit omits notice content and unrelated personal data')
+await as('student')
 const originalReadAt = (await db.query('select read_at from announcement_reads where announcement_id=$1 and user_id=$2', [visibleNewsletterId, ids.student])).rows[0].read_at
 await db.query(
   "insert into announcement_reads(announcement_id,user_id,read_at) values($1,$2,'2000-01-01T00:00:00Z') on conflict(announcement_id,user_id) do nothing",
@@ -848,6 +858,10 @@ await db.query(
 )
 assert.equal((await db.query('select count(*) from announcement_reads where announcement_id=$1 and user_id=$2', [visibleNewsletterId, ids.student])).rows[0].count, 1,
   'a duplicate acknowledgement does not create another receipt')
+await as('admin')
+assert.equal((await db.query("select count(*) from audit_trail where entity_type='newsletter_acknowledgement' and entity_id=$1 and actor_id=$2", [visibleNewsletterId, ids.student])).rows[0].count, 1,
+  'a duplicate acknowledgement does not create another audit event')
+await as('student')
 assert.equal(new Date((await db.query('select read_at from announcement_reads where announcement_id=$1 and user_id=$2', [visibleNewsletterId, ids.student])).rows[0].read_at).getTime(), new Date(originalReadAt).getTime(),
   'a duplicate acknowledgement cannot rewrite the original read time')
 await rejects(
