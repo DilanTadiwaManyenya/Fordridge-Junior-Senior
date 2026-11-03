@@ -98,6 +98,7 @@ async function pageFor(
   let rolloverDecisions = []
   let rolloverAppliedRun = null
   let rolloverReversedRun = false
+  let rolloverReversalReason = null
   const reportRecords = [
     { id: 'senior-mark', student_id: student.id, title: 'Term assessment', subject: 'Mathematics', assessment_type: 'markbook', score: 74, max_score: 100, event_date: '2026-01-15', academic_year: 2026, academic_term: 'Term 1', student },
     { id: 'senior-coursework', student_id: student.id, title: 'Course Work', subject: 'Mathematics', assessment_type: 'coursework', score: 100, max_score: 100, event_date: '2026-01-14', academic_year: 2026, academic_term: 'Term 1', student },
@@ -231,7 +232,7 @@ async function pageFor(
         status: rolloverReversedRun ? 'reversed' : 'applied',
         reversed_at: rolloverReversedRun ? '2026-10-29T13:00:00.000Z' : null,
         reversed_by_name: rolloverReversedRun ? 'Main Admin' : null,
-        reversal_reason: rolloverReversedRun ? 'Corrected after approval review' : null,
+        reversal_reason: rolloverReversedRun ? rolloverReversalReason : null,
       } : null)
     if (path.endsWith('/rpc/preview_year_rollover_batch_reversal'))
       return send(rolloverAppliedRun ? {
@@ -251,6 +252,7 @@ async function pageFor(
     }
     if (path.endsWith('/rpc/reverse_year_rollover_batch')) {
       rolloverReversedRun = true
+      rolloverReversalReason = body.p_reason
       return send({ already_reversed: false, batch_run_id: 'rollover-run-1', learner_count: 1, reversal_reason: body.p_reason })
     }
     if (path.endsWith('/rpc/save_year_rollover_decision')) {
@@ -276,7 +278,7 @@ async function pageFor(
       }
       return send(null)
     }
-    if (path.endsWith('/audit_trail')) {
+    if (path.endsWith('/rpc/read_activity_log')) {
       activityAttempts += 1
       if (!activityCanSucceed)
         return send({ message: 'Temporary activity service failure.' }, 503)
@@ -285,10 +287,9 @@ async function pageFor(
           id: 'activity-check',
           entity_type: 'learner_profile',
           action: 'Updated profile',
-          detail: null,
           created_at: '2026-10-28T10:00:00Z',
-          actor: { full_name: 'Test User' },
-          campus: { name: 'Junior School' },
+          actor_name: 'Test User',
+          campus_name: 'Junior School',
         },
       ])
     }
@@ -700,7 +701,7 @@ try {
   await page.getByRole('heading', { name: 'Payment receipt' }).waitFor()
   await page.getByText('Ledger transaction ID', { exact: true }).waitFor()
   await page.getByText('transaction', { exact: true }).waitFor()
-  await page.getByText('Fee record', { exact: true }).waitFor()
+  await page.locator('dt').getByText('Fee record', { exact: true }).waitFor()
   await page.getByText('fee', { exact: true }).waitFor()
   await page.getByText('USD totals', { exact: true }).waitFor()
   await page.getByText('ZiG totals', { exact: true }).waitFor()
@@ -801,6 +802,27 @@ try {
     true,
     'tablet layout does not overflow horizontally',
   )
+  const signup = await pageFor('parent', false)
+  await signup.goto('http://127.0.0.1:5179/portal/parent/signup')
+  await signup.getByLabel('Full name').fill('Synthetic Parent')
+  await signup.getByLabel('Phone number', { exact: true }).fill('0777123456')
+  await signup.getByLabel('Password', { exact: true }).fill('SyntheticParent123!')
+  await signup.getByRole('button', { name: 'Create account' }).click()
+  await signup.getByRole('status').filter({ hasText: 'SMS code to verify your account' }).waitFor()
+  await signup.getByRole('button', { name: 'Resend code' }).click()
+  await signup.getByRole('status').filter({ hasText: 'A new code has been requested' }).waitFor()
+  await signup.getByLabel('SMS verification code').fill('123456')
+  await signup.getByRole('button', { name: 'Verify code', exact: true }).click()
+  await signup.waitForURL('**/portal')
+  assert.ok(writes.some(write => write.path.includes('/auth/v1/signup')), 'parent signup requests phone verification')
+  assert.ok(writes.some(write => write.path.includes('/auth/v1/verify') && write.body?.type === 'sms'), 'parent signup verifies an SMS one-time code')
+  const parentLogin = await pageFor('parent', false)
+  await parentLogin.goto('http://127.0.0.1:5179/portal/parent/login')
+  await parentLogin.getByLabel('Phone number', { exact: true }).fill('0777123456')
+  await parentLogin.getByLabel('Password', { exact: true }).fill('SyntheticParent123!')
+  await parentLogin.getByRole('button', { name: 'Sign in to portal' }).click()
+  await parentLogin.waitForURL('**/portal')
+  assert.ok(writes.some(write => write.path.includes('/auth/v1/token')), 'parent can sign in using the verified phone and password')
   const teacher = await pageFor('teacher', false)
   await teacher.goto('http://127.0.0.1:5179/portal/staff/login')
   await teacher.getByLabel('Phone number', { exact: true }).fill('0777123456')
@@ -978,7 +1000,7 @@ try {
   assert.equal(await reverseButton.isDisabled(), false, 'an eligible batch can be reversed after explicit reason and confirmation')
   await reverseButton.click()
   await page.getByRole('heading', { name: 'Year rollover reversed' }).waitFor()
-  await page.getByText('Reason: Correction approved after review', { exact: true }).waitFor()
+  await page.getByText(/Reason: Correction approved after review/).waitFor()
   assert.equal(await page.getByRole('button', { name: 'Reverse reviewed rollover' }).count(), 0,
     'a completed reversal cannot be submitted again')
   const reversedRolloverWrite = writes.find(write => write.path.endsWith('/rpc/reverse_year_rollover_batch'))
@@ -1141,7 +1163,7 @@ try {
   await parent.waitForURL('http://127.0.0.1:5179/portal')
   assert.deepEqual(errors, [])
   console.log(
-    'PASS: profile editing, account creation, Reliance grade-band boundary preview and audited scale save, read-only rollover readiness and review reasons, reviewed per-learner promote/retain/transfer/complete decision save, configured destination proposal and capacity-aware year-rollover batch preview, destination capacity what-if/unknown-capacity/unmatched-stream preview, report readiness and release attribution, report integrity verified/mismatch/not-found flows, historical release-time learner/class/stream/campus identity and legacy-context disclosure, Junior/Senior/Sixth Form report variants, A4 print context/title/width and hidden portal controls, coursework exclusion from averages, reporting-period registration and reviewed close, publishing, records, timetable, payment retry, teacher sign-in and Coursework access, parent route guards, linked-account directory/search, credential-free audited recovery guidance, mobile layout; no uncaught browser errors. All backend requests were mocked.',
+    'PASS: profile editing, account creation, parent SMS signup/resend/verification/sign-in, SMS recovery/password reset, Reliance grade-band boundary preview and audited scale save, read-only rollover readiness and review reasons, reviewed per-learner decisions and placement save, capacity-aware rollover preview/apply/reversal, report readiness/release/integrity/history variants/print, coursework exclusion, reporting-period close/reopen/publish, records, timetable, payment retry, teacher sign-in and Coursework access, parent route guards and linked-account directory/search, credential-free audited recovery guidance, mobile layout; no uncaught browser errors. All backend and SMS responses were mocked.',
   )
 } catch (error) {
   const p = browser.contexts()[0]?.pages()[0]
