@@ -140,7 +140,7 @@ Stages 7–20 establish access and class foundations. Do not roll out a new admi
 
 ## Current checkpoint
 
-Stage 77 makes Activity Log reads role-scoped and redacted. Main Admin, Principal, Accountant, and Teacher views have distinct authorization; the database function never returns audit detail. Campus Admin remains unavailable under the existing Stage 15 guard. Isolated policy checks, full lint, production build, and diff checks pass with existing warnings. Production migration and hosted frontend release remain pending. See the [Stage 77 record](STAGE-77-ACTIVITY-LOG-SCOPE-AND-REDACTION.md) and [stage tracker](STAGE-TRACKER.md).
+Stage 78's repository review found unconfirmed placeholders across public identity, mission/vision, curriculum, admissions, leadership, notices, contact links and map location. The review is recorded; public copy remains unchanged pending Fordridge approval. Stage 77's role-scoped Activity Log implementation is pushed; its production migration and hosted frontend release remain pending. See the [Stage 77 record](STAGE-77-ACTIVITY-LOG-SCOPE-AND-REDACTION.md), [Stage 78 review](STAGE-78-PUBLIC-SCHOOL-CONTENT-REVIEW.md), and [stage tracker](STAGE-TRACKER.md).
 
 ## Post-roadmap launch requirement
 
