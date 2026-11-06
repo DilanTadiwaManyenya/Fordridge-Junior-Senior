@@ -41,23 +41,41 @@ export function SiteLayout({ children }) {
   const location = useLocation()
   useEffect(() => setOpen(false), [location.pathname])
   useEffect(() => {
-    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches || !('IntersectionObserver' in window)) return
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return
     const targets = document.querySelectorAll('#main-content .editorial-hero-copy, #main-content .editorial-hero-image, #main-content .story-feature > div, #main-content .values-editorial > article, #main-content .activity-editorial > article, #main-content .home-proof, #main-content .home-life-heading, #main-content .life-photo, #main-content .admissions-steps > article, #main-content .admissions-note > div, #main-content .contact-quick > a, #main-content .contact-location > div, #main-content .public-form, #main-content .home-hero .hero-seal, #main-content .home-hero .hero-index, #main-content .content-section > .section-heading, #main-content .content-section > .intro-copy, #main-content .school-card')
-    const observer = new IntersectionObserver((entries) => {
-      entries.forEach((entry) => {
-        if (!entry.isIntersecting) return
-        entry.target.classList.remove('motion-pending')
-        requestAnimationFrame(() => entry.target.classList.add('motion-visible'))
-        observer.unobserve(entry.target)
+    let observer
+    const reveal = (target) => {
+      if (!target.classList.contains('motion-pending')) return
+      target.classList.remove('motion-pending')
+      requestAnimationFrame(() => target.classList.add('motion-visible'))
+      observer?.unobserve(target)
+    }
+    const revealVisible = () => {
+      targets.forEach((target) => {
+        const rect = target.getBoundingClientRect()
+        if (rect.top < window.innerHeight * 0.92 && rect.bottom > 0) reveal(target)
       })
-    }, { threshold: 0.12, rootMargin: '0px 0px -36px 0px' })
+    }
     targets.forEach((target, index) => {
       target.style.setProperty('--motion-index', String(index % 4))
       target.classList.add('motion-reveal')
       target.classList.add('motion-pending')
-      observer.observe(target)
     })
-    return () => observer.disconnect()
+    requestAnimationFrame(revealVisible)
+    if ('IntersectionObserver' in window) {
+      observer = new IntersectionObserver((entries) => entries.forEach((entry) => {
+        if (entry.isIntersecting) reveal(entry.target)
+      }), { threshold: 0.01, rootMargin: '0px 0px -24px 0px' })
+      targets.forEach((target) => observer.observe(target))
+    } else {
+      window.addEventListener('scroll', revealVisible, { passive: true })
+      window.addEventListener('resize', revealVisible)
+    }
+    return () => {
+      observer?.disconnect()
+      window.removeEventListener('scroll', revealVisible)
+      window.removeEventListener('resize', revealVisible)
+    }
   }, [location.pathname])
   return <div className="public-site">
     <a className="skip-link" href="#main-content">Skip to content</a>

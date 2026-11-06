@@ -61,11 +61,10 @@
 @media(prefers-reduced-motion:reduce){.public-site .school-card,.public-site .school-card-photo img,.public-site a,.public-site button,.public-site .primary-button,.public-site .portal-button,.public-site .light-button{transition:none!important;transform:none!important}}
 
 /* Stage 3: scroll reveals for editorial content */
-.motion-reveal{opacity:0;transform:translate3d(0,18px,0);transition:opacity var(--motion-slow) var(--motion-ease),transform var(--motion-slow) var(--motion-ease);transition-delay:calc(var(--motion-index,0)*65ms);will-change:opacity,transform}
+.motion-reveal{opacity:1;transform:none;transition:opacity var(--motion-slow) var(--motion-ease),transform var(--motion-slow) var(--motion-ease);transition-delay:calc(var(--motion-index,0)*65ms)}
 .motion-reveal.motion-visible{opacity:1;transform:translate3d(0,0,0)}
-/* Hide only while the observer is actively preparing a reveal. */
-.public-site .motion-reveal.motion-pending{opacity:0;transform:translate3d(0,24px,0)}
-.public-site .motion-reveal.motion-pending.motion-visible{opacity:1;transform:translate3d(0,0,0)}
+/* Hide only while an element below the fold is waiting to enter view. */
+.public-site .motion-reveal.motion-pending{opacity:0;transform:translate3d(0,24px,0);will-change:opacity,transform}
 @media(prefers-reduced-motion:reduce){.motion-reveal,.motion-reveal.motion-visible{opacity:1!important;transform:none!important;transition:none!important;will-change:auto}}
 
 /* Stage 4: gallery, admissions and contact micro-interactions */
