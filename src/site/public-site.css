@@ -39,3 +39,22 @@
 @keyframes fordridge-enter{from{opacity:0;transform:translate3d(0,16px,0)}to{opacity:1;transform:translate3d(0,0,0)}}
 @media(prefers-reduced-motion:reduce){.public-site,.public-site *,.public-site *::before,.public-site *::after{animation:none!important;transition:none!important;scroll-behavior:auto!important}.home-hero-copy,.hero-visual,.hero-actions>*,.hero-signature{opacity:1!important;transform:none!important}}
 
+/* Stage 2: tactile homepage interaction motion */
+.public-site a,.public-site button{ -webkit-tap-highlight-color:transparent }
+.public-site a:focus-visible,.public-site button:focus-visible{outline:3px solid #a64c68;outline-offset:4px;border-radius:2px}
+.public-site .primary-button,.public-site .portal-button,.public-site .light-button,.public-site .gallery-shuffle{transition:transform var(--motion-fast) var(--motion-ease),background-color var(--motion-fast) var(--motion-ease),color var(--motion-fast) var(--motion-ease),box-shadow var(--motion-fast) var(--motion-ease)}
+.public-site .primary-button:hover,.public-site .portal-button:hover,.public-site .light-button:hover,.public-site .gallery-shuffle:hover{transform:translateY(-2px);box-shadow:0 9px 20px rgba(6,29,58,.14)}
+.public-site .primary-button:active,.public-site .portal-button:active,.public-site .light-button:active,.public-site .gallery-shuffle:active{transform:translateY(0) scale(.985);box-shadow:none}
+.hero-actions .primary-button span,.hero-actions .text-link span,.school-card-copy b span,.contact-quick-links span{display:inline-block;transition:transform var(--motion-fast) var(--motion-ease)}
+.hero-actions .primary-button:hover span,.hero-actions .text-link:hover span{transform:translateX(4px)}
+.school-card{transform:translateY(0);transition:transform var(--motion-standard) var(--motion-ease),box-shadow var(--motion-standard) var(--motion-ease),border-color var(--motion-standard) var(--motion-ease)}
+.school-card:hover{transform:translateY(-5px);border-color:rgba(107,9,41,.35);box-shadow:0 18px 40px rgba(6,29,58,.13)}
+.school-card:active{transform:translateY(-1px) scale(.995)}
+.school-card .school-card-photo img{transition:transform var(--motion-slow) var(--motion-ease)}
+.school-card:hover .school-card-photo img{transform:scale(1.045)}
+.school-card-copy b span{transition:transform var(--motion-fast) var(--motion-ease)}
+.school-card:hover .school-card-copy b span{transform:translateX(4px)}
+.public-nav>a:not(.portal-button){transition:color var(--motion-fast) var(--motion-ease),border-color var(--motion-fast) var(--motion-ease)}
+@media(hover:none){.school-card:hover,.public-site .primary-button:hover,.public-site .portal-button:hover{transform:none;box-shadow:none}.school-card:active{transform:scale(.99)}}
+@media(prefers-reduced-motion:reduce){.public-site .school-card,.public-site .school-card-photo img,.public-site a,.public-site button,.public-site .primary-button,.public-site .portal-button,.public-site .light-button{transition:none!important;transform:none!important}}
+
