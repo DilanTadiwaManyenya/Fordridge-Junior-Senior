@@ -61,6 +61,10 @@
 /* Stage 3: scroll reveals for editorial content */
 .motion-reveal{opacity:0;transform:translate3d(0,18px,0);transition:opacity var(--motion-slow) var(--motion-ease),transform var(--motion-slow) var(--motion-ease);transition-delay:calc(var(--motion-index,0)*65ms);will-change:opacity,transform}
 .motion-reveal.motion-visible{opacity:1;transform:translate3d(0,0,0)}
+/* Keep reveal motion opt-in after the observer is ready; content remains visible by default. */
+.public-site .motion-reveal:not(.motion-visible){opacity:1;transform:none}
+.public-site .motion-reveal.motion-pending{opacity:0;transform:translate3d(0,18px,0)}
+.public-site .motion-reveal.motion-pending.motion-visible{opacity:1;transform:translate3d(0,0,0)}
 @media(prefers-reduced-motion:reduce){.motion-reveal,.motion-reveal.motion-visible{opacity:1!important;transform:none!important;transition:none!important;will-change:auto}}
 
 /* Stage 4: gallery, admissions and contact micro-interactions */

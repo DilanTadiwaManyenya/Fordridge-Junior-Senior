@@ -42,17 +42,19 @@ export function SiteLayout({ children }) {
   useEffect(() => setOpen(false), [location.pathname])
   useEffect(() => {
     if (window.matchMedia('(prefers-reduced-motion: reduce)').matches || !('IntersectionObserver' in window)) return
-    const targets = document.querySelectorAll('#main-content .editorial-hero-copy, #main-content .editorial-hero-image, #main-content .story-feature > div, #main-content .values-editorial > article, #main-content .activity-editorial > article, #main-content .home-proof, #main-content .home-life-heading, #main-content .life-photo, #main-content .admissions-steps > article, #main-content .admissions-note > div, #main-content .contact-quick > a, #main-content .contact-location > div, #main-content .public-form')
+    const targets = document.querySelectorAll('#main-content .editorial-hero-copy, #main-content .editorial-hero-image, #main-content .story-feature > div, #main-content .values-editorial > article, #main-content .activity-editorial > article, #main-content .home-proof, #main-content .home-life-heading, #main-content .life-photo, #main-content .admissions-steps > article, #main-content .admissions-note > div, #main-content .contact-quick > a, #main-content .contact-location > div, #main-content .public-form, #main-content .home-hero .hero-seal, #main-content .home-hero .hero-index, #main-content .content-section > .section-heading, #main-content .content-section > .intro-copy, #main-content .school-card')
     const observer = new IntersectionObserver((entries) => {
       entries.forEach((entry) => {
         if (!entry.isIntersecting) return
         entry.target.classList.add('motion-visible')
+        entry.target.classList.remove('motion-pending')
         observer.unobserve(entry.target)
       })
     }, { threshold: 0.12, rootMargin: '0px 0px -36px 0px' })
     targets.forEach((target, index) => {
       target.style.setProperty('--motion-index', String(index % 4))
       target.classList.add('motion-reveal')
+      target.classList.add('motion-pending')
       observer.observe(target)
     })
     return () => observer.disconnect()
