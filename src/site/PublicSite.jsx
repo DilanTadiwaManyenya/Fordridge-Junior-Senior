@@ -40,6 +40,23 @@ export function SiteLayout({ children }) {
   const [open, setOpen] = useState(false)
   const location = useLocation()
   useEffect(() => setOpen(false), [location.pathname])
+  useEffect(() => {
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches || !('IntersectionObserver' in window)) return
+    const targets = document.querySelectorAll('#main-content .editorial-hero-copy, #main-content .editorial-hero-image, #main-content .story-feature > div, #main-content .values-editorial > article, #main-content .activity-editorial > article, #main-content .home-proof, #main-content .home-life-heading, #main-content .life-photo, #main-content .admissions-steps > article, #main-content .admissions-note > div, #main-content .gallery-grid figure, #main-content .contact-quick > a, #main-content .contact-location > div, #main-content .public-form')
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach((entry) => {
+        if (!entry.isIntersecting) return
+        entry.target.classList.add('motion-visible')
+        observer.unobserve(entry.target)
+      })
+    }, { threshold: 0.12, rootMargin: '0px 0px -36px 0px' })
+    targets.forEach((target, index) => {
+      target.style.setProperty('--motion-index', String(index % 4))
+      target.classList.add('motion-reveal')
+      observer.observe(target)
+    })
+    return () => observer.disconnect()
+  }, [location.pathname])
   return <div className="public-site">
     <a className="skip-link" href="#main-content">Skip to content</a>
     <header className="public-header"><Brand />
