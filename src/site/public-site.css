@@ -28,3 +28,14 @@
 @media(max-width:700px){.contact-quick>a{min-height:92px}.gallery-filter{padding-inline:12px}.public-form .primary-button{width:100%;justify-content:space-between}.hero-actions .primary-button{width:auto}.home-proof{scrollbar-width:thin}}
 @media(prefers-reduced-motion:reduce){.public-site *{animation:none!important;scroll-behavior:auto!important;transition:none!important}}
 
+/* Stage 1: shared motion foundation */
+.public-site{--motion-fast:180ms;--motion-standard:320ms;--motion-slow:650ms;--motion-ease:cubic-bezier(.22,.68,0,1)}
+.public-site a,.public-site button,.public-site input,.public-site select,.public-site textarea,.public-site img{transition-duration:var(--motion-standard);transition-timing-function:var(--motion-ease)}
+.home-hero-copy{animation:fordridge-enter .72s var(--motion-ease) both}
+.hero-visual{animation:fordridge-enter .82s var(--motion-ease) 100ms both}
+.hero-actions>*{animation:fordridge-enter .5s var(--motion-ease) both}
+.hero-actions>*:nth-child(2){animation-delay:120ms}
+.hero-signature{animation:fordridge-enter .55s var(--motion-ease) 180ms both}
+@keyframes fordridge-enter{from{opacity:0;transform:translate3d(0,16px,0)}to{opacity:1;transform:translate3d(0,0,0)}}
+@media(prefers-reduced-motion:reduce){.public-site,.public-site *,.public-site *::before,.public-site *::after{animation:none!important;transition:none!important;scroll-behavior:auto!important}.home-hero-copy,.hero-visual,.hero-actions>*,.hero-signature{opacity:1!important;transform:none!important}}
+
