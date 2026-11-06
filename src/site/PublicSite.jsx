@@ -42,7 +42,7 @@ export function SiteLayout({ children }) {
   useEffect(() => setOpen(false), [location.pathname])
   useEffect(() => {
     if (window.matchMedia('(prefers-reduced-motion: reduce)').matches || !('IntersectionObserver' in window)) return
-    const targets = document.querySelectorAll('#main-content .editorial-hero-copy, #main-content .editorial-hero-image, #main-content .story-feature > div, #main-content .values-editorial > article, #main-content .activity-editorial > article, #main-content .home-proof, #main-content .home-life-heading, #main-content .life-photo, #main-content .admissions-steps > article, #main-content .admissions-note > div, #main-content .gallery-grid figure, #main-content .contact-quick > a, #main-content .contact-location > div, #main-content .public-form')
+    const targets = document.querySelectorAll('#main-content .editorial-hero-copy, #main-content .editorial-hero-image, #main-content .story-feature > div, #main-content .values-editorial > article, #main-content .activity-editorial > article, #main-content .home-proof, #main-content .home-life-heading, #main-content .life-photo, #main-content .admissions-steps > article, #main-content .admissions-note > div, #main-content .contact-quick > a, #main-content .contact-location > div, #main-content .public-form')
     const observer = new IntersectionObserver((entries) => {
       entries.forEach((entry) => {
         if (!entry.isIntersecting) return
