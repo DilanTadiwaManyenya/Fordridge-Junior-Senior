@@ -41,6 +41,29 @@
 @keyframes fordridge-enter{from{opacity:0;transform:translate3d(0,32px,0)}to{opacity:1;transform:translate3d(0,0,0)}}
 @media(prefers-reduced-motion:reduce){.public-site,.public-site *,.public-site *::before,.public-site *::after{animation:none!important;transition:none!important;scroll-behavior:auto!important}.home-hero-copy,.hero-visual,.hero-actions>*,.hero-signature{opacity:1!important;transform:none!important}}
 
+/* Stage 1: Fordridge signature hero entrance */
+.home-hero-copy{animation:none}
+.home-hero .hero-eyebrow{animation:hero-rise .55s var(--motion-ease) .04s both}
+.home-hero .eyebrow-rule{transform-origin:left center;animation:hero-rule-draw .62s var(--motion-ease) .12s both}
+.home-hero h1 .hero-title-line{display:block;animation:hero-rise .72s cubic-bezier(.2,.75,.25,1) both}
+.home-hero h1 .hero-title-line:first-child{animation-delay:.14s}
+.home-hero h1 .hero-title-line:last-child{animation-delay:.29s}
+.home-hero .hero-summary{animation:hero-rise .62s var(--motion-ease) .46s both}
+.home-hero .hero-actions>*{animation:none}
+.home-hero .hero-actions{animation:hero-rise .58s var(--motion-ease) .58s both}
+.home-hero .hero-signature{animation:hero-rise .58s var(--motion-ease) .7s both}
+.home-hero .hero-photo-main{animation:hero-photo-unfold .95s cubic-bezier(.2,.75,.25,1) .12s both}
+.home-hero .hero-photo-float{animation:hero-float-in .7s var(--motion-ease) .62s both}
+.home-hero .hero-seal{animation:hero-seal-arrive .78s cubic-bezier(.2,.8,.25,1) .52s both}
+.home-hero .hero-index{animation:hero-rise .5s var(--motion-ease) .68s both}
+@keyframes hero-rise{from{opacity:0;transform:translate3d(0,26px,0)}to{opacity:1;transform:translate3d(0,0,0)}}
+@keyframes hero-rule-draw{from{transform:scaleX(0)}to{transform:scaleX(1)}}
+@keyframes hero-photo-unfold{from{opacity:.35;clip-path:inset(0 0 100% 0 round 190px 190px 3px 3px)}to{opacity:1;clip-path:inset(0 0 0 0 round 190px 190px 3px 3px)}}
+@keyframes hero-float-in{from{opacity:0;transform:translate3d(24px,20px,0)}to{opacity:1;transform:translate3d(0,0,0)}}
+@keyframes hero-seal-arrive{0%{opacity:0;transform:rotate(-25deg) scale(.68)}75%{opacity:1;transform:rotate(-3deg) scale(1.06)}100%{opacity:1;transform:rotate(-7deg) scale(1)}}
+@media(max-width:650px){.home-hero .hero-photo-main{animation-name:hero-photo-unfold-mobile}.home-hero .hero-photo-float{animation-delay:.48s}.home-hero .hero-seal{animation-delay:.38s}}
+@keyframes hero-photo-unfold-mobile{from{opacity:.35;clip-path:inset(0 0 100% 0 round 45vw 45vw 3px 3px)}to{opacity:1;clip-path:inset(0 0 0 0 round 45vw 45vw 3px 3px)}}
+
 /* Stage 2: tactile homepage interaction motion */
 .public-site a,.public-site button{ -webkit-tap-highlight-color:transparent }
 .public-site a:focus-visible,.public-site button:focus-visible{outline:3px solid #a64c68;outline-offset:4px;border-radius:2px}
