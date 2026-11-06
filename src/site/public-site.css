@@ -33,12 +33,12 @@
 /* Stage 1: shared motion foundation */
 .public-site{--motion-fast:180ms;--motion-standard:320ms;--motion-slow:650ms;--motion-ease:cubic-bezier(.22,.68,0,1)}
 .public-site a,.public-site button,.public-site input,.public-site select,.public-site textarea,.public-site img{transition-duration:var(--motion-standard);transition-timing-function:var(--motion-ease)}
-.home-hero-copy{animation:fordridge-enter .72s var(--motion-ease) both}
-.hero-visual{animation:fordridge-enter .82s var(--motion-ease) 100ms both}
-.hero-actions>*{animation:fordridge-enter .5s var(--motion-ease) both}
+.home-hero-copy{animation:fordridge-enter .9s cubic-bezier(.2,.75,.25,1) both}
+.hero-visual{animation:fordridge-enter .95s cubic-bezier(.2,.75,.25,1) 140ms both}
+.hero-actions>*{animation:fordridge-enter .65s cubic-bezier(.2,.75,.25,1) both}
 .hero-actions>*:nth-child(2){animation-delay:120ms}
-.hero-signature{animation:fordridge-enter .55s var(--motion-ease) 180ms both}
-@keyframes fordridge-enter{from{opacity:0;transform:translate3d(0,16px,0)}to{opacity:1;transform:translate3d(0,0,0)}}
+.hero-signature{animation:fordridge-enter .7s cubic-bezier(.2,.75,.25,1) 220ms both}
+@keyframes fordridge-enter{from{opacity:0;transform:translate3d(0,32px,0)}to{opacity:1;transform:translate3d(0,0,0)}}
 @media(prefers-reduced-motion:reduce){.public-site,.public-site *,.public-site *::before,.public-site *::after{animation:none!important;transition:none!important;scroll-behavior:auto!important}.home-hero-copy,.hero-visual,.hero-actions>*,.hero-signature{opacity:1!important;transform:none!important}}
 
 /* Stage 2: tactile homepage interaction motion */
@@ -63,9 +63,8 @@
 /* Stage 3: scroll reveals for editorial content */
 .motion-reveal{opacity:0;transform:translate3d(0,18px,0);transition:opacity var(--motion-slow) var(--motion-ease),transform var(--motion-slow) var(--motion-ease);transition-delay:calc(var(--motion-index,0)*65ms);will-change:opacity,transform}
 .motion-reveal.motion-visible{opacity:1;transform:translate3d(0,0,0)}
-/* Keep reveal motion opt-in after the observer is ready; content remains visible by default. */
-.public-site .motion-reveal:not(.motion-visible){opacity:1;transform:none}
-.public-site .motion-reveal.motion-pending{opacity:0;transform:translate3d(0,18px,0)}
+/* Hide only while the observer is actively preparing a reveal. */
+.public-site .motion-reveal.motion-pending{opacity:0;transform:translate3d(0,24px,0)}
 .public-site .motion-reveal.motion-pending.motion-visible{opacity:1;transform:translate3d(0,0,0)}
 @media(prefers-reduced-motion:reduce){.motion-reveal,.motion-reveal.motion-visible{opacity:1!important;transform:none!important;transition:none!important;will-change:auto}}
 

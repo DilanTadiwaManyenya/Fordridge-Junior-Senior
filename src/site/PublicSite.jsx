@@ -46,8 +46,8 @@ export function SiteLayout({ children }) {
     const observer = new IntersectionObserver((entries) => {
       entries.forEach((entry) => {
         if (!entry.isIntersecting) return
-        entry.target.classList.add('motion-visible')
         entry.target.classList.remove('motion-pending')
+        requestAnimationFrame(() => entry.target.classList.add('motion-visible'))
         observer.unobserve(entry.target)
       })
     }, { threshold: 0.12, rootMargin: '0px 0px -36px 0px' })
