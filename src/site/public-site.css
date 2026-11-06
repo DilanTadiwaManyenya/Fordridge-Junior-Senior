@@ -91,6 +91,22 @@
 @media(hover:none){.public-site .school-card.motion-visible:active{transform:scale(.99)}.life-photo.motion-visible:active img{transform:scale(1.015)}}
 @media(prefers-reduced-motion:reduce){.story-feature-image img,.life-photo img,.life-photo figcaption,.values-editorial article,.admissions-steps article,.activity-editorial article,.school-card,.school-card .school-card-photo img,.home-proof i{clip-path:none!important;transition:none!important;transform:none!important;opacity:1!important}.values-editorial article:after,.admissions-steps article:after{transition:none!important;transform:scaleX(1)}}
 
+/* Stage 3: Junior, Senior and gallery motion identity */
+.page-hero-junior{background:radial-gradient(ellipse at 92% 48%,rgba(107,9,41,.075),transparent 39%),#fff}
+.page-hero-senior{background:radial-gradient(ellipse at 92% 48%,rgba(9,45,89,.09),transparent 39%),#fff}
+.page-hero-junior .eyebrow-rule,.page-hero-senior .eyebrow-rule{transform:scaleX(.2);transform-origin:left center;transition:transform .65s var(--motion-ease) .2s}
+.page-hero-junior .editorial-hero-copy.motion-visible .eyebrow-rule,.page-hero-senior .editorial-hero-copy.motion-visible .eyebrow-rule{transform:scaleX(1)}
+.junior-feature .story-feature-image{box-shadow:12px 12px 0 rgba(107,9,41,.1)}
+.senior-feature .story-feature-image{box-shadow:-12px 12px 0 rgba(9,45,89,.1)}
+.story-feature-image.motion-pending>span{opacity:0;transform:translate3d(0,12px,0)}
+.story-feature-image.motion-visible>span{opacity:1;transform:translate3d(0,0,0);transition:opacity .45s var(--motion-ease) .45s,transform .45s var(--motion-ease) .45s}
+.gallery-filter{isolation:isolate}
+.gallery-filter:after{content:'';position:absolute;z-index:-1;left:12px;right:12px;bottom:5px;height:2px;background:currentColor;transform:scaleX(0);transform-origin:left center;transition:transform .3s var(--motion-ease)}
+.gallery-filter.is-active:after{transform:scaleX(1)}
+.gallery-grid figure{animation:gallery-arrive .58s cubic-bezier(.2,.75,.25,1) both;animation-delay:calc(var(--motion-index,0)*45ms)}
+@keyframes gallery-arrive{from{opacity:0;transform:translate3d(0,20px,0) scale(.985)}to{opacity:1;transform:translate3d(0,0,0) scale(1)}}
+@media(prefers-reduced-motion:reduce){.page-hero-junior .eyebrow-rule,.page-hero-senior .eyebrow-rule,.story-feature-image.motion-pending>span,.story-feature-image.motion-visible>span,.gallery-filter:after{transition:none!important;transform:none!important;opacity:1!important}.page-hero-junior,.page-hero-senior{background:#fff}}
+
 /* Stage 2: tactile homepage interaction motion */
 .public-site a,.public-site button{ -webkit-tap-highlight-color:transparent }
 .public-site a:focus-visible,.public-site button:focus-visible{outline:3px solid #a64c68;outline-offset:4px;border-radius:2px}
