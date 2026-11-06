@@ -7,7 +7,7 @@ import { submitEnquiry } from './enquiry-workflow'
 import './public-site.css'
 
 const navItems = [
-  ['About', '/about'], ['Junior School', '/junior-school'], ['Senior School', '/senior-school'], ['Gallery', '/gallery'], ['Admissions', '/admissions'], ['Contact', '/contact'],
+  ['Home', '/'], ['About', '/about'], ['Junior School', '/junior-school'], ['Senior School', '/senior-school'], ['Gallery', '/gallery'], ['Admissions', '/admissions'], ['Contact', '/contact'],
 ]
 
 const galleryImages = Object.values(import.meta.glob('../assets/images/*.{jpeg,jpg,png,webp}', { eager: true, import: 'default' }))
