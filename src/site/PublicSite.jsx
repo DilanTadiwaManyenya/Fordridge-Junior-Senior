@@ -86,7 +86,7 @@ export function SiteLayout({ children }) {
         <a className="portal-button" href="/portal/login">Portal Login</a>
       </nav>
     </header>
-    <main id="main-content">{children}</main>
+    <main id="main-content" key={location.pathname}>{children}</main>
     <footer className="public-footer"><div className="footer-brand"><Brand /><p>{schoolInfo.motto}</p></div><div><h2>Visit us</h2><p>{schoolInfo.address}</p></div><div><h2>Get in touch</h2><p>{schoolInfo.phone}<br />{schoolInfo.email}</p><a className="footer-portal" href="/portal/login">Portal Login</a></div></footer>
   </div>
 }

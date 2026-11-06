@@ -107,6 +107,23 @@
 @keyframes gallery-arrive{from{opacity:0;transform:translate3d(0,20px,0) scale(.985)}to{opacity:1;transform:translate3d(0,0,0) scale(1)}}
 @media(prefers-reduced-motion:reduce){.page-hero-junior .eyebrow-rule,.page-hero-senior .eyebrow-rule,.story-feature-image.motion-pending>span,.story-feature-image.motion-visible>span,.gallery-filter:after{transition:none!important;transform:none!important;opacity:1!important}.page-hero-junior,.page-hero-senior{background:#fff}}
 
+/* Stage 4: navigation, route and enquiry feedback */
+.public-site>main{animation:public-page-enter .38s cubic-bezier(.22,.68,0,1) both}
+@keyframes public-page-enter{from{opacity:0;transform:translate3d(0,8px,0)}to{opacity:1;transform:translate3d(0,0,0)}}
+.menu-icon i{transition:transform .24s cubic-bezier(.22,.68,0,1)}
+@media(max-width:900px){.public-site .public-nav{display:grid;grid-template-columns:1fr 1fr;visibility:hidden;opacity:0;transform:translate3d(0,-9px,0);pointer-events:none;transition:opacity .22s var(--motion-ease),transform .22s var(--motion-ease),visibility 0s linear .22s}.public-site .public-nav.is-open{display:grid;visibility:visible;opacity:1;transform:translate3d(0,0,0);pointer-events:auto;transition:opacity .24s var(--motion-ease),transform .24s var(--motion-ease),visibility 0s}.public-site .public-nav.is-open>a{animation:nav-link-enter .32s var(--motion-ease) both;animation-delay:calc(var(--nav-index,0)*38ms)}.public-site .public-nav.is-open>a:nth-child(1){--nav-index:0}.public-site .public-nav.is-open>a:nth-child(2){--nav-index:1}.public-site .public-nav.is-open>a:nth-child(3){--nav-index:2}.public-site .public-nav.is-open>a:nth-child(4){--nav-index:3}.public-site .public-nav.is-open>a:nth-child(5){--nav-index:4}.public-site .public-nav.is-open>a:nth-child(6){--nav-index:5}.public-site .public-nav.is-open>a:nth-child(7){--nav-index:6}.public-site .public-nav.is-open>a:nth-child(8){--nav-index:7}}
+@media(max-width:650px){.public-site .public-nav.is-open{grid-template-columns:1fr}}
+@keyframes nav-link-enter{from{opacity:0;transform:translate3d(0,-6px,0)}to{opacity:1;transform:translate3d(0,0,0)}}
+.public-site .form-success{animation:form-success-enter .52s cubic-bezier(.2,.8,.25,1) both}
+.public-site .form-success:before{display:inline-block;animation:form-check-pop .45s cubic-bezier(.2,.8,.25,1) .12s both}
+.public-site .public-form .form-error{animation:form-error-enter .38s cubic-bezier(.22,.68,0,1) both}
+.public-site .public-form .primary-button:disabled span{animation:submit-pulse .8s ease-in-out infinite}
+@keyframes form-success-enter{from{opacity:0;transform:translate3d(0,14px,0) scale(.985)}to{opacity:1;transform:translate3d(0,0,0) scale(1)}}
+@keyframes form-check-pop{from{opacity:0;transform:scale(.35) rotate(-25deg)}75%{opacity:1;transform:scale(1.15) rotate(5deg)}to{opacity:1;transform:scale(1) rotate(0)}}
+@keyframes form-error-enter{from{opacity:0;transform:translate3d(8px,0,0)}to{opacity:1;transform:translate3d(0,0,0)}}
+@keyframes submit-pulse{50%{transform:translateX(3px)}}
+@media(prefers-reduced-motion:reduce){.public-site>main,.public-site .public-nav.is-open>a,.public-site .form-success,.public-site .form-success:before,.public-site .public-form .form-error,.public-site .public-form .primary-button:disabled span{animation:none!important}.public-site .menu-icon i,.public-site .public-nav,.public-site .form-success,.public-site .form-success:before,.public-site .public-form .form-error{transition:none!important;transform:none!important;opacity:1}}
+
 /* Stage 2: tactile homepage interaction motion */
 .public-site a,.public-site button{ -webkit-tap-highlight-color:transparent }
 .public-site a:focus-visible,.public-site button:focus-visible{outline:3px solid #a64c68;outline-offset:4px;border-radius:2px}
